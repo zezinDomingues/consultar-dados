@@ -17,5 +17,5 @@ export const PREFIXOS_PUBLICOS = ['/api/publico'] as const
 
 /** Páginas do site institucional (cópias estáticas em public/site/, servidas por rewrite). */
 export const PAGINAS_SITE = [
-  'quem-somos', 'segmentos', 'eventos', 'seja-um-parceiro', 'diagnostico', 'blog', 'politica-de-privacidade', 'termos-de-uso'
+  'quem-somos', 'segmentos', 'seja-um-parceiro', 'diagnostico', 'blog', 'politica-de-privacidade', 'termos-de-uso'
 ] as const

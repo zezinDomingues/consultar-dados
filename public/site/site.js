@@ -254,6 +254,57 @@
     if (secao && b.tagName === 'BUTTON' && trocarEstado(secao, b)) ev.preventDefault()
   })
 
+
+  // 6) Radar tributário do blog: notícias do dia (API própria, filtrada para não sair do tema)
+  var ENDPOINT_NOTICIAS = '/api/publico/noticias'
+  function radar() {
+    var raiz = document.querySelector('[data-radar]')
+    if (!raiz) return
+    var lista = raiz.querySelector('[data-radar-lista]')
+    var filtros = raiz.querySelector('[data-radar-filtros]')
+    var mais = raiz.querySelector('[data-radar-mais]')
+    var status = raiz.querySelector('[data-radar-status]')
+    var BASE = filtros.getAttribute('data-classe-botao')
+    var ATIVO = ' bg-[#0B3C34] text-white border border-[#0B3C34] shadow-md shadow-[#0B3C34]/10'
+    var INATIVO = ' bg-white/40 text-[#0B3C34]/70 border border-[#0B4B3F]/10 hover:border-[#0B4B3F]/30 hover:text-[#0B3C34]'
+    var PASSO = window.innerWidth < 768 ? 4 : 9
+    var dados = null, tema = 'Todas', mostrando = PASSO
+    var seta = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg>'
+    function esc(t) { var d = document.createElement('div'); d.textContent = t; return d.innerHTML }
+    function quando(iso) {
+      var min = Math.max(1, Math.round((Date.now() - new Date(iso)) / 60000))
+      if (min < 60) return 'há ' + min + ' min'
+      var h = Math.round(min / 60)
+      if (h < 24) return 'há ' + h + ' h'
+      return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })
+    }
+    function desenhar() {
+      var itens = dados.noticias.filter(function (n) { return tema === 'Todas' || n.tema === tema })
+      lista.innerHTML = itens.length ? itens.slice(0, mostrando).map(function (n) {
+        return '<a class="radar-card" href="' + esc(n.link) + '" target="_blank" rel="noopener noreferrer">' +
+          '<div class="radar-topo"><span>' + esc(n.tema) + '</span><i></i><time datetime="' + n.data + '">' + quando(n.data) + '</time></div>' +
+          '<h3 class="radar-titulo font-serif">' + esc(n.titulo) + '</h3>' +
+          '<div class="radar-fonte"><span>' + esc(n.fonte) + '</span>' + seta + '</div></a>'
+      }).join('') : '<div class="radar-vazio">Nenhuma notícia deste tema nas últimas 72 horas.</div>'
+      mais.hidden = itens.length <= mostrando
+      filtros.querySelectorAll('button').forEach(function (b) { b.className = BASE + (b.textContent === tema ? ATIVO : INATIVO) })
+    }
+    fetch(ENDPOINT_NOTICIAS).then(function (r) { return r.ok ? r.json() : Promise.reject(r.status) }).then(function (d) {
+      dados = d
+      filtros.innerHTML = ['Todas'].concat(d.temas).map(function (t) { return '<button type="button">' + esc(t) + '</button>' }).join('')
+      var hora = new Date(d.atualizadoEm).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+      status.textContent = 'Atualizado em ' + hora + ' · ' + d.noticias.length + ' notícias das últimas 72 h · os links abrem no veículo original'
+      desenhar()
+    }).catch(function () {
+      lista.innerHTML = '<div class="radar-vazio">Não foi possível carregar as notícias agora. Tente novamente em alguns minutos.</div>'
+    })
+    filtros.addEventListener('click', function (ev) {
+      var b = ev.target.closest('button'); if (!b || !dados) return
+      tema = b.textContent; mostrando = PASSO; desenhar()
+    })
+    mais.addEventListener('click', function () { mostrando += PASSO; desenhar() })
+  }
+
   document.addEventListener('submit', function (ev) {
     var form = ev.target
     var tipo = form.getAttribute('data-form')
@@ -267,6 +318,8 @@
     if (ev.key === 'Escape') fecharMenu()
   })
 
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', radar)
+  else radar()
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { animar() })
   else animar()
 })()

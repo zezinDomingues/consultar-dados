@@ -28,7 +28,7 @@ SUPABASE_SECRET_KEY=sb_secret_... npm run criar-usuario -- pessoa@empresa.com 's
 
 | Rota | O que faz |
 |---|---|
-| `/` e `/quem-somos`, `/segmentos`, `/eventos`, `/seja-um-parceiro`, `/diagnostico`, `/blog`, `/blog/<artigo>`, `/politica-de-privacidade`, `/termos-de-uso` | Site institucional da OficialCert (base: site da GWT Solution, ver abaixo) |
+| `/` e `/quem-somos`, `/segmentos`, `/seja-um-parceiro`, `/diagnostico`, `/blog`, `/blog/<artigo>`, `/politica-de-privacidade`, `/termos-de-uso` | Site institucional da OficialCert (base: site da GWT Solution, ver abaixo) |
 | `/login` | Entrar (aparece sempre, mesmo com sessão aberta). Depois do login vai para onde a pessoa tentou ir, ou `/dashboard` |
 | `/dashboard` | Consulta: filtros, indicadores, distribuições clicáveis, tabela paginada, ordenação, exportar CSV |
 | `/dashboard/empresa/[cnpj]` | Ficha completa da empresa |
@@ -102,7 +102,7 @@ Montado a partir do site da GWT Solution (15 páginas), da qual a OficialCert é
 Textos (04/11/2026, `scripts/clonar-site/trocar-textos.py`): saíram os números e afirmações que são da GWT
 (R$ 1 bi+, 200+ empresas, 100%, 8 unidades, prazos de 48 h, "risco zero"/"glosa zero") e a afiliação aparece
 no destaque, numa seção própria da home, em Quem Somos e no rodapé. O carrossel "Empresas que confiam na GWT",
-os artigos do blog, os eventos e a liderança em Quem Somos ficam creditados à GWT. Políticas de privacidade e termos falam em nome
+os artigos do blog e a liderança em Quem Somos ficam creditados à GWT. Políticas de privacidade e termos falam em nome
 da OficialCert (e-mail `contato@oficialcert.com`) — **revisar com o jurídico**.
 
 - Textos: edite os `.html` em `public/site/` (um por página). Visual: CSS original em `public/site/css/`.
@@ -111,4 +111,11 @@ da OficialCert (e-mail `contato@oficialcert.com`) — **revisar com o jurídico*
 - Formulários: abrem o WhatsApp ("Preenchi o formulário no site da OficialCert…") e gravam o contato na tabela
   `leads_site` do Supabase (rota pública `/api/publico/lead`, função `registrar_lead_site`, migração 002).
 - "Login" em todas as páginas leva para `/login` da plataforma.
+- Página Eventos removida em 04/11/2026 (`/eventos` redireciona para `/blog#noticias`).
+- **Radar tributário** (topo do `/blog`): notícias do dia vindas de `GET /api/publico/noticias`
+  (`src/lib/noticias/noticias.ts`). Fonte: Google Notícias (RSS público, sem chave), uma busca por tema
+  (reforma, PIS/COFINS, ICMS, Receita, tribunais, obrigações, patrimônio), últimas 72 h, até 8 por tema, sem
+  manchetes repetidas do mesmo fato. Três travas para não sair do tema: busca temática → título com termo
+  fiscal e sem termos proibidos → o Nemotron confere a lista (se a IA falhar, fica a segunda trava). Cache de
+  1 h na CDN da Vercel (`s-maxage=3600`), então as notícias se renovam sozinhas ao longo do dia.
 - Como a cópia foi feita (e como refazer): `scripts/clonar-site/LEIA-ME.md`.

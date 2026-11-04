@@ -11,3 +11,27 @@
     transform: none !important;
   }
 }
+
+/* Radar tributário (blog): notícias do dia vindas de /api/publico/noticias */
+.radar-grade { display: grid; gap: 1rem; grid-template-columns: 1fr; }
+@media (min-width: 768px) { .radar-grade { grid-template-columns: repeat(2, 1fr); gap: 1.25rem; } }
+@media (min-width: 1024px) { .radar-grade { grid-template-columns: repeat(3, 1fr); } }
+.radar-card {
+  display: flex; flex-direction: column; gap: .85rem; min-height: 190px; padding: 1.5rem;
+  border-radius: 1rem; background: rgba(255, 255, 255, .62); border: 1px solid rgba(11, 75, 63, .09);
+  color: #0B3C34; text-decoration: none; transition: border-color .3s, transform .3s, box-shadow .3s, background .3s;
+}
+a.radar-card:hover { background: #fff; border-color: rgba(11, 75, 63, .28); transform: translateY(-3px); box-shadow: 0 14px 30px -18px rgba(3, 26, 21, .35); }
+.radar-topo { display: flex; align-items: center; gap: .6rem; font-size: 10px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: #9A8556; }
+.radar-topo i { width: 4px; height: 4px; border-radius: 99px; background: rgba(11, 75, 63, .25); }
+.radar-topo time { letter-spacing: .04em; text-transform: none; font-weight: 600; color: rgba(11, 60, 52, .55); font-size: 11px; }
+.radar-titulo { font-size: 1.08rem; line-height: 1.38; font-weight: 700; letter-spacing: -.01em; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.radar-fonte { margin-top: auto; padding-top: .9rem; border-top: 1px solid rgba(11, 75, 63, .08); display: flex; align-items: center; justify-content: space-between; gap: .75rem; font-size: 12px; font-weight: 600; color: rgba(11, 60, 52, .7); }
+.radar-fonte span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.radar-fonte svg { flex-shrink: 0; transition: transform .3s; }
+a.radar-card:hover .radar-fonte svg { transform: translate(2px, -2px); }
+.radar-rodape { display: flex; flex-direction: column; align-items: center; gap: .9rem; margin-top: 1.75rem; text-align: center; }
+.radar-esqueleto { position: relative; overflow: hidden; background: rgba(11, 75, 63, .05); border-color: transparent; }
+.radar-esqueleto::after { content: ''; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .55), transparent); animation: radarBrilho 1.4s infinite; }
+@keyframes radarBrilho { to { transform: translateX(100%); } }
+.radar-vazio { grid-column: 1 / -1; padding: 2rem; text-align: center; font-size: 14px; color: rgba(11, 60, 52, .7); }
