@@ -2,10 +2,11 @@ import { redirect } from 'next/navigation'
 import { ShieldAlert } from 'lucide-react'
 import { MenuLateral } from '@/components/app/menu-lateral'
 import { usuarioAtual } from '@/lib/empresas/consulta'
+import { ROTAS } from '@/lib/rotas'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const usuario = await usuarioAtual()
-  if (!usuario) redirect('/login')
+  if (!usuario) redirect(ROTAS.login)
 
   return (
     <div className='flex min-h-screen'>

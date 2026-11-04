@@ -36,7 +36,7 @@ const EXEMPLOS = [
   ] }
 ]
 
-const CHAVE_SESSAO = 'agente:conversa:v2'
+const CHAVE_SESSAO = 'agente:conversa:v3' // v3: links passaram para /dashboard
 
 /** O que a tela já mostrou (mais recente por último). Vai para o servidor SEPARADO do
  *  histórico: dentro das mensagens do agente, o modelo passava a imitar a nota. */

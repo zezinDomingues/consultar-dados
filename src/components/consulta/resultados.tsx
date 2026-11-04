@@ -5,6 +5,7 @@ import { buscarEmpresas, resumoEmpresas } from '@/lib/empresas/consulta'
 import { hrefConsulta, type Consulta } from '@/lib/empresas/filtros'
 import { fmtInt } from '@/lib/formatar'
 import { cn } from '@/lib/utils'
+import { ROTAS } from '@/lib/rotas'
 
 export async function Resultados({ consulta }: { consulta: Consulta }) {
   const [empresas, resumo] = await Promise.all([
@@ -19,7 +20,7 @@ export async function Resultados({ consulta }: { consulta: Consulta }) {
         <SearchX className='mx-auto size-10 text-slate-300' />
         <p className='mt-3 font-medium'>Nenhuma empresa com esses filtros</p>
         <p className='mt-1 text-sm text-slate-500'>Tire algum filtro ou amplie a faixa de capital/idade.</p>
-        <LinkNav href='/' className='mt-4 inline-block text-sm font-medium text-marca-700 hover:underline'>
+        <LinkNav href={ROTAS.dashboard} className='mt-4 inline-block text-sm font-medium text-marca-700 hover:underline'>
           Limpar todos os filtros
         </LinkNav>
       </div>

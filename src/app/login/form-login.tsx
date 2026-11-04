@@ -9,7 +9,7 @@ export function FormLogin({ next }: { next?: string }) {
 
   return (
     <form action={acao} className='space-y-4'>
-      <input type='hidden' name='next' value={next ?? '/'} />
+      <input type='hidden' name='next' value={next ?? ''} />
       <label className='block space-y-1.5'>
         <span className='text-sm font-medium text-slate-700'>E-mail</span>
         <input

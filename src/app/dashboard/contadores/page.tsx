@@ -4,6 +4,8 @@ import { ChevronLeft, ChevronRight, Search } from 'lucide-react'
 import { listarContadores } from '@/lib/empresas/consulta'
 import { fmtInt } from '@/lib/formatar'
 import { cn } from '@/lib/utils'
+import { ROTAS } from '@/lib/rotas'
+import { hrefConsulta } from '@/lib/empresas/filtros'
 
 export const metadata: Metadata = { title: 'Contadores e grupos' }
 
@@ -15,7 +17,7 @@ export default async function ContadoresPage({ searchParams }: { searchParams: P
   const pagina = Math.max(1, parseInt(sp.pagina ?? '1', 10) || 1)
   const { itens, total } = await listarContadores(q, pagina, POR_PAGINA)
   const paginas = Math.max(1, Math.ceil(total / POR_PAGINA))
-  const href = (p: number) => `/contadores?${new URLSearchParams({ ...(q ? { q } : {}), ...(p > 1 ? { pagina: String(p) } : {}) })}`
+  const href = (p: number) => `${ROTAS.contadores}?${new URLSearchParams({ ...(q ? { q } : {}), ...(p > 1 ? { pagina: String(p) } : {}) })}`
 
   return (
     <div className='space-y-5 p-6'>
@@ -27,7 +29,7 @@ export default async function ContadoresPage({ searchParams }: { searchParams: P
             clientes) e grupos econômicos com várias empresas.
           </p>
         </div>
-        <form className='relative w-full max-w-sm' action='/contadores'>
+        <form className='relative w-full max-w-sm' action={ROTAS.contadores}>
           <Search className='absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400' />
           <input
             name='q'
@@ -68,7 +70,7 @@ export default async function ContadoresPage({ searchParams }: { searchParams: P
                   </td>
                   <td className='px-3 py-3 text-right'>
                     <Link
-                      href={`/?email=${encodeURIComponent(c.email)}`}
+                      href={hrefConsulta({ filtros: { email: c.email } })}
                       className='font-semibold tabular-nums text-marca-700 hover:underline'
                       title='Ver as empresas na consulta'
                     >

@@ -9,7 +9,7 @@ Stack igual aos outros projetos: Next.js 16 (App Router, `proxy.ts`), React 19, 
 
 ```bash
 npm install
-npm run dev            # http://localhost:3000
+npm run dev            # http://localhost:3000  (landing) · /dashboard (área logada)
 # produção: npm run build && npm start
 ```
 
@@ -28,11 +28,16 @@ SUPABASE_SECRET_KEY=sb_secret_... npm run criar-usuario -- pessoa@empresa.com 's
 
 | Rota | O que faz |
 |---|---|
-| `/` | Consulta: filtros (painel à esquerda), indicadores, distribuições clicáveis, tabela paginada, ordenação, exportar CSV |
-| `/empresa/[cnpj]` | Ficha completa: atividade e CNAEs secundários, tributação, porte, contato, endereço/mapa, outras empresas com o mesmo e-mail |
-| `/contadores` | E-mails presentes em 5+ empresas (escritórios contábeis e grupos), com link para os clientes |
-| `/agente` | Página reservada para o agente de IA (em breve) |
-| `/api/exportar` | CSV (até 20 mil linhas) com os mesmos filtros da tela; abre direto no Excel |
+| `/` | Landing page pública (provisória: apresenta o produto e leva ao login) |
+| `/login` | Entrar. Depois do login volta para onde a pessoa tentou ir, ou `/dashboard` |
+| `/dashboard` | Consulta: filtros, indicadores, distribuições clicáveis, tabela paginada, ordenação, exportar CSV |
+| `/dashboard/empresa/[cnpj]` | Ficha completa da empresa |
+| `/dashboard/contadores` | E-mails presentes em 5+ empresas (escritórios contábeis e grupos) |
+| `/dashboard/agente` | Agente de IA |
+| `/api/exportar`, `/api/empresas`, `/api/agente` | CSV, paginação do agente e o agente (exigem login; sem login: 401) |
+
+Rotas centralizadas em `src/lib/rotas.ts`; o `src/proxy.ts` protege `/dashboard` e `/api` e deixa o resto público
+(sem nem consultar o Supabase), então páginas novas da landing não precisam mexer no proxy.
 
 A URL guarda todos os filtros: dá para salvar, compartilhar e voltar no navegador.
 

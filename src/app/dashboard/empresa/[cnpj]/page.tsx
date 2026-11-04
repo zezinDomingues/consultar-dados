@@ -6,6 +6,8 @@ import { PORTE_CURTO, SeloPrioridade, SeloSituacao } from '@/components/consulta
 import { Copiar } from '@/components/ui/copiar'
 import { obterEmpresa } from '@/lib/empresas/consulta'
 import { fmtData, fmtInt, fmtMoeda } from '@/lib/formatar'
+import { ROTAS } from '@/lib/rotas'
+import { hrefConsulta } from '@/lib/empresas/filtros'
 
 type Props = { params: Promise<{ cnpj: string }> }
 
@@ -28,7 +30,7 @@ export default async function EmpresaPage({ params }: Props) {
 
   return (
     <div className='mx-auto max-w-6xl space-y-5 p-6'>
-      <Link href='/' className='inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-marca-700'>
+      <Link href={ROTAS.dashboard} className='inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-marca-700'>
         <ArrowLeft className='size-4' /> Voltar à consulta
       </Link>
 
@@ -72,7 +74,7 @@ export default async function EmpresaPage({ params }: Props) {
                 <ul className='grid gap-1 text-sm sm:grid-cols-2'>
                   {secundarias.map(s => (
                     <li key={s.cnae} className='flex gap-2'>
-                      <Link href={`/?cnae_secundario=${s.cnae}`} className='font-mono text-xs text-marca-700 hover:underline'>
+                      <Link href={hrefConsulta({ filtros: { cnae_secundario: s.cnae } })} className='font-mono text-xs text-marca-700 hover:underline'>
                         {s.cnae_fmt}
                       </Link>
                       <span className='text-slate-600'>{s.atividade}</span>
@@ -117,7 +119,7 @@ export default async function EmpresaPage({ params }: Props) {
               <ul className='divide-y divide-slate-100 text-sm'>
                 {mesmoEmail.map(o => (
                   <li key={o.cnpj} className='flex items-center justify-between gap-3 py-2'>
-                    <Link href={`/empresa/${o.cnpj}`} className='truncate text-slate-700 hover:text-marca-700'>
+                    <Link href={ROTAS.empresa(o.cnpj)} className='truncate text-slate-700 hover:text-marca-700'>
                       {o.razao_social}
                     </Link>
                     <span className='shrink-0 text-xs text-slate-400'>{o.municipio}</span>
@@ -125,7 +127,7 @@ export default async function EmpresaPage({ params }: Props) {
                 ))}
               </ul>
               <Link
-                href={`/?email=${encodeURIComponent(e.email!)}`}
+                href={hrefConsulta({ filtros: { email: e.email! } })}
                 className='mt-3 inline-block text-sm font-medium text-marca-700 hover:underline'
               >
                 Ver todas na consulta →

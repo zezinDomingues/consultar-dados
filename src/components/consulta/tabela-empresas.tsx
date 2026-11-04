@@ -4,6 +4,7 @@ import { PORTE_CURTO, SeloPrioridade, SeloSituacao } from './selos'
 import type { EmpresaLista } from '@/lib/empresas/tipos'
 import { fmtMoeda } from '@/lib/formatar'
 import { cn } from '@/lib/utils'
+import { ROTAS } from '@/lib/rotas'
 
 // Tabela de empresas da Consulta. Componente puro (sem busca de dados): a página
 // de Consulta (servidor) e o chat do agente (navegador) desenham a mesma tabela.
@@ -39,7 +40,7 @@ export function LinhaEmpresa({ e }: { e: EmpresaLista }) {
         <SeloPrioridade prioridade={e.prioridade} score={e.score} />
       </td>
       <td className='max-w-[260px] px-3 py-3'>
-        <Link href={`/empresa/${e.cnpj}`} className='line-clamp-2 font-medium text-slate-900 hover:text-marca-700'>
+        <Link href={ROTAS.empresa(e.cnpj)} className='line-clamp-2 font-medium text-slate-900 hover:text-marca-700'>
           {e.razao_social}
         </Link>
         {e.nome_fantasia && <p className='truncate text-xs text-slate-500'>{e.nome_fantasia}</p>}

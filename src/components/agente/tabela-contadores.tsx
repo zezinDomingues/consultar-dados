@@ -4,6 +4,8 @@ import Link from 'next/link'
 import type { AnexoContadores } from '@/lib/agente/tipos'
 import { fmtInt } from '@/lib/formatar'
 import { cn } from '@/lib/utils'
+import { ROTAS } from '@/lib/rotas'
+import { hrefConsulta } from '@/lib/empresas/filtros'
 
 export function TabelaContadores({ anexo }: { anexo: AnexoContadores }) {
   return (
@@ -12,7 +14,7 @@ export function TabelaContadores({ anexo }: { anexo: AnexoContadores }) {
         <span className='text-slate-600'>
           <strong className='text-slate-900'>{fmtInt(anexo.total)}</strong> e-mails presentes em 5+ empresas
         </span>
-        <Link href='/contadores' className='text-xs font-medium text-marca-700 hover:underline'>
+        <Link href={ROTAS.contadores} className='text-xs font-medium text-marca-700 hover:underline'>
           Ver todos →
         </Link>
       </header>
@@ -42,7 +44,7 @@ export function TabelaContadores({ anexo }: { anexo: AnexoContadores }) {
                   {c.telefone_mais_frequente && <span className='ml-2 text-xs text-slate-500'>{c.telefone_mais_frequente}</span>}
                 </td>
                 <td className='px-3 py-2.5 text-right'>
-                  <Link href={`/?email=${encodeURIComponent(c.email)}`} className='font-semibold tabular-nums text-marca-700 hover:underline' title='Ver as empresas'>
+                  <Link href={hrefConsulta({ filtros: { email: c.email } })} className='font-semibold tabular-nums text-marca-700 hover:underline' title='Ver as empresas'>
                     {fmtInt(c.empresas)}
                   </Link>
                 </td>

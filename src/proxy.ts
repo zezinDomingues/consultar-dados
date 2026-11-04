@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { PREFIXOS_PROTEGIDOS, ROTAS } from '@/lib/rotas'
 
 // Redirect que leva junto os cookies que o Supabase acabou de gravar (token
 // renovado). Um redirect "cru" descartaria o token novo e derrubaria a sessão.
@@ -9,9 +10,17 @@ function redirecionar(url: URL, origem: NextResponse) {
   return resposta
 }
 
-export async function proxy(request: NextRequest) {
-  let resposta = NextResponse.next({ request })
+const protegida = (pathname: string) =>
+  PREFIXOS_PROTEGIDOS.some(p => pathname === p || pathname.startsWith(`${p}/`))
 
+export async function proxy(request: NextRequest) {
+  const { pathname, search } = request.nextUrl
+  const ehLogin = pathname === ROTAS.login || pathname.startsWith(`${ROTAS.login}/`)
+
+  // Landing page e demais páginas públicas: nem consulta o Supabase.
+  if (!protegida(pathname) && !ehLogin) return NextResponse.next()
+
+  let resposta = NextResponse.next({ request })
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
@@ -31,20 +40,19 @@ export async function proxy(request: NextRequest) {
 
   const { data } = await supabase.auth.getClaims()
   const logado = !!data?.claims
-  const { pathname, search } = request.nextUrl
-  const publica = pathname.startsWith('/login')
 
-  if (!logado && !publica) {
+  if (!logado && protegida(pathname)) {
+    if (pathname.startsWith('/api/')) return NextResponse.json({ erro: 'Faça login.' }, { status: 401 })
     const url = request.nextUrl.clone()
-    url.pathname = '/login'
+    url.pathname = ROTAS.login
     url.search = ''
-    if (pathname !== '/') url.searchParams.set('next', pathname + search)
+    if (pathname !== ROTAS.dashboard || search) url.searchParams.set('next', pathname + search)
     return redirecionar(url, resposta)
   }
 
-  if (logado && publica) {
+  if (logado && ehLogin) {
     const url = request.nextUrl.clone()
-    url.pathname = '/'
+    url.pathname = ROTAS.dashboard
     url.search = ''
     return redirecionar(url, resposta)
   }

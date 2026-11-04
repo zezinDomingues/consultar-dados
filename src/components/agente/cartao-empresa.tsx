@@ -6,6 +6,7 @@ import { PORTE_CURTO, SeloPrioridade, SeloSituacao } from '@/components/consulta
 import { Copiar } from '@/components/ui/copiar'
 import type { Empresa } from '@/lib/empresas/tipos'
 import { fmtData, fmtInt, fmtMoeda } from '@/lib/formatar'
+import { ROTAS } from '@/lib/rotas'
 
 /** Ficha resumida de uma empresa dentro do chat. */
 export function CartaoEmpresa({ e }: { e: Empresa }) {
@@ -32,7 +33,7 @@ export function CartaoEmpresa({ e }: { e: Empresa }) {
           </div>
         </div>
         <Link
-          href={`/empresa/${e.cnpj}`}
+          href={ROTAS.empresa(e.cnpj)}
           className='inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-medium text-slate-700 hover:border-marca-300 hover:text-marca-800'
         >
           Ficha completa <ArrowRight className='size-3.5' />

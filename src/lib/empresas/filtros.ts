@@ -3,6 +3,7 @@
 // valida com ele e, no futuro, o agente de IA vai recebê-lo como a ferramenta
 // "buscar_empresas" (as descrições abaixo viram a documentação da ferramenta).
 import { z } from 'zod'
+import { ROTAS } from '@/lib/rotas'
 
 export const PORTES = ['Microempresa', 'Empresa de pequeno porte', 'Demais (médio/grande)'] as const
 export const REGIMES = ['Lucro Real', 'Lucro Presumido', 'Tributação mista'] as const
@@ -139,7 +140,7 @@ export function paraQuery(c: { filtros: Filtros; ordem?: Ordem; pagina?: number;
 
 export function hrefConsulta(c: { filtros: Filtros; ordem?: Ordem; pagina?: number; por?: number }) {
   const q = paraQuery(c)
-  return q ? `/?${q}` : '/'
+  return q ? `${ROTAS.dashboard}?${q}` : ROTAS.dashboard
 }
 
 export function contarFiltros(f: Filtros) {

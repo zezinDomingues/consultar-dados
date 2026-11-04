@@ -5,11 +5,12 @@ import { usePathname } from 'next/navigation'
 import { Building2, Database, LogOut, Search, Sparkles } from 'lucide-react'
 import { sair } from '@/app/login/actions'
 import { cn } from '@/lib/utils'
+import { ROTAS } from '@/lib/rotas'
 
 const ITENS = [
-  { href: '/', rotulo: 'Consultar empresas', icone: Search, ativo: (p: string) => p === '/' || p.startsWith('/empresa') },
-  { href: '/contadores', rotulo: 'Contadores e grupos', icone: Building2, ativo: (p: string) => p.startsWith('/contadores') },
-  { href: '/agente', rotulo: 'Agente de IA', icone: Sparkles, ativo: (p: string) => p.startsWith('/agente'), selo: 'novo' }
+  { href: ROTAS.dashboard, rotulo: 'Consultar empresas', icone: Search, ativo: (p: string) => p === ROTAS.dashboard || p.startsWith(`${ROTAS.dashboard}/empresa`) },
+  { href: ROTAS.contadores, rotulo: 'Contadores e grupos', icone: Building2, ativo: (p: string) => p.startsWith(ROTAS.contadores) },
+  { href: ROTAS.agente, rotulo: 'Agente de IA', icone: Sparkles, ativo: (p: string) => p.startsWith(ROTAS.agente), selo: 'novo' }
 ]
 
 export function MenuLateral({ email }: { email: string }) {
