@@ -59,12 +59,25 @@ src/app/(app)/                                 páginas logadas
 Tempos medidos: filtros comuns ~25 ms; resumo 0,4–2 s (fica 15 min em cache no servidor); busca por texto ~1,4 s
 (varredura completa — um índice de trigramas resolveria, mas custa ~60 MB do limite de 500 MB do plano grátis).
 
-## Próximo passo: o agente de IA
+## Agente de IA (`/agente`)
 
-A busca já foi feita para virar ferramenta:
+Conversa em português que consulta a base com as **mesmas funções da tela** e responde dúvidas gerais de
+tributação (como orientação, não consultoria).
 
-1. `FiltrosSchema` (em `filtros.ts`) tem descrição em cada campo → `z.toJSONSchema(FiltrosSchema)` vira o
-   `input_schema` da ferramenta `buscar_empresas`.
-2. A ferramenta chama `buscarEmpresas(...)` / `resumoEmpresas(...)` de `consulta.ts`, com a sessão do usuário
-   (mesmas permissões da tela).
-3. Falta: rota `/api/agente` com o modelo + a tela de conversa em `/agente`.
+- Código: `src/lib/agente/` — `ferramentas.ts` (buscar_codigos, buscar_empresas, resumo_empresas,
+  detalhar_empresa, listar_contadores), `provedores.ts` (Nemotron e Gemini pela API compatível com OpenAI),
+  `agente.ts` (prompt + laço de ferramentas). Rota: `src/app/api/agente/route.ts`.
+- O agente roda com a sessão do usuário: o RLS vale para ele igual vale para a tela.
+- Números e empresas sempre vêm das ferramentas. A tabela de empresas é desenhada pela tela; o modelo só recebe
+  nome/CNPJ (sem contatos) e usa `detalhar_empresa` quando pedem o contato de uma empresa.
+
+Variáveis (servidor, **nunca** `NEXT_PUBLIC_`):
+
+| Variável | Para quê |
+|---|---|
+| `NVIDIA_API_KEY` | Nemotron pelo NVIDIA NIM (padrão). Chave gratuita em https://build.nvidia.com |
+| `GEMINI_API_KEY` | Gemini, reserva quando a fila gratuita da NVIDIA recusa. https://aistudio.google.com/apikey |
+| `AGENTE_PROVEDORES` | Ordem de tentativa, padrão `nvidia,gemini` |
+| `NVIDIA_MODEL`, `GEMINI_MODELOS` | Trocar modelo sem mexer no código |
+
+Medido em 04/11/2026 (Nemotron 3.5 Super, raciocínio desligado): 2–8 s por resposta com consulta à base.
