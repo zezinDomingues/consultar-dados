@@ -1,6 +1,6 @@
 /* Comportamento do site institucional (cópia do gwtsolution.com.br).
  * Substitui o JavaScript do React do original, reproduzindo o mesmo comportamento:
- * animações de entrada, menu do celular, abas/filtros, "Ver mais clientes",
+ * animações de entrada, menu do celular, abas/filtros,
  * formulários (WhatsApp + registro do contato) e compartilhar artigo. */
 (function () {
   'use strict'
@@ -9,8 +9,8 @@
   // ⚠️ Número copiado do site da GWT. Enquanto não trocar, os contatos do
   //    formulário abrem conversa no WhatsApp DELES.
   var WHATSAPP = '5515991529008'
-  // Mensagem montada igual à do original (mesmo texto e mesma ordem).
-  var MENSAGEM_ABERTURA = 'Olá! Preenchi o formulário no site da GWT e gostaria de falar com um especialista.'
+  // Mensagem de abertura da conversa (mesma ordem de campos do original).
+  var MENSAGEM_ABERTURA = 'Olá! Preenchi o formulário no site da OficialCert e gostaria de falar com um especialista.'
   var ENDPOINT_LEAD = '/api/publico/lead'
   // ==========================================================================
 

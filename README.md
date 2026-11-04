@@ -28,7 +28,7 @@ SUPABASE_SECRET_KEY=sb_secret_... npm run criar-usuario -- pessoa@empresa.com 's
 
 | Rota | O que faz |
 |---|---|
-| `/` e `/quem-somos`, `/segmentos`, `/eventos`, `/seja-um-parceiro`, `/diagnostico`, `/blog`, `/blog/<artigo>`, `/politica-de-privacidade`, `/termos-de-uso` | Site institucional (cópia do gwtsolution.com.br, ver abaixo) |
+| `/` e `/quem-somos`, `/segmentos`, `/eventos`, `/seja-um-parceiro`, `/diagnostico`, `/blog`, `/blog/<artigo>`, `/politica-de-privacidade`, `/termos-de-uso` | Site institucional da OficialCert (base: site da GWT Solution, ver abaixo) |
 | `/login` | Entrar (aparece sempre, mesmo com sessão aberta). Depois do login vai para onde a pessoa tentou ir, ou `/dashboard` |
 | `/dashboard` | Consulta: filtros, indicadores, distribuições clicáveis, tabela paginada, ordenação, exportar CSV |
 | `/dashboard/empresa/[cnpj]` | Ficha completa da empresa |
@@ -95,14 +95,20 @@ Modelo padrão: **Nemotron 3 Ultra** (`nvidia/nemotron-3-ultra-550b-a55b`), rese
 
 ## Site institucional (`public/site/`)
 
-Cópia fiel do site gwtsolution.com.br (15 páginas), servida por *rewrites* em `next.config.ts` — a URL fica
-limpa (`/`, `/quem-somos`, `/blog/<artigo>`…). Sem a logo e sem o emblema 3D: os espaços estão vazios e
-marcados com `data-logo-slot` e um comentário `<!-- LOGO: … -->` / `<!-- EMBLEMA: … -->` em cada página.
+Montado a partir do site da GWT Solution (15 páginas), da qual a OficialCert é **afiliada**, e servido por
+*rewrites* em `next.config.ts` — a URL fica limpa (`/`, `/quem-somos`, `/blog/<artigo>`…). Marca OficialCert
+(Selo Oficial) em `public/site/marca/`.
+
+Textos (04/11/2026, `scripts/clonar-site/trocar-textos.py`): saíram os números e afirmações que são da GWT
+(R$ 1 bi+, 200+ empresas, 100%, 8 unidades, prazos de 48 h, "risco zero"/"glosa zero") e a afiliação aparece
+no destaque, numa seção própria da home, em Quem Somos e no rodapé. O carrossel "Empresas que confiam na GWT",
+os artigos do blog, os eventos e a liderança em Quem Somos ficam creditados à GWT. Políticas de privacidade e termos falam em nome
+da OficialCert (e-mail `contato@oficialcert.com`) — **revisar com o jurídico**.
 
 - Textos: edite os `.html` em `public/site/` (um por página). Visual: CSS original em `public/site/css/`.
 - Comportamento (animações, menu do celular, abas, filtros, formulários): `public/site/site.js`.
-  **O número de WhatsApp está no topo desse arquivo** (`WHATSAPP`) — ainda é o da GWT.
-- Formulários: abrem o WhatsApp com a mesma mensagem do original e gravam o contato na tabela
+  **O número de WhatsApp está no topo desse arquivo** (`WHATSAPP`) — ainda é o da GWT (trocar pelo da OficialCert).
+- Formulários: abrem o WhatsApp ("Preenchi o formulário no site da OficialCert…") e gravam o contato na tabela
   `leads_site` do Supabase (rota pública `/api/publico/lead`, função `registrar_lead_site`, migração 002).
 - "Login" em todas as páginas leva para `/login` da plataforma.
 - Como a cópia foi feita (e como refazer): `scripts/clonar-site/LEIA-ME.md`.
