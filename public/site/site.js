@@ -173,6 +173,64 @@
     if (navigator.clipboard) navigator.clipboard.writeText(location.href).then(function () { alert('Link copiado!') })
   }
 
+  // 6) Selo 3D do destaque — mesma rotina do brasão 3D do original:
+  //    inclina até 8° seguindo o mouse (9° no toque), balança sozinho e inclina ao rolar.
+  var giro = { alvoX: 0, alvoY: 0, x: 0, y: 0, rolagemAlvo: 0, rolagem: 0 }
+  function emblemaRef() { return document.querySelector('[data-emblema-giro]') }
+  window.addEventListener('mousemove', function (e) {
+    var el = emblemaRef()
+    if (!el) return
+    var r = el.getBoundingClientRect()
+    var sx = ((e.clientX - r.left) / r.width) * 2 - 1
+    var sy = ((e.clientY - r.top) / r.height) * 2 - 1
+    var perto = e.clientX >= r.left - 450 && e.clientX <= r.right + 450 && e.clientY >= r.top - 450 && e.clientY <= r.bottom + 450
+    giro.alvoX = perto ? -(8 * sy) : 0
+    giro.alvoY = perto ? 8 * sx : 0
+  }, { passive: true })
+  window.addEventListener('touchmove', function (e) {
+    var el = emblemaRef()
+    if (!el || !e.touches[0]) return
+    var r = el.getBoundingClientRect(), t = e.touches[0]
+    var sx = Math.max(-1, Math.min(1, ((t.clientX - r.left) / r.width) * 2 - 1))
+    var sy = Math.max(-1, Math.min(1, ((t.clientY - r.top) / r.height) * 2 - 1))
+    giro.alvoX = -(9 * sy)
+    giro.alvoY = 9 * sx
+  }, { passive: true })
+  window.addEventListener('touchend', function () { giro.alvoX = 0; giro.alvoY = 0 }, { passive: true })
+  window.addEventListener('scroll', function () {
+    var y = window.scrollY || document.documentElement.scrollTop
+    if (y <= 800) giro.rolagemAlvo = (y / 800) * 16
+  }, { passive: true })
+  function quadro() {
+    var agora = performance.now()
+    var ondaY = 4 * Math.sin(0.0014 * agora)
+    var ondaX = 2.5 * Math.cos(0.0011 * agora)
+    giro.rolagem += (giro.rolagemAlvo - giro.rolagem) * 0.08
+    giro.x += (giro.alvoX - giro.x) * 0.08
+    giro.y += (giro.alvoY - giro.y) * 0.08
+    var rx = 10 + giro.x + ondaX + 0.6 * giro.rolagem
+    var ry = -16 + giro.y + ondaY - 0.4 * giro.rolagem
+    document.querySelectorAll('[data-emblema-giro]').forEach(function (el) {
+      el.style.transform = 'perspective(1200px) rotateX(' + rx.toFixed(2) + 'deg) rotateY(' + ry.toFixed(2) + 'deg) rotateZ(2.5deg)'
+    })
+    document.querySelectorAll('[data-emblema-topo]').forEach(function (el) { el.style.transform = 'translateZ(28px)' })
+    requestAnimationFrame(quadro)
+  }
+  if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) requestAnimationFrame(quadro)
+
+  // 7) Cabeçalho: igual ao original, ganha fundo escuro quando a página rola mais de 60px
+  //    (sem isso, nas seções de fundo claro a logo e o menu somem).
+  var CLS_ROLADO = ['bg-[#031A15]/95', 'backdrop-blur-xl', 'border-b', 'border-white/5', 'shadow-sm']
+  function cabecalho() {
+    var h = document.querySelector('header.fixed')
+    if (!h) return
+    var rolado = window.scrollY > 60
+    CLS_ROLADO.forEach(function (c) { h.classList.toggle(c, rolado) })
+    h.classList.toggle('bg-transparent', !rolado)
+  }
+  window.addEventListener('scroll', cabecalho, { passive: true })
+  cabecalho()
+
   // Delegação de eventos (funciona também nos trechos trocados pelas abas)
   document.addEventListener('click', function (ev) {
     var b = ev.target.closest('button, a')
