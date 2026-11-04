@@ -1,6 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
-import { PREFIXOS_PROTEGIDOS, ROTAS } from '@/lib/rotas'
+import { PREFIXOS_PROTEGIDOS, PREFIXOS_PUBLICOS, ROTAS } from '@/lib/rotas'
 
 // Redirect que leva junto os cookies que o Supabase acabou de gravar (token
 // renovado). Um redirect "cru" descartaria o token novo e derrubaria a sessão.
@@ -10,8 +10,9 @@ function redirecionar(url: URL, origem: NextResponse) {
   return resposta
 }
 
+const comeca = (pathname: string, p: string) => pathname === p || pathname.startsWith(`${p}/`)
 const protegida = (pathname: string) =>
-  PREFIXOS_PROTEGIDOS.some(p => pathname === p || pathname.startsWith(`${p}/`))
+  PREFIXOS_PROTEGIDOS.some(p => comeca(pathname, p)) && !PREFIXOS_PUBLICOS.some(p => comeca(pathname, p))
 
 export async function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl

@@ -28,7 +28,7 @@ SUPABASE_SECRET_KEY=sb_secret_... npm run criar-usuario -- pessoa@empresa.com 's
 
 | Rota | O que faz |
 |---|---|
-| `/` | Landing page pública (provisória: apresenta o produto e leva ao login) |
+| `/` e `/quem-somos`, `/segmentos`, `/eventos`, `/seja-um-parceiro`, `/diagnostico`, `/blog`, `/blog/<artigo>`, `/politica-de-privacidade`, `/termos-de-uso` | Site institucional (cópia do gwtsolution.com.br, ver abaixo) |
 | `/login` | Entrar (aparece sempre, mesmo com sessão aberta). Depois do login vai para onde a pessoa tentou ir, ou `/dashboard` |
 | `/dashboard` | Consulta: filtros, indicadores, distribuições clicáveis, tabela paginada, ordenação, exportar CSV |
 | `/dashboard/empresa/[cnpj]` | Ficha completa da empresa |
@@ -92,3 +92,17 @@ Variáveis (servidor, **nunca** `NEXT_PUBLIC_`):
 | `NVIDIA_MODEL`, `GEMINI_MODELOS` | Trocar modelos (lista separada por vírgula, em ordem) sem mexer no código |
 
 Modelo padrão: **Nemotron 3 Ultra** (`nvidia/nemotron-3-ultra-550b-a55b`), reserva Nemotron 3.5 Super e depois Gemini. Comparação de 04/11/2026 em `src/lib/agente/provedores.ts`; resposta completa com consulta leva 7–12 s.
+
+## Site institucional (`public/site/`)
+
+Cópia fiel do site gwtsolution.com.br (15 páginas), servida por *rewrites* em `next.config.ts` — a URL fica
+limpa (`/`, `/quem-somos`, `/blog/<artigo>`…). Sem a logo e sem o emblema 3D: os espaços estão vazios e
+marcados com `data-logo-slot` e um comentário `<!-- LOGO: … -->` / `<!-- EMBLEMA: … -->` em cada página.
+
+- Textos: edite os `.html` em `public/site/` (um por página). Visual: CSS original em `public/site/css/`.
+- Comportamento (animações, menu do celular, abas, filtros, formulários): `public/site/site.js`.
+  **O número de WhatsApp está no topo desse arquivo** (`WHATSAPP`) — ainda é o da GWT.
+- Formulários: abrem o WhatsApp com a mesma mensagem do original e gravam o contato na tabela
+  `leads_site` do Supabase (rota pública `/api/publico/lead`, função `registrar_lead_site`, migração 002).
+- "Login" em todas as páginas leva para `/login` da plataforma.
+- Como a cópia foi feita (e como refazer): `scripts/clonar-site/LEIA-ME.md`.

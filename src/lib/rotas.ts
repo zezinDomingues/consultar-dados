@@ -11,3 +11,11 @@ export const ROTAS = {
 
 /** Prefixos que exigem usuário logado (o proxy barra o resto). */
 export const PREFIXOS_PROTEGIDOS = ['/dashboard', '/api'] as const
+
+/** Exceções públicas dentro dos protegidos (ex.: formulários do site institucional). */
+export const PREFIXOS_PUBLICOS = ['/api/publico'] as const
+
+/** Páginas do site institucional (cópias estáticas em public/site/, servidas por rewrite). */
+export const PAGINAS_SITE = [
+  'quem-somos', 'segmentos', 'eventos', 'seja-um-parceiro', 'diagnostico', 'blog', 'politica-de-privacidade', 'termos-de-uso'
+] as const

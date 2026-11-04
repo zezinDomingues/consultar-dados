@@ -1,0 +1,13 @@
+/* Ajustes da cópia do site. O visual vem inteiro dos CSS originais em /site/css/. */
+
+/* Espaços reservados para a logo e o emblema da sua marca (vazios por enquanto). */
+[data-logo-slot] {
+  min-width: 1px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gwt-anim {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
