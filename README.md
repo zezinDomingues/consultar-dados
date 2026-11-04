@@ -78,6 +78,6 @@ Variáveis (servidor, **nunca** `NEXT_PUBLIC_`):
 | `NVIDIA_API_KEY` | Nemotron pelo NVIDIA NIM (padrão). Chave gratuita em https://build.nvidia.com |
 | `GEMINI_API_KEY` | Gemini, reserva quando a fila gratuita da NVIDIA recusa. https://aistudio.google.com/apikey |
 | `AGENTE_PROVEDORES` | Ordem de tentativa, padrão `nvidia,gemini` |
-| `NVIDIA_MODEL`, `GEMINI_MODELOS` | Trocar modelo sem mexer no código |
+| `NVIDIA_MODEL`, `GEMINI_MODELOS` | Trocar modelos (lista separada por vírgula, em ordem) sem mexer no código |
 
-Medido em 04/11/2026 (Nemotron 3.5 Super, raciocínio desligado): 2–8 s por resposta com consulta à base.
+Modelo padrão: **Nemotron 3 Ultra** (`nvidia/nemotron-3-ultra-550b-a55b`), reserva Nemotron 3.5 Super e depois Gemini. Comparação de 04/11/2026 em `src/lib/agente/provedores.ts`; resposta completa com consulta leva 7–12 s.

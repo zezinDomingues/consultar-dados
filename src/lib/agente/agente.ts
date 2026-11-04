@@ -5,7 +5,7 @@ import { novaSessao, type Mensagem } from './provedores'
 const MAX_ITERACOES = 6
 const MAX_HISTORICO = 20
 
-function sistema() {
+export function sistema() {
   const hoje = new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })
   return `Você é o assistente da plataforma "Consultar Dados". Hoje é ${hoje}.
 

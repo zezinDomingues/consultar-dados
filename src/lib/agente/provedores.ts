@@ -35,7 +35,15 @@ function provedores(): Provedor[] {
       rotulo: 'Nemotron (NVIDIA)',
       base: process.env.NVIDIA_BASE_URL || 'https://integrate.api.nvidia.com/v1',
       chave: process.env.NVIDIA_API_KEY,
-      modelos: [process.env.NVIDIA_MODEL || 'nvidia/nemotron-3.5-super-vl-120b-a12b'],
+      // Medido em 04/11/2026 com as ferramentas e o prompt reais (4 perguntas, cota gratuita):
+      //   nemotron-3-ultra-550b-a55b   7/8 acertos, ~2 s por decisão  ← padrão
+      //   nemotron-3.5-super-vl-120b   5/8 (chamou buscar_codigos sem argumento), ~1,6 s
+      //   nemotron-3.5-lightning-30b   5/8, ~0,9 s · mistral-large-4 7/8 mas ~9,5 s
+      //   kimi-k2.6, llama-nemotron-ultra-253b: 404 na conta · gpt-oss, glm, gemma-4, deepseek: timeout de 60 s
+      modelos: (process.env.NVIDIA_MODEL || 'nvidia/nemotron-3-ultra-550b-a55b,nvidia/nemotron-3.5-super-vl-120b-a12b')
+        .split(',')
+        .map(s => s.trim())
+        .filter(Boolean),
       extra: { chat_template_kwargs: { enable_thinking: false } }
     },
     {
