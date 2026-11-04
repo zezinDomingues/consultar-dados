@@ -1,55 +1,21 @@
 import { X } from 'lucide-react'
 import { LinkNav } from './contexto'
-import { hrefConsulta, type ChaveFiltro, type Consulta, type Filtros } from '@/lib/empresas/filtros'
-import type { Opcao, Opcoes } from '@/lib/empresas/tipos'
-import { fmtCnae, fmtMoeda } from '@/lib/formatar'
-
-type Chip = { rotulo: string; sem: Filtros }
+import { hrefConsulta, type Consulta, type Filtros } from '@/lib/empresas/filtros'
+import { rotulosFiltros } from '@/lib/empresas/rotulos'
+import type { Opcoes } from '@/lib/empresas/tipos'
 
 /** Mostra cada filtro aplicado como um chip removível. */
 export function FiltrosAtivos({ consulta, opcoes }: { consulta: Consulta; opcoes: Opcoes }) {
   const f = consulta.filtros
-  const chips: Chip[] = []
-  const nomes = (lista: Opcao[]) => new Map(lista.map(o => [o.chave, o.nome]))
-  const mapas: Partial<Record<ChaveFiltro, Map<string, string>>> = {
-    setores: nomes(opcoes.setores),
-    ramos: nomes(opcoes.ramos),
-    segmentos: nomes(opcoes.segmentos),
-    cnaes: new Map(opcoes.atividades.map(o => [o.chave, `${o.cod} ${o.nome}`]))
-  }
-  const prefixo: Partial<Record<ChaveFiltro, string>> = { prioridades: 'Prioridade ', situacoes_regime: '' }
-
-  const semValor = (k: ChaveFiltro, v?: string): Filtros => {
-    const atual = f[k]
-    if (Array.isArray(atual) && v !== undefined) {
-      const resto = atual.filter(x => x !== v)
-      return { ...f, [k]: resto.length ? resto : undefined } as Filtros
-    }
-    return { ...f, [k]: undefined } as Filtros
-  }
-
-  for (const [k, v] of Object.entries(f) as [ChaveFiltro, unknown][]) {
-    if (Array.isArray(v)) {
-      for (const item of v as string[]) {
-        chips.push({ rotulo: `${prefixo[k] ?? ''}${mapas[k]?.get(item) ?? item}`, sem: semValor(k, item) })
-      }
-      continue
-    }
-    const r: Partial<Record<ChaveFiltro, string>> = {
-      q: `“${v}”`,
-      cnae_secundario: `Também faz ${fmtCnae(String(v))}`,
-      capital_min: `Capital ≥ ${fmtMoeda(v as number, true)}`,
-      capital_max: `Capital ≤ ${fmtMoeda(v as number, true)}`,
-      idade_min: `≥ ${v} anos`,
-      idade_max: `≤ ${v} anos`,
-      estab_min: `≥ ${v} estabelecimentos`,
-      com_whatsapp: 'Com WhatsApp',
-      com_email: 'Com e-mail',
-      contato_proprio: 'Contato próprio',
-      email: `E-mail: ${v}`
-    }
-    chips.push({ rotulo: r[k] ?? `${k}: ${v}`, sem: semValor(k) })
-  }
+  const chips = rotulosFiltros(f, opcoes).map(r => {
+    const atual = f[r.chave]
+    let sem: Filtros
+    if (Array.isArray(atual) && r.valor !== undefined) {
+      const resto = (atual as string[]).filter(x => x !== r.valor)
+      sem = { ...f, [r.chave]: resto.length ? resto : undefined } as Filtros
+    } else sem = { ...f, [r.chave]: undefined } as Filtros
+    return { rotulo: r.rotulo, sem }
+  })
 
   if (!chips.length) return null
 

@@ -1,11 +1,19 @@
 // Ferramentas do agente. Cada uma chama a MESMA camada de consulta da tela
 // (src/lib/empresas/consulta.ts), com a sessão do usuário logado — o agente
 // enxerga exatamente o que o usuário enxergaria na Consulta.
+//
+// Divisão de trabalho: a ferramenta devolve DOIS resultados.
+//   • um "anexo" para a TELA (indicadores, distribuições, tabela, ficha) — é o
+//     que o usuário vê, idêntico à Consulta;
+//   • um resumo curto para o MODELO, que só escreve a legenda. Os contatos não
+//     vão para o modelo: assim ele não repete a tabela em texto.
 import 'server-only'
 import { z } from 'zod'
 import { buscarEmpresas, listarContadores, obterEmpresa, opcoesFiltros, resumoEmpresas } from '@/lib/empresas/consulta'
 import { FiltrosSchema, hrefConsulta, ORDENS, type Filtros, type Ordem } from '@/lib/empresas/filtros'
-import type { Opcao } from '@/lib/empresas/tipos'
+import { rotulosFiltros } from '@/lib/empresas/rotulos'
+import type { Opcao, Resumo } from '@/lib/empresas/tipos'
+import type { Anexo, AnexoConsulta, EventoAgente, Sugestao } from './tipos'
 
 // ---------------------------------------------------------------- esquemas
 /** JSON Schema "enxuto": só type/description/enum/items/properties.
@@ -26,7 +34,9 @@ function enxugar(no: unknown): unknown {
 
 const ESQUEMA_FILTROS = {
   ...(enxugar(z.toJSONSchema(FiltrosSchema)) as Record<string, unknown>),
-  description: 'Filtros da busca. Omita o que não for pedido. Listas aceitam vários valores (OU entre eles).'
+  description:
+    'Filtros da busca. Omita o que não foi pedido. Dentro de uma lista é OU; entre filtros diferentes é E. ' +
+    'Em refinamentos ("dessas…", "agora só…"), repita os filtros da busca anterior e mude só o pedido.'
 }
 
 const ORDENS_LISTA = Object.keys(ORDENS) as Ordem[]
@@ -37,9 +47,9 @@ export const FERRAMENTAS = [
     function: {
       name: 'buscar_codigos',
       description:
-        'Traduz palavras do usuário para os códigos usados nos filtros: atividades (CNAE 7 dígitos), segmentos ' +
-        '(grupo CNAE), ramos (divisão CNAE), setores (letra), municípios e regiões. Use SEMPRE que precisar filtrar ' +
-        'por atividade/ramo/segmento ou confirmar o nome exato de um município.',
+        'Traduz palavras do usuário para os códigos dos filtros: atividades (CNAE 7 dígitos), segmentos (grupo), ' +
+        'ramos (divisão), setores (letra), municípios e regiões. Use quando o termo não estiver nos atalhos do ' +
+        'prompt ou para confirmar a grafia de um município.',
       parameters: {
         type: 'object',
         properties: {
@@ -57,16 +67,20 @@ export const FERRAMENTAS = [
   {
     type: 'function',
     function: {
-      name: 'buscar_empresas',
+      name: 'consultar_empresas',
       description:
-        'Lista empresas que atendem aos filtros, com total encontrado e link para abrir a lista completa na tela de ' +
-        'Consulta. Use para "quais/liste/traga/me mostre empresas".',
+        'Consulta a base com os filtros e MOSTRA AO USUÁRIO o painel completo: total, indicadores, distribuições ' +
+        '(setor, ramo, município, porte) e a tabela das empresas com contatos. Serve tanto para "quantas" quanto ' +
+        'para "quais/liste/me traga". Devolve a você só os números principais e as primeiras empresas (nome e CNPJ).',
       parameters: {
         type: 'object',
         properties: {
           filtros: ESQUEMA_FILTROS,
-          ordem: { type: 'string', enum: ORDENS_LISTA, description: 'score (padrão, melhores para prospectar), capital, antigas, novas, nome' },
-          limite: { type: 'integer', description: 'Quantas empresas trazer (1 a 20, padrão 10)' }
+          ordem: {
+            type: 'string',
+            enum: ORDENS_LISTA,
+            description: 'score (padrão: melhores para prospectar), capital (maiores), antigas, novas, nome'
+          }
         },
         required: ['filtros']
       }
@@ -75,19 +89,12 @@ export const FERRAMENTAS = [
   {
     type: 'function',
     function: {
-      name: 'resumo_empresas',
-      description:
-        'Conta as empresas que atendem aos filtros e mostra como se distribuem (setor, ramo, porte, regime, região, ' +
-        'município, prioridade). Use para "quantas", "qual a distribuição", "onde estão", comparações.',
-      parameters: { type: 'object', properties: { filtros: ESQUEMA_FILTROS }, required: ['filtros'] }
-    }
-  },
-  {
-    type: 'function',
-    function: {
       name: 'detalhar_empresa',
-      description: 'Ficha completa de uma empresa pelo CNPJ (14 dígitos, com ou sem pontuação): WhatsApp, telefones, e-mail (e se é do contador), endereço, atividades secundárias, regime, porte, capital. Use sempre que pedirem contato ou detalhes de uma empresa específica.',
-      parameters: { type: 'object', properties: { cnpj: { type: 'string' } }, required: ['cnpj'] }
+      description:
+        'Abre a ficha de UMA empresa pelo CNPJ e MOSTRA AO USUÁRIO um cartão com WhatsApp, telefones, e-mail (e se é ' +
+        'do contador), endereço, atividade, porte, capital e regime. Use sempre que pedirem contato ou detalhes de ' +
+        'uma empresa (inclusive "a segunda da lista": o CNPJ está no histórico).',
+      parameters: { type: 'object', properties: { cnpj: { type: 'string', description: '14 dígitos, com ou sem pontuação' } }, required: ['cnpj'] }
     }
   },
   {
@@ -95,8 +102,8 @@ export const FERRAMENTAS = [
     function: {
       name: 'listar_contadores',
       description:
-        'E-mails que aparecem no cadastro de 5+ empresas (escritórios contábeis e grupos), ordenados por nº de ' +
-        'empresas. Para ver os clientes de um deles, use buscar_empresas com filtros.email.',
+        'Mostra ao usuário a tabela de e-mails presentes no cadastro de 5+ empresas (escritórios contábeis e grupos), ' +
+        'com quantas empresas cada um atende. Para ver os clientes de um deles, use consultar_empresas com filtros.email.',
       parameters: {
         type: 'object',
         properties: {
@@ -108,43 +115,16 @@ export const FERRAMENTAS = [
   }
 ] as const
 
-// ---------------------------------------------------------------- resultados para a tela
-export type EmpresaResumida = {
-  cnpj: string
-  razao_social: string
-  nome_fantasia: string | null
-  municipio: string | null
-  ramo: string | null
-  porte: string | null
-  capital_social: number | null
-  regime: string | null
-  situacao_regime: string | null
-  prioridade: string
-  score: number
-  whatsapp: string | null
-  whatsapp_link: string | null
-  email: string | null
-  email_tipo: string | null
-}
+// ---------------------------------------------------------------- apoio
+export type Contexto = { anexos: Anexo[]; emitir: (e: EventoAgente) => void }
 
-/** O que a tela desenha além do texto: tabelas das buscas feitas no turno. */
-export type Anexo = { tipo: 'empresas'; total: number; href: string; filtros: Filtros; empresas: EmpresaResumida[] }
-
-// ---------------------------------------------------------------- execução
 const normalizar = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
-
-const ArgsBusca = z.object({
-  filtros: FiltrosSchema.default({}),
-  ordem: z.enum(ORDENS_LISTA as [Ordem, ...Ordem[]]).optional().catch(undefined),
-  limite: z.coerce.number().int().min(1).max(20).optional().catch(undefined)
-})
-
 const PARADAS = new Set(['de', 'da', 'do', 'das', 'dos', 'e', 'com', 'para', 'em', 'a', 'o', 'as', 'os', 'por', 'sem'])
 // "farmácia" precisa achar "farmacêuticos": cada palavra vale pelo radical (sem as 2–3 últimas letras).
 const radical = (p: string) => (p.length >= 7 ? p.slice(0, -3) : p.length >= 5 ? p.slice(0, -2) : p)
 
 /** Busca por palavras com radical; ordena por quantas palavras casam e depois pelo nº de empresas. */
-function limitarLista(lista: Opcao[], termo: string, max = 12) {
+function procurar(lista: Opcao[], termo: string, max = 12) {
   const palavras = normalizar(termo).split(/[^a-z0-9]+/).filter(p => p && !PARADAS.has(p)).map(radical)
   if (!palavras.length) return []
   return lista
@@ -159,11 +139,89 @@ function limitarLista(lista: Opcao[], termo: string, max = 12) {
     .map(({ o }) => ({ codigo: o.chave, nome: o.nome, ...(o.cod ? { cnae: o.cod } : {}), empresas: o.n }))
 }
 
-export async function executarFerramenta(
-  nome: string,
-  argsTexto: string,
-  anexos: Anexo[]
-): Promise<unknown> {
+const top = (r: Resumo, k: keyof Resumo['dims'], n: number) =>
+  (r.dims[k] ?? []).slice(0, n).map(i => ({ nome: i.nome, empresas: i.n }))
+
+/** Distribuições aparadas para a tela (o resumo completo do município tem até 645 itens). */
+function aparar(r: Resumo): Resumo {
+  const dims: Resumo['dims'] = {}
+  const limites = { setor: 8, ramo: 8, municipio: 8, regiao: 11, porte: 3, regime: 3, situacao_regime: 4, prioridade: 4, localizacao: 4 } as const
+  for (const [k, n] of Object.entries(limites) as [keyof Resumo['dims'], number][]) {
+    if (r.dims[k]) dims[k] = r.dims[k]!.slice(0, n)
+  }
+  return { total: r.total, dims }
+}
+
+/** Próximos passos mais úteis para o resultado atual (viram botões na tela). */
+function sugerir(f: Filtros, ordem: Ordem, r: Resumo): Sugestao[] {
+  if (r.total.n === 0) return []
+  const s: Sugestao[] = []
+  if (!f.com_whatsapp && r.total.com_whatsapp > 0) s.push({ rotulo: 'Só com WhatsApp', pergunta: 'Dessas, mostre só as que têm WhatsApp.' })
+  if (!f.portes) s.push({ rotulo: 'Só médias e grandes', pergunta: 'Dessas, só as de porte médio ou grande.' })
+  if (!f.situacoes_regime) s.push({ rotulo: 'Regime recente', pergunta: 'Dessas, só as com regime recente (ECF 2024).' })
+  if (!f.contato_proprio) s.push({ rotulo: 'Contato direto', pergunta: 'Dessas, só as com contato da própria empresa (sem contador).' })
+  const mun = r.dims.municipio?.[0]
+  if (!f.municipios && mun && r.total.n > 30 && (r.dims.municipio?.length ?? 0) > 1) {
+    s.push({ rotulo: `Só em ${mun.nome}`, pergunta: `Dessas, só as de ${mun.nome}.` })
+  }
+  if (ordem !== 'capital') s.push({ rotulo: 'Maiores por capital', pergunta: 'Mostre essas mesmas ordenadas pelo maior capital social.' })
+  return s.slice(0, 5)
+}
+
+async function consultar(filtros: Filtros, ordem: Ordem, ctx: Contexto): Promise<AnexoConsulta> {
+  const chave = JSON.stringify(filtros)
+  const [empresas, resumo, opcoes] = await Promise.all([
+    buscarEmpresas(filtros, ordem, 1, 10),
+    resumoEmpresas(chave),
+    opcoesFiltros()
+  ])
+  const anexo: AnexoConsulta = {
+    tipo: 'consulta',
+    chave: `consulta:${chave}`,
+    filtros,
+    ordem,
+    href: hrefConsulta({ filtros, ordem }),
+    rotulos: rotulosFiltros(filtros, opcoes).map(r => r.rotulo),
+    totalBase: opcoes.total_base,
+    resumo: aparar(resumo),
+    empresas,
+    sugestoes: sugerir(filtros, ordem, resumo)
+  }
+  // Mesmos filtros no mesmo turno = mesmo painel (a tela troca pelo mais novo).
+  const i = ctx.anexos.findIndex(a => a.chave === anexo.chave)
+  if (i >= 0) ctx.anexos[i] = anexo
+  else ctx.anexos.push(anexo)
+  ctx.emitir({ tipo: 'anexo', anexo })
+  return anexo
+}
+
+// ---------------------------------------------------------------- execução
+const ArgsConsulta = z.object({
+  filtros: FiltrosSchema.default({}),
+  ordem: z.enum(ORDENS_LISTA as [Ordem, ...Ordem[]]).optional().catch(undefined)
+})
+
+/** Frase curta do que está acontecendo, para a tela mostrar enquanto espera. */
+export function descreverEtapa(nome: string, argsTexto: string) {
+  let a: Record<string, unknown> = {}
+  try {
+    a = JSON.parse(argsTexto || '{}')
+  } catch {}
+  switch (nome) {
+    case 'buscar_codigos':
+      return `Procurando “${String(a.termo ?? '').slice(0, 40)}” na CNAE e nos municípios`
+    case 'consultar_empresas':
+      return 'Consultando as 628 mil empresas'
+    case 'detalhar_empresa':
+      return 'Abrindo a ficha da empresa'
+    case 'listar_contadores':
+      return 'Levantando os escritórios contábeis'
+    default:
+      return 'Consultando'
+  }
+}
+
+export async function executarFerramenta(nome: string, argsTexto: string, ctx: Contexto): Promise<unknown> {
   let args: Record<string, unknown>
   try {
     args = argsTexto ? JSON.parse(argsTexto) : {}
@@ -179,63 +237,45 @@ export async function executarFerramenta(
       const o = await opcoesFiltros()
       const quer = (t: string) => tipo === 'todos' || tipo === t
       return {
-        ...(quer('setor') && { setores: limitarLista(o.setores, termo, 5) }),
-        ...(quer('ramo') && { ramos: limitarLista(o.ramos, termo, 8) }),
-        ...(quer('segmento') && { segmentos: limitarLista(o.segmentos, termo, 10) }),
-        ...(quer('atividade') && { atividades: limitarLista(o.atividades, termo, 15) }),
-        ...(quer('municipio') && { municipios: limitarLista(o.municipios, termo, 8) }),
-        ...(quer('regiao') && { regioes: limitarLista(o.regioes, termo, 5) })
+        ...(quer('setor') && { setores: procurar(o.setores, termo, 5) }),
+        ...(quer('ramo') && { ramos: procurar(o.ramos, termo, 8) }),
+        ...(quer('segmento') && { segmentos: procurar(o.segmentos, termo, 10) }),
+        ...(quer('atividade') && { atividades: procurar(o.atividades, termo, 15) }),
+        ...(quer('municipio') && { municipios: procurar(o.municipios, termo, 8) }),
+        ...(quer('regiao') && { regioes: procurar(o.regioes, termo, 5) })
       }
     }
 
-    case 'buscar_empresas': {
-      const p = ArgsBusca.safeParse(args)
-      if (!p.success) return { erro: 'Filtros inválidos', detalhes: z.prettifyError(p.error) }
-      const { filtros, ordem = 'score', limite = 10 } = p.data
-      const [empresas, resumo] = await Promise.all([
-        buscarEmpresas(filtros, ordem, 1, limite),
-        resumoEmpresas(JSON.stringify(filtros))
-      ])
-      const resumidas: EmpresaResumida[] = empresas.map(e => ({
-        cnpj: e.cnpj, razao_social: e.razao_social, nome_fantasia: e.nome_fantasia, municipio: e.municipio,
-        ramo: e.ramo, porte: e.porte, capital_social: e.capital_social, regime: e.regime,
-        situacao_regime: e.situacao_regime, prioridade: e.prioridade, score: e.score, whatsapp: e.whatsapp,
-        whatsapp_link: e.whatsapp_link, email: e.email, email_tipo: e.email_tipo
-      }))
-      const href = hrefConsulta({ filtros, ordem })
-      anexos.push({ tipo: 'empresas', total: resumo.total.n, href, filtros, empresas: resumidas })
-      // O modelo recebe só o necessário para comentar o resultado. Os contatos ficam
-      // de fora de propósito: a tabela da tela já mostra, e sem eles o modelo não
-      // repete a lista no texto. Para o contato de uma empresa: detalhar_empresa.
-      return {
-        total_encontrado: resumo.total.n,
-        mostrando_na_tela: resumidas.length,
-        link_consulta: href,
-        instrucao: 'A tela já mostra estas empresas em tabela, com contatos. NÃO liste as empresas no texto: dê o total, os filtros usados e no máximo 3 nomes em destaque. Se depois pedirem o contato ou detalhes de uma delas, chame detalhar_empresa com o CNPJ.',
-        empresas: resumidas.map(e => ({
-          cnpj: e.cnpj, razao_social: e.razao_social, municipio: e.municipio, ramo: e.ramo, porte: e.porte,
-          capital: e.capital_social, prioridade: e.prioridade
-        }))
-      }
-    }
-
+    case 'consultar_empresas':
+    case 'buscar_empresas':
     case 'resumo_empresas': {
-      const p = FiltrosSchema.safeParse(args.filtros ?? {})
+      const p = ArgsConsulta.safeParse(args)
       if (!p.success) return { erro: 'Filtros inválidos', detalhes: z.prettifyError(p.error) }
-      const r = await resumoEmpresas(JSON.stringify(p.data))
-      const top = (k: keyof typeof r.dims, n = 8) => (r.dims[k] ?? []).slice(0, n).map(i => ({ nome: i.nome, empresas: i.n }))
+      const { filtros, ordem = 'score' } = p.data
+      const a = await consultar(filtros, ordem, ctx)
+      const r = a.resumo
       return {
-        total: r.total,
-        link_consulta: hrefConsulta({ filtros: p.data }),
-        por_setor: top('setor'),
-        por_ramo: top('ramo'),
-        por_porte: top('porte', 3),
-        por_regime: top('regime', 3),
-        por_situacao_regime: top('situacao_regime', 4),
-        por_prioridade: top('prioridade', 4),
-        por_regiao: top('regiao', 11),
-        por_localizacao: top('localizacao', 4),
-        por_municipio: top('municipio', 10)
+        instrucao:
+          'O USUÁRIO JÁ ESTÁ VENDO o painel com estes números, as distribuições e a tabela com contatos. Escreva só a ' +
+          'legenda: 1 ou 2 frases (o total e o que você entendeu, mais um destaque se for útil). Sem listas, sem tabela, ' +
+          'sem repetir números além de no máximo 2.',
+        filtros_entendidos: a.rotulos,
+        total: r.total.n,
+        indicadores: {
+          lucro_real: r.total.lucro_real,
+          regime_recente: r.total.regime_recente,
+          com_whatsapp: r.total.com_whatsapp,
+          email_proprio: r.total.email_proprio,
+          prioridade_a: r.total.prioridade_a
+        },
+        maiores_concentracoes: {
+          setor: top(r, 'setor', 3),
+          ramo: top(r, 'ramo', 3),
+          regiao: top(r, 'regiao', 3),
+          municipio: top(r, 'municipio', 3),
+          porte: top(r, 'porte', 3)
+        },
+        primeiras_empresas: a.empresas.map((e, i) => `${i + 1}. ${e.razao_social} (CNPJ ${e.cnpj}, ${e.municipio})`)
       }
     }
 
@@ -245,10 +285,33 @@ export async function executarFerramenta(
       const d = await obterEmpresa(cnpj)
       if (!d) return { erro: 'Empresa não encontrada na base (pode não ter ECF de Lucro Real/Presumido).' }
       const e = d.empresa
+      const anexo = { tipo: 'empresa' as const, chave: `empresa:${cnpj}`, empresa: e }
+      if (!ctx.anexos.some(a => a.chave === anexo.chave)) ctx.anexos.push(anexo)
+      ctx.emitir({ tipo: 'anexo', anexo })
       return {
-        ...e,
-        link_ficha: `/empresa/${cnpj}`,
-        atividades_secundarias: d.secundarias.map(s => `${s.cnae_fmt} ${s.atividade}`),
+        instrucao: 'O USUÁRIO JÁ ESTÁ VENDO o cartão da empresa com todos os contatos. Responda em 1 a 3 frases exatamente o que foi pedido.',
+        razao_social: e.razao_social,
+        fantasia: e.nome_fantasia,
+        cnpj: e.cnpj_formatado,
+        atividade: `${e.cnae_fmt} ${e.atividade_principal}`,
+        ramo: e.ramo,
+        municipio: e.municipio,
+        endereco: [e.endereco, e.bairro, e.municipio, e.cep].filter(Boolean).join(', '),
+        porte: e.porte,
+        capital_social: e.capital_social,
+        abertura: e.data_abertura,
+        regime: e.regime,
+        situacao_regime: e.situacao_regime,
+        simples_out2026: e.simples_out2026,
+        prioridade: e.prioridade,
+        score: e.score,
+        whatsapp: e.whatsapp,
+        telefone1: e.telefone1,
+        telefone2: e.telefone2,
+        email: e.email,
+        email_tipo: e.email_tipo,
+        empresas_com_o_mesmo_email: e.empresas_mesmo_email,
+        atividades_secundarias: d.secundarias.map(s => `${s.cnae_fmt} ${s.atividade}`).slice(0, 15),
         outras_empresas_mesmo_email: d.mesmoEmail.map(o => o.razao_social)
       }
     }
@@ -256,10 +319,21 @@ export async function executarFerramenta(
     case 'listar_contadores': {
       const limite = Math.min(20, Math.max(1, Number(args.limite) || 10))
       const { itens, total } = await listarContadores(args.termo ? String(args.termo) : undefined, 1, limite)
-      return { total, contadores: itens }
+      const anexo = { tipo: 'contadores' as const, chave: `contadores:${args.termo ?? ''}`, total, itens }
+      ctx.anexos.push(anexo)
+      ctx.emitir({ tipo: 'anexo', anexo })
+      return {
+        instrucao: 'O USUÁRIO JÁ ESTÁ VENDO a tabela. Escreva 1 ou 2 frases de leitura (quem se destaca e por quê).',
+        total,
+        contadores: itens.map(c => ({
+          email: c.email, classificacao: c.classificacao, empresas: c.empresas, lucro_real: c.lucro_real,
+          municipio: c.municipio_principal, setor: c.setor_principal
+        }))
+      }
     }
 
     default:
       return { erro: `Ferramenta desconhecida: ${nome}` }
   }
 }
+

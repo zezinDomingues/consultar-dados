@@ -61,15 +61,21 @@ Tempos medidos: filtros comuns ~25 ms; resumo 0,4–2 s (fica 15 min em cache no
 
 ## Agente de IA (`/agente`)
 
-Conversa em português que consulta a base com as **mesmas funções da tela** e responde dúvidas gerais de
-tributação (como orientação, não consultoria).
+Conversa em português com dois modos:
+- **Pergunta sobre empresas** → o agente consulta a base e a tela mostra o **mesmo painel da Consulta** (filtros
+  entendidos, indicadores, distribuições, tabela com contatos, "Carregar mais", exportar). O modelo escreve só a
+  legenda (1–2 frases). Ficha de empresa e contadores também viram cartões.
+- **Dúvida geral** (tributação, ECF, reforma, LGPD) → texto formatado, ancorado na referência de `conhecimento.ts`.
 
-- Código: `src/lib/agente/` — `ferramentas.ts` (buscar_codigos, buscar_empresas, resumo_empresas,
-  detalhar_empresa, listar_contadores), `provedores.ts` (Nemotron e Gemini pela API compatível com OpenAI),
-  `agente.ts` (prompt + laço de ferramentas). Rota: `src/app/api/agente/route.ts`.
-- O agente roda com a sessão do usuário: o RLS vale para ele igual vale para a tela.
-- Números e empresas sempre vêm das ferramentas. A tabela de empresas é desenhada pela tela; o modelo só recebe
-  nome/CNPJ (sem contatos) e usa `detalhar_empresa` quando pedem o contato de uma empresa.
+Como funciona:
+- `src/lib/agente/ferramentas.ts` — buscar_codigos, consultar_empresas, detalhar_empresa, listar_contadores. Cada
+  ferramenta devolve um *anexo* para a tela e um resumo curto para o modelo (sem contatos, para ele não repetir a tabela).
+- `src/lib/agente/conhecimento.ts` — dicionário termo → CNAE (conferido na base) e fatos tributários.
+- `src/lib/agente/agente.ts` — prompt e laço de ferramentas; `provedores.ts` — Nemotron/Gemini.
+- `src/app/api/agente/route.ts` — responde em NDJSON (etapas, anexos e texto chegam ao vivo).
+- O chat manda o que já está na tela num campo `contexto` separado do histórico (dentro do histórico o modelo
+  imitava a nota), o que permite "dessas, só…" e "o WhatsApp da segunda".
+- Componentes visuais compartilhados com a Consulta: `components/consulta/tabela-empresas.tsx` e `indicadores.tsx`.
 
 Variáveis (servidor, **nunca** `NEXT_PUBLIC_`):
 

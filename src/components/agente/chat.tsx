@@ -1,38 +1,59 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { ArrowUp, ExternalLink, LoaderCircle, MessageCircle, RotateCcw, Sparkles, TriangleAlert } from 'lucide-react'
-import { PORTE_CURTO, SeloPrioridade } from '@/components/consulta/selos'
-import { fmtInt, fmtMoeda } from '@/lib/formatar'
-import type { Anexo } from '@/lib/agente/ferramentas'
+import { ArrowUp, Check, LoaderCircle, RotateCcw, Sparkles, TriangleAlert, Wand2 } from 'lucide-react'
+import { CartaoEmpresa } from './cartao-empresa'
+import { PainelConsulta } from './painel-consulta'
+import { TabelaContadores } from './tabela-contadores'
+import type { Anexo, AnexoConsulta, EventoAgente } from '@/lib/agente/tipos'
 import { cn } from '@/lib/utils'
 
-type Turno =
-  | { papel: 'usuario'; texto: string }
-  | { papel: 'agente'; texto: string; anexos?: Anexo[]; motor?: string | null; ms?: number; ferramentas?: string[] }
-  | { papel: 'erro'; texto: string }
+type TurnoAgente = {
+  papel: 'agente'
+  texto: string
+  anexos: Anexo[]
+  etapas: string[]
+  pendente: boolean
+  motor?: string | null
+  ms?: number
+}
+type Turno = { papel: 'usuario'; texto: string } | TurnoAgente | { papel: 'erro'; texto: string }
 
 const EXEMPLOS = [
-  'Quais indústrias de alimentos no interior têm Lucro Real e WhatsApp?',
-  'Me traga 10 clínicas em Campinas com e-mail próprio, as maiores primeiro.',
-  'Quantas construtoras com mais de 20 anos existem na Grande SP?',
-  'Qual a diferença entre Lucro Real e Lucro Presumido?',
-  'Quais escritórios contábeis atendem mais empresas de Lucro Real?',
-  'Farmácias de manipulação em Ribeirão Preto'
+  { grupo: 'Encontrar empresas', itens: [
+    'Transportadoras de carga com Lucro Real no interior',
+    'Clínicas em Campinas com contato direto, as maiores primeiro',
+    'Indústrias de alimentos médias ou grandes com WhatsApp',
+    'Quantas construtoras com mais de 20 anos existem na Grande SP?'
+  ] },
+  { grupo: 'Tirar dúvidas', itens: [
+    'Qual a diferença entre Lucro Real e Lucro Presumido?',
+    'O que muda com a reforma tributária para quem está no Presumido?',
+    'Posso prospectar por WhatsApp sem ferir a LGPD?',
+    'Quais escritórios contábeis atendem mais empresas de Lucro Real?'
+  ] }
 ]
 
-const CHAVE_SESSAO = 'agente:conversa'
+const CHAVE_SESSAO = 'agente:conversa:v2'
 
-/** O agente só recebe texto de volta; esta nota diz a ele quais empresas a tela mostrou,
- *  para perguntas como "e o WhatsApp da segunda?". */
-function comContexto(t: Extract<Turno, { papel: 'agente' }>) {
-  const linhas = (t.anexos ?? []).flatMap(a =>
-    a.empresas.map((e, i) => `${i + 1}. ${e.razao_social} (CNPJ ${e.cnpj}, ${e.municipio ?? ''})`)
-  )
-  return linhas.length ? `${t.texto}\n\n[Empresas mostradas na tela, em ordem:\n${linhas.join('\n')}]` : t.texto
+/** O que a tela já mostrou (mais recente por último). Vai para o servidor SEPARADO do
+ *  histórico: dentro das mensagens do agente, o modelo passava a imitar a nota. */
+function contextoDaTela(turnos: Turno[]) {
+  const notas = turnos
+    .filter((t): t is TurnoAgente => t.papel === 'agente')
+    .flatMap(t => t.anexos)
+    .slice(-4)
+    .map(a => {
+      if (a.tipo === 'consulta') {
+        const lista = a.empresas.map((e, i) => `  ${i + 1}. ${e.razao_social} (CNPJ ${e.cnpj}, ${e.municipio ?? ''})`).join('\n')
+        return `- Busca: filtros=${JSON.stringify(a.filtros)} · ordem=${a.ordem} · total=${a.resumo.total.n}\n  Tabela, em ordem:\n${lista}`
+      }
+      if (a.tipo === 'empresa') return `- Ficha: ${a.empresa.razao_social} (CNPJ ${a.empresa.cnpj})`
+      return `- Contadores: ${a.itens.map(c => c.email).join(', ')}`
+    })
+  return notas.join('\n')
 }
 
 export function Chat() {
@@ -42,41 +63,89 @@ export function Chat() {
   const fim = useRef<HTMLDivElement>(null)
   const campo = useRef<HTMLTextAreaElement>(null)
 
-  // A conversa sobrevive a trocas de página (até fechar a aba).
+  // A conversa sobrevive a idas e vindas entre as páginas (até fechar a aba).
   useEffect(() => {
     try {
-      const salvo = sessionStorage.getItem(CHAVE_SESSAO)
-      if (salvo) setTurnos(JSON.parse(salvo))
+      const salvo: Turno[] = JSON.parse(sessionStorage.getItem(CHAVE_SESSAO) ?? '[]')
+      setTurnos(salvo.filter(t => !(t.papel === 'agente' && t.pendente)))
     } catch {}
   }, [])
   useEffect(() => {
+    if (enviando) return
     try {
       sessionStorage.setItem(CHAVE_SESSAO, JSON.stringify(turnos))
     } catch {}
-    fim.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
   }, [turnos, enviando])
+  const ultimoTurno = turnos.at(-1)
+  const rolarChave = `${turnos.length}:${ultimoTurno?.papel === 'agente' ? `${ultimoTurno.etapas.length}:${ultimoTurno.anexos.length}:${!!ultimoTurno.texto}` : ''}`
+  useEffect(() => {
+    fim.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+  }, [rolarChave])
+
+  function atualizarUltimo(muda: (t: TurnoAgente) => TurnoAgente) {
+    setTurnos(atual => {
+      const i = atual.length - 1
+      const t = atual[i]
+      if (!t || t.papel !== 'agente') return atual
+      return [...atual.slice(0, i), muda(t)]
+    })
+  }
+
+  function aplicar(e: EventoAgente) {
+    if (e.tipo === 'etapa') atualizarUltimo(t => ({ ...t, etapas: [...t.etapas, e.texto] }))
+    else if (e.tipo === 'anexo')
+      atualizarUltimo(t => {
+        const i = t.anexos.findIndex(a => a.chave === e.anexo.chave)
+        const anexos = i >= 0 ? t.anexos.map((a, j) => (j === i ? e.anexo : a)) : [...t.anexos, e.anexo]
+        return { ...t, anexos }
+      })
+    else if (e.tipo === 'fim') atualizarUltimo(t => ({ ...t, texto: e.texto, motor: e.motor, ms: e.ms, pendente: false }))
+    else if (e.tipo === 'erro') throw new Error(e.texto)
+  }
 
   async function enviar(pergunta: string) {
     const t = pergunta.trim()
     if (!t || enviando) return
-    const novos: Turno[] = [...turnos.filter(x => x.papel !== 'erro'), { papel: 'usuario', texto: t }]
-    setTurnos(novos)
+    const base = turnos.filter(x => x.papel !== 'erro')
+    const historico = [...base, { papel: 'usuario' as const, texto: t }].map(x => ({
+      papel: x.papel,
+      texto: x.papel === 'agente' ? x.texto || '(mostrei o resultado na tela)' : x.texto
+    }))
+    const contexto = contextoDaTela(base)
+    setTurnos([...base, { papel: 'usuario', texto: t }, { papel: 'agente', texto: '', anexos: [], etapas: [], pendente: true }])
     setTexto('')
     setEnviando(true)
     try {
-      const historico = novos
-        .filter((x): x is Exclude<Turno, { papel: 'erro' }> => x.papel !== 'erro')
-        .map(x => ({ papel: x.papel, texto: x.papel === 'agente' ? comContexto(x) : x.texto }))
       const r = await fetch('/api/agente', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ historico })
+        body: JSON.stringify({ historico, contexto })
       })
-      const j = await r.json().catch(() => ({}))
-      if (!r.ok) throw new Error(j.erro || `Erro ${r.status}`)
-      setTurnos(atual => [...atual, { papel: 'agente', ...j }])
+      if (!r.ok || !r.body) {
+        const j = await r.json().catch(() => ({}))
+        throw new Error(j.erro || `Erro ${r.status}`)
+      }
+      const leitor = r.body.getReader()
+      const dec = new TextDecoder()
+      let buffer = ''
+      for (;;) {
+        const { done, value } = await leitor.read()
+        if (done) break
+        buffer += dec.decode(value, { stream: true })
+        let i
+        while ((i = buffer.indexOf('\n')) >= 0) {
+          const linha = buffer.slice(0, i).trim()
+          buffer = buffer.slice(i + 1)
+          if (linha) aplicar(JSON.parse(linha))
+        }
+      }
+      atualizarUltimo(t => (t.pendente ? { ...t, pendente: false, texto: t.texto || 'A resposta foi interrompida.' } : t))
     } catch (e) {
-      setTurnos(atual => [...atual, { papel: 'erro', texto: (e as Error).message }])
+      setTurnos(atual => {
+        const ultimo = atual.at(-1)
+        const semVazio = ultimo?.papel === 'agente' && !ultimo.anexos.length ? atual.slice(0, -1) : atual
+        return [...semVazio, { papel: 'erro', texto: (e as Error).message }]
+      })
     } finally {
       setEnviando(false)
       campo.current?.focus()
@@ -84,6 +153,7 @@ export function Chat() {
   }
 
   const ultimaPergunta = [...turnos].reverse().find(t => t.papel === 'usuario')?.texto
+  const iUltimoAgente = turnos.findLastIndex(t => t.papel === 'agente')
 
   return (
     <div className='flex h-screen flex-col'>
@@ -94,7 +164,7 @@ export function Chat() {
           </div>
           <div>
             <h1 className='font-semibold leading-tight'>Agente de IA</h1>
-            <p className='text-xs text-slate-500'>Pergunte sobre as empresas da base ou tire dúvidas de tributação</p>
+            <p className='text-xs text-slate-500'>Encontra empresas na base e tira dúvidas de tributação e prospecção</p>
           </div>
         </div>
         {turnos.length > 0 && (
@@ -109,24 +179,35 @@ export function Chat() {
       </header>
 
       <div className='flex-1 overflow-y-auto'>
-        <div className='mx-auto max-w-4xl space-y-6 px-6 py-6'>
+        <div className='mx-auto max-w-6xl space-y-6 px-6 py-6'>
           {turnos.length === 0 && (
-            <div className='py-10 text-center'>
-              <Sparkles className='mx-auto size-10 text-marca-400' />
-              <h2 className='mt-4 text-xl font-semibold'>O que você quer encontrar?</h2>
-              <p className='mx-auto mt-1 max-w-lg text-sm text-slate-500'>
-                Peça em português: o agente monta os filtros, consulta as 628 mil empresas e devolve a lista com o link
-                para a Consulta. Também responde dúvidas gerais sobre regimes e tributação.
-              </p>
-              <div className='mx-auto mt-6 grid max-w-2xl gap-2 sm:grid-cols-2'>
-                {EXEMPLOS.map(e => (
-                  <button
-                    key={e}
-                    onClick={() => enviar(e)}
-                    className='rounded-xl border border-slate-200 bg-white px-4 py-3 text-left text-sm text-slate-600 transition hover:border-marca-300 hover:text-marca-900'
-                  >
-                    {e}
-                  </button>
+            <div className='py-8'>
+              <div className='text-center'>
+                <div className='mx-auto grid size-14 place-items-center rounded-2xl bg-marca-900 text-white shadow-lg shadow-marca-900/20'>
+                  <Sparkles className='size-7' />
+                </div>
+                <h2 className='mt-4 text-2xl font-semibold'>O que você quer encontrar?</h2>
+                <p className='mx-auto mt-1 max-w-xl text-sm text-slate-500'>
+                  Peça em português. O agente monta os filtros, consulta as 628 mil empresas e mostra o resultado igual à
+                  Consulta — com indicadores, tabela e contatos. Dúvidas de tributação ele responde direto.
+                </p>
+              </div>
+              <div className='mx-auto mt-8 grid max-w-4xl gap-6 md:grid-cols-2'>
+                {EXEMPLOS.map(g => (
+                  <div key={g.grupo}>
+                    <p className='mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400'>{g.grupo}</p>
+                    <div className='space-y-2'>
+                      {g.itens.map(e => (
+                        <button
+                          key={e}
+                          onClick={() => enviar(e)}
+                          className='w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-left text-sm text-slate-600 transition hover:border-marca-300 hover:text-marca-900 hover:shadow-sm'
+                        >
+                          {e}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 ))}
               </div>
             </div>
@@ -135,7 +216,7 @@ export function Chat() {
           {turnos.map((t, i) =>
             t.papel === 'usuario' ? (
               <div key={i} className='flex justify-end'>
-                <div className='max-w-[80%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-marca-800 px-4 py-2.5 text-sm text-white'>
+                <div className='max-w-[75%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-marca-800 px-4 py-2.5 text-sm text-white'>
                   {t.texto}
                 </div>
               </div>
@@ -156,17 +237,8 @@ export function Chat() {
                 )}
               </div>
             ) : (
-              <RespostaAgente key={i} turno={t} />
+              <RespostaAgente key={i} turno={t} ultimo={i === iUltimoAgente} aoSugerir={enviar} ocupado={enviando} />
             )
-          )}
-
-          {enviando && (
-            <div className='flex items-center gap-3 text-sm text-slate-500'>
-              <div className='grid size-8 place-items-center rounded-full bg-marca-50 text-marca-600'>
-                <LoaderCircle className='size-4 animate-spin' />
-              </div>
-              Consultando a base…
-            </div>
           )}
           <div ref={fim} />
         </div>
@@ -174,7 +246,7 @@ export function Chat() {
 
       <div className='border-t border-slate-200 bg-white px-6 py-4'>
         <form
-          className='mx-auto flex max-w-4xl items-end gap-2'
+          className='mx-auto flex max-w-6xl items-end gap-2'
           onSubmit={e => {
             e.preventDefault()
             enviar(texto)
@@ -193,7 +265,7 @@ export function Chat() {
             rows={1}
             maxLength={4000}
             placeholder='Ex.: transportadoras de médio porte em Sorocaba com WhatsApp'
-            className='max-h-40 min-h-11 flex-1 resize-none rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition field-sizing-content focus:border-marca-400 focus:bg-white focus:ring-4 focus:ring-marca-50'
+            className='field-sizing-content max-h-40 min-h-11 flex-1 resize-none rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-marca-400 focus:bg-white focus:ring-4 focus:ring-marca-50'
           />
           <button
             type='submit'
@@ -201,95 +273,97 @@ export function Chat() {
             aria-label='Enviar'
             className='grid size-11 shrink-0 place-items-center rounded-xl bg-marca-800 text-white transition hover:bg-marca-900 disabled:opacity-40'
           >
-            <ArrowUp className='size-5' />
+            {enviando ? <LoaderCircle className='size-5 animate-spin' /> : <ArrowUp className='size-5' />}
           </button>
         </form>
-        <p className='mx-auto mt-2 max-w-4xl text-[11px] text-slate-400'>
-          Respostas sobre tributação são orientação geral, não consultoria. Os dados vêm da base; o regime é histórico (ECF).
+        <p className='mx-auto mt-2 max-w-6xl text-[11px] text-slate-400'>
+          Dados da Receita Federal (o regime é histórico, da ECF). Respostas sobre tributação são orientação geral, não consultoria.
         </p>
       </div>
     </div>
   )
 }
 
-function RespostaAgente({ turno }: { turno: Extract<Turno, { papel: 'agente' }> }) {
+function RespostaAgente({
+  turno,
+  ultimo,
+  aoSugerir,
+  ocupado
+}: {
+  turno: TurnoAgente
+  ultimo: boolean
+  aoSugerir: (p: string) => void
+  ocupado: boolean
+}) {
+  const sugestoes = ultimo && !turno.pendente
+    ? turno.anexos.filter((a): a is AnexoConsulta => a.tipo === 'consulta').at(-1)?.sugestoes ?? []
+    : []
+
   return (
-    <div className='flex gap-3'>
+    <div className='flex gap-3' data-turno='agente'>
       <div className='grid size-8 shrink-0 place-items-center rounded-full bg-marca-50 text-marca-700'>
         <Sparkles className='size-4' />
       </div>
       <div className='min-w-0 flex-1 space-y-3'>
-        <div className='prose-agente text-sm leading-relaxed text-slate-800'>
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>{turno.texto}</ReactMarkdown>
-        </div>
-        {turno.anexos?.map((a, i) => <TabelaEmpresas key={i} anexo={a} />)}
-        {turno.motor && (
+        {turno.pendente && (
+          <ol className='space-y-1.5 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm'>
+            {(turno.etapas.length ? turno.etapas : ['Entendendo o pedido']).map((e, i, todas) => {
+              const atual = i === todas.length - 1
+              return (
+                <li key={i} className={cn('flex items-center gap-2', atual ? 'text-slate-700' : 'text-slate-400')}>
+                  {atual ? (
+                    <LoaderCircle className='size-3.5 animate-spin text-marca-500' />
+                  ) : (
+                    <Check className='size-3.5 text-emerald-500' />
+                  )}
+                  {e}
+                  {atual && '…'}
+                </li>
+              )
+            })}
+          </ol>
+        )}
+
+        {turno.texto && (
+          <div className='prose-agente text-[15px] leading-relaxed text-slate-800'>
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{turno.texto}</ReactMarkdown>
+          </div>
+        )}
+
+        {turno.anexos.map(a =>
+          a.tipo === 'consulta' ? (
+            <PainelConsulta key={a.chave} anexo={a} />
+          ) : a.tipo === 'empresa' ? (
+            <CartaoEmpresa key={a.chave} e={a.empresa} />
+          ) : (
+            <TabelaContadores key={a.chave} anexo={a} />
+          )
+        )}
+
+        {sugestoes.length > 0 && (
+          <div className='flex flex-wrap items-center gap-2'>
+            <span className='flex items-center gap-1 text-xs font-medium text-slate-500'>
+              <Wand2 className='size-3.5 text-marca-500' /> Refinar:
+            </span>
+            {sugestoes.map(s => (
+              <button
+                key={s.rotulo}
+                disabled={ocupado}
+                onClick={() => aoSugerir(s.pergunta)}
+                className='rounded-full border border-marca-200 bg-white px-3 py-1 text-xs text-marca-800 transition hover:bg-marca-50 disabled:opacity-50'
+              >
+                {s.rotulo}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {!turno.pendente && turno.motor && (
           <p className='text-[11px] text-slate-400'>
-            {turno.motor}
+            {turno.motor.split(' · ')[0]}
             {turno.ms != null && ` · ${(turno.ms / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} s`}
-            {!!turno.ferramentas?.length && ` · consultou: ${[...new Set(turno.ferramentas)].join(', ')}`}
           </p>
         )}
-      </div>
-    </div>
-  )
-}
-
-function TabelaEmpresas({ anexo }: { anexo: Anexo }) {
-  if (!anexo.empresas.length) return null
-  return (
-    <div className='overflow-hidden rounded-xl border border-slate-200 bg-white'>
-      <div className='flex items-center justify-between gap-3 border-b border-slate-100 bg-slate-50 px-4 py-2.5 text-sm'>
-        <span className='text-slate-600'>
-          <strong className='text-slate-900'>{fmtInt(anexo.total)}</strong> empresas encontradas
-          {anexo.total > anexo.empresas.length && ` · mostrando ${anexo.empresas.length}`}
-        </span>
-        <Link href={anexo.href} className='flex items-center gap-1 font-medium text-marca-700 hover:underline'>
-          Abrir na consulta <ExternalLink className='size-3.5' />
-        </Link>
-      </div>
-      <div className='overflow-x-auto'>
-        <table className='w-full min-w-[720px] text-left text-sm'>
-          <tbody>
-            {anexo.empresas.map(e => (
-              <tr key={e.cnpj} className='border-t border-slate-100 align-top first:border-0'>
-                <td className='py-2.5 pl-4 pr-2'>
-                  <SeloPrioridade prioridade={e.prioridade as 'A'} score={e.score} />
-                </td>
-                <td className='max-w-[280px] px-2 py-2.5'>
-                  <Link href={`/empresa/${e.cnpj}`} className='line-clamp-1 font-medium text-slate-900 hover:text-marca-700'>
-                    {e.razao_social}
-                  </Link>
-                  <p className='truncate text-xs text-slate-500'>{e.ramo}</p>
-                </td>
-                <td className='px-2 py-2.5 text-slate-600'>{e.municipio}</td>
-                <td className='whitespace-nowrap px-2 py-2.5 text-xs text-slate-500'>
-                  {e.porte ? PORTE_CURTO[e.porte] ?? e.porte : '—'} · {fmtMoeda(e.capital_social, true)}
-                  <br />
-                  {e.regime}
-                </td>
-                <td className='px-2 py-2.5 pr-4 text-xs'>
-                  {e.whatsapp_link ? (
-                    <a
-                      href={e.whatsapp_link}
-                      target='_blank'
-                      rel='noreferrer'
-                      className='inline-flex items-center gap-1 whitespace-nowrap rounded-md bg-emerald-50 px-2 py-1 font-medium text-emerald-700 ring-1 ring-inset ring-emerald-200 hover:bg-emerald-100'
-                    >
-                      <MessageCircle className='size-3.5' /> {e.whatsapp}
-                    </a>
-                  ) : e.email ? (
-                    <a href={`mailto:${e.email}`} className={cn('block max-w-[180px] truncate hover:underline', e.email_tipo === 'Escritório contábil' ? 'text-amber-700' : 'text-marca-700')}>
-                      {e.email}
-                    </a>
-                  ) : (
-                    <span className='text-slate-400'>sem contato</span>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
       </div>
     </div>
   )

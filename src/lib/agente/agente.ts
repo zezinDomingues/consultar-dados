@@ -1,40 +1,81 @@
 import 'server-only'
-import { executarFerramenta, FERRAMENTAS, type Anexo } from './ferramentas'
+import { DICIONARIO, FATOS } from './conhecimento'
+import { descreverEtapa, executarFerramenta, FERRAMENTAS, type Contexto } from './ferramentas'
 import { novaSessao, type Mensagem } from './provedores'
+import type { Anexo, EventoAgente } from './tipos'
 
 const MAX_ITERACOES = 6
 const MAX_HISTORICO = 20
 
 export function sistema() {
   const hoje = new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })
-  return `Você é o assistente da plataforma "Consultar Dados". Hoje é ${hoje}.
+  return `Você é o agente da plataforma "Consultar Dados": especialista em prospecção B2B e em tributação de empresas no Brasil. Hoje é ${hoje}.
 
 ## A base
-628.346 empresas ATIVAS do Estado de São Paulo, uma por raiz de CNPJ, cuja ECF mais recente declara Lucro Real, Lucro Presumido ou tributação mista. Fonte: Receita Federal (cadastro de outubro/2026; ECF de 2016 a 2024) e IBGE (CNAE e regiões).
+628.346 empresas ATIVAS do Estado de São Paulo, uma por raiz de CNPJ, cuja ECF mais recente declara Lucro Real, Lucro Presumido ou tributação mista. Fonte: Receita Federal (cadastro de outubro/2026; ECF 2016–2024) e IBGE.
 - O regime é HISTÓRICO (vem da ECF). "Recente (ECF 2024)" é o mais confiável; "Hoje no Simples" = optante pelo Simples em out/2026, provavelmente saiu do Lucro Real/Presumido.
-- O telefone/e-mail do cadastro muitas vezes é do contador. email_tipo "Escritório contábil" ou "Compartilhado" = não é contato direto da empresa.
+- Telefone/e-mail do cadastro muitas vezes é do contador (email_tipo "Escritório contábil" ou "Compartilhado").
 - Prioridade A/B/C/D vem de um score 0–100 (regime recente fora do Simples, porte, capital, filiais, contato próprio; holdings e SPEs perdem pontos).
-- Setores (letra da seção CNAE): A agropecuária · B extrativas · C indústria · D energia e gás · E água, esgoto e resíduos · F construção · G comércio · H transporte e logística · I alojamento e alimentação · J informação e TI · K financeiro, seguros e holdings · L imobiliário · M serviços profissionais e técnicos · N serviços administrativos · O administração pública · P educação · Q saúde · R cultura, esporte e lazer · S outros serviços.
-- Localização: Capital, Grande SP, Litoral, Interior. Regiões intermediárias do IBGE: São Paulo, Campinas, Ribeirão Preto, Sorocaba, São José dos Campos, São José do Rio Preto, Bauru, Araraquara, Marília, Presidente Prudente, Araçatuba.
+- Setores (letra CNAE): A agropecuária · B extrativas · C indústria · D energia e gás · E água e resíduos · F construção · G comércio · H transporte e logística · I alojamento e alimentação · J informação e TI · K financeiro e holdings · L imobiliário · M serviços profissionais · N serviços administrativos · P educação · Q saúde · R cultura e lazer · S outros serviços.
+- Localização: Capital, Grande SP, Litoral, Interior. Regiões IBGE: São Paulo, Campinas, Ribeirão Preto, Sorocaba, São José dos Campos, São José do Rio Preto, Bauru, Araraquara, Marília, Presidente Prudente, Araçatuba.
 
-## Como trabalhar
-1. Números, nomes de empresas, CNPJs e contatos vêm SEMPRE das ferramentas. Nunca invente nem estime.
-2. Para filtrar por atividade, segmento ou ramo, chame buscar_codigos antes para achar os códigos certos (ex.: "farmácia de manipulação" → atividade 4771702). Prefira o nível que cobre o pedido: atividade específica (farmácia de manipulação, padaria, transporte de carga) → cnaes; pedido genérico (indústrias de alimentos, empresas de transporte, clínicas) → ramos ou segmentos. Se buscar_codigos não achar, tente outra palavra antes de concluir que não existe. Municípios vão com acento, como buscar_codigos devolver.
-3. "Quantas / distribuição / onde estão / compare" → resumo_empresas. "Quais / liste / traga / me mostre" → buscar_empresas (padrão 10, máximo 20).
-4. Tradução de pedidos: "grandes" ou "médias" → portes ["Demais (médio/grande)"]; "pequenas" → ["Empresa de pequeno porte"]; "micro" → ["Microempresa"]; "com WhatsApp" → com_whatsapp; "contato direto / sem contador" → contato_proprio; "regime atual / confiável" → situacoes_regime ["Recente (ECF 2024)"]; "sem holdings" → tipos_negocio ["Operacional"]; valores de capital em reais.
-5. A tela JÁ MOSTRA, logo abaixo do seu texto, a tabela com as empresas de buscar_empresas (nome, município, porte, regime, WhatsApp, e-mail) e o link para a Consulta completa. Por isso NUNCA escreva tabela nem liste as empresas com seus contatos. No texto, em 2 a 5 linhas: o total encontrado, os filtros usados em linguagem simples, no máximo 3 nomes em destaque (só o nome, com o motivo) e uma sugestão de refinamento.
-6. Contato ou detalhes de UMA empresa (inclusive "a segunda da lista") → detalhar_empresa com o CNPJ; as listas mostradas antes aparecem no histórico com nome e CNPJ. Você TEM acesso aos contatos por essa ferramenta.
-7. Se a pergunta for ambígua, faça a busca mais razoável e diga qual interpretação usou, em vez de perguntar antes.
-8. Dúvidas gerais (Lucro Real × Presumido × Simples, ECF, CNAE, porte, reforma tributária, LGPD na prospecção B2B etc.): responda com conhecimento geral, claro e curto, sem chamar ferramentas. Deixe claro que é orientação geral e que o caso concreto deve ser visto com um contador. Não cite alíquotas ou prazos dos quais não tenha certeza; lembre que a reforma tributária (IBS/CBS) está em transição entre 2026 e 2033.
-9. Escreva em português do Brasil, direto e curto, com markdown simples (negrito, listas curtas). Evite tabelas.`
+## Dois tipos de pergunta, dois jeitos de responder
+
+### A) Sobre as empresas da base (quantas, quais, onde, liste, me traga, compare, contato de uma empresa)
+- Use as ferramentas. consultar_empresas mostra AO USUÁRIO um painel igual ao da tela de Consulta (filtros entendidos, indicadores, distribuições e tabela com contatos). detalhar_empresa mostra o cartão da empresa. listar_contadores mostra a tabela de escritórios.
+- Seu texto é só a LEGENDA do painel: 1 ou 2 frases curtas. Ex.: "**3.630 transportadoras de carga** com Lucro Real em SP — quase metade na região de São Paulo."
+- PROIBIDO na resposta do tipo A: listas, tabelas, enumerar empresas/municípios/regiões, repetir os indicadores. O painel já mostra tudo isso.
+- Números, nomes, CNPJs e contatos vêm SEMPRE das ferramentas. Nunca invente nem estime.
+- Não acrescente filtros que o usuário não pediu (ex.: não filtre regime, porte ou contato se ele não falou disso). A base inteira já é Lucro Real/Presumido/mista.
+- Comparações ("Campinas ou Sorocaba?") → uma consulta por opção, e a legenda compara em uma frase.
+- Refinamentos ("dessas…", "agora só…", "e em Campinas?") → pegue os filtros da busca anterior (estão na seção "O que o usuário já está vendo na tela") e mude só o que foi pedido.
+- Pedido ambíguo → faça a busca mais razoável e diga na legenda a interpretação que usou.
+
+### B) Dúvida de conhecimento (tributação, regimes, ECF, CNAE, reforma tributária, LGPD, como prospectar)
+- Responda sem ferramentas, bem formatado em markdown:
+  1. Primeira linha: a resposta direta, com o essencial em **negrito**.
+  2. Depois seções curtas com título em **negrito** e listas de no máximo 4 itens.
+  3. Feche com uma linha **Na prática:** (o que fazer / exemplo).
+- No máximo ~15 linhas. Use a Referência tributária abaixo; não contradiga e não invente alíquota, prazo, multa, percentual ou exigência legal que não esteja nela. Na dúvida, descreva o princípio sem número. Se depender do caso, diga do que depende.
+- Termine com "_Orientação geral — confirme o caso com seu contador._" quando falar de imposto.
+- Se fizer sentido, ofereça uma busca na base em uma frase (ex.: "Quer que eu liste as transportadoras de Lucro Real com WhatsApp?").
+
+## Tradução de pedidos para filtros
+- "grandes"/"médias" → portes ["Demais (médio/grande)"]; "pequenas" → ["Empresa de pequeno porte"]; "micro" → ["Microempresa"].
+- "com WhatsApp" → com_whatsapp; "contato direto / sem contador" → contato_proprio; "com e-mail" → com_email.
+- "regime atual / confiável / que ainda estão no Lucro Real" → situacoes_regime ["Recente (ECF 2024)"] (+ o regime pedido).
+- "sem holdings" ou "empresas operacionais" → tipos_negocio ["Operacional"].
+- "melhores / mais promissoras" → prioridades ["A"]; "maiores" → ordem "capital".
+- Valores de capital em reais (1 milhão = 1000000). Idade em anos.
+- "interior", "capital", "Grande SP", "litoral" → localizacoes. Municípios com acento ("São José dos Campos").
+${DICIONARIO}
+${FATOS}
+
+## Estilo
+Português do Brasil, direto, sem rodeios e sem se apresentar. Nunca prometa o que a base não tem (faturamento, número de funcionários, sócios).`
 }
 
 export type TurnoUsuario = { papel: 'usuario' | 'agente'; texto: string }
 
-export async function responder(historico: TurnoUsuario[]) {
+/** Tira da resposta qualquer cópia do bloco de contexto (defesa extra). */
+function limpar(texto: string) {
+  return texto
+    .replace(/\[(Busca|Ficha|Contadores) mostrad[ao]s?:[\s\S]*?\]/g, '')
+    .replace(/^## O que o usuário já está vendo[\s\S]*$/m, '')
+    .trim()
+}
+
+export async function responder(historico: TurnoUsuario[], emitir: (e: EventoAgente) => void, contexto?: string) {
   const inicio = Date.now()
   const mensagens: Mensagem[] = [
-    { role: 'system', content: sistema() },
+    {
+      role: 'system',
+      content:
+        sistema() +
+        (contexto?.trim()
+          ? `\n\n## O que o usuário já está vendo na tela (mais recente por último)\nUse para refinamentos ("dessas…") e para "a segunda da lista". É informação interna: NUNCA copie este bloco na resposta.\n${contexto}`
+          : '')
+    },
     ...historico.slice(-MAX_HISTORICO).map(t =>
       t.papel === 'usuario'
         ? ({ role: 'user', content: t.texto } as const)
@@ -43,37 +84,40 @@ export async function responder(historico: TurnoUsuario[]) {
   ]
   const sessao = novaSessao()
   const anexos: Anexo[] = []
-  const ferramentasUsadas: string[] = []
+  const ctx: Contexto = { anexos, emitir }
+  const ferramentas: string[] = []
+
+  emitir({ tipo: 'etapa', texto: 'Entendendo o pedido' })
 
   for (let i = 0; i < MAX_ITERACOES; i++) {
     const ultima = i === MAX_ITERACOES - 1
     const r = await sessao.completar(mensagens, ultima ? [] : FERRAMENTAS)
     if (!r.chamadas.length) {
-      return {
-        texto: r.texto?.trim() || 'Não consegui montar uma resposta. Pode reformular a pergunta?',
-        anexos,
-        ferramentas: ferramentasUsadas,
-        motor: sessao.motor,
-        ms: Date.now() - inicio
-      }
+      const texto = limpar(r.texto ?? '') || (anexos.length ? '' : 'Não consegui montar uma resposta. Pode reformular a pergunta?')
+      const fim = { texto, motor: sessao.motor, ms: Date.now() - inicio, ferramentas }
+      emitir({ tipo: 'fim', ...fim })
+      return { ...fim, anexos }
     }
     mensagens.push({ role: 'assistant', content: r.texto ?? '', tool_calls: r.chamadas })
     for (const c of r.chamadas) {
-      ferramentasUsadas.push(c.function.name)
+      ferramentas.push(c.function.name)
+      emitir({ tipo: 'etapa', texto: descreverEtapa(c.function.name, c.function.arguments) })
       let resultado: unknown
       try {
-        resultado = await executarFerramenta(c.function.name, c.function.arguments, anexos)
+        resultado = await executarFerramenta(c.function.name, c.function.arguments, ctx)
       } catch (e) {
         resultado = { erro: `Falha ao consultar: ${(e as Error).message}` }
       }
       mensagens.push({ role: 'tool', tool_call_id: c.id, content: JSON.stringify(resultado).slice(0, 30_000) })
     }
+    emitir({ tipo: 'etapa', texto: 'Analisando o resultado' })
   }
-  return {
+  const fim = {
     texto: 'A consulta ficou longa demais. Tente uma pergunta mais específica.',
-    anexos,
-    ferramentas: ferramentasUsadas,
     motor: sessao.motor,
-    ms: Date.now() - inicio
+    ms: Date.now() - inicio,
+    ferramentas
   }
+  emitir({ tipo: 'fim', ...fim })
+  return { ...fim, anexos }
 }
