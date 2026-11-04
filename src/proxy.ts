@@ -15,10 +15,9 @@ const protegida = (pathname: string) =>
 
 export async function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl
-  const ehLogin = pathname === ROTAS.login || pathname.startsWith(`${ROTAS.login}/`)
-
-  // Landing page e demais páginas públicas: nem consulta o Supabase.
-  if (!protegida(pathname) && !ehLogin) return NextResponse.next()
+  // Landing page, login e demais páginas públicas: nem consulta o Supabase.
+  // (O login aparece sempre, mesmo para quem ainda tem sessão — como em qualquer app.)
+  if (!protegida(pathname)) return NextResponse.next()
 
   let resposta = NextResponse.next({ request })
   const supabase = createServerClient(
@@ -47,13 +46,6 @@ export async function proxy(request: NextRequest) {
     url.pathname = ROTAS.login
     url.search = ''
     if (pathname !== ROTAS.dashboard || search) url.searchParams.set('next', pathname + search)
-    return redirecionar(url, resposta)
-  }
-
-  if (logado && ehLogin) {
-    const url = request.nextUrl.clone()
-    url.pathname = ROTAS.dashboard
-    url.search = ''
     return redirecionar(url, resposta)
   }
 

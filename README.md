@@ -29,7 +29,7 @@ SUPABASE_SECRET_KEY=sb_secret_... npm run criar-usuario -- pessoa@empresa.com 's
 | Rota | O que faz |
 |---|---|
 | `/` | Landing page pública (provisória: apresenta o produto e leva ao login) |
-| `/login` | Entrar. Depois do login volta para onde a pessoa tentou ir, ou `/dashboard` |
+| `/login` | Entrar (aparece sempre, mesmo com sessão aberta). Depois do login vai para onde a pessoa tentou ir, ou `/dashboard` |
 | `/dashboard` | Consulta: filtros, indicadores, distribuições clicáveis, tabela paginada, ordenação, exportar CSV |
 | `/dashboard/empresa/[cnpj]` | Ficha completa da empresa |
 | `/dashboard/contadores` | E-mails presentes em 5+ empresas (escritórios contábeis e grupos) |
