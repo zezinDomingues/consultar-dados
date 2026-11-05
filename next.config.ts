@@ -6,14 +6,17 @@ import { PAGINAS_SITE } from './src/lib/rotas'
 const nextConfig: NextConfig = {
   // a página Eventos saiu em 04/11/2026; quem tiver o link cai nas notícias do blog
   async redirects() {
-    return [{ source: '/eventos', destination: '/blog#noticias', permanent: true }]
+    return [
+      { source: '/eventos', destination: '/blog#noticias', permanent: true },
+      // artigos antigos saíram em 04/11/2026: o blog agora é o Radar tributário
+      { source: '/blog/:artigo', destination: '/blog#noticias', permanent: true }
+    ]
   },
   async rewrites() {
     return {
       beforeFiles: [
         { source: '/', destination: '/site/index.html' },
-        ...PAGINAS_SITE.map(p => ({ source: `/${p}`, destination: `/site/${p}.html` })),
-        { source: '/blog/:artigo', destination: '/site/blog/:artigo.html' }
+        ...PAGINAS_SITE.map(p => ({ source: `/${p}`, destination: `/site/${p}.html` }))
       ],
       afterFiles: [],
       fallback: []

@@ -255,22 +255,32 @@
   })
 
 
-  // 6) Radar tributário do blog: notícias do dia (API própria, filtrada para não sair do tema)
+  // 6) Radar tributário: notícias do dia (API própria, filtrada para não sair do tema).
+  //    Toda notícia tem imagem: a do portal; se não carregar, a miniatura; se nenhuma, o cartão sai.
   var ENDPOINT_NOTICIAS = '/api/publico/noticias'
-  function radar() {
-    var raiz = document.querySelector('[data-radar]')
-    if (!raiz) return
+  var pedidoNoticias = null
+  function carregarNoticias() {
+    pedidoNoticias = pedidoNoticias || fetch(ENDPOINT_NOTICIAS).then(function (r) { return r.ok ? r.json() : Promise.reject(r.status) })
+    return pedidoNoticias
+  }
+  window.__radarImg = function (img) {
+    var reserva = img.getAttribute('data-reserva')
+    if (reserva && img.src !== reserva) { img.removeAttribute('data-reserva'); img.src = reserva; return }
+    var card = img.closest('.radar-card'); if (card) card.remove()
+  }
+  function radar(raiz) {
     var lista = raiz.querySelector('[data-radar-lista]')
     var filtros = raiz.querySelector('[data-radar-filtros]')
     var mais = raiz.querySelector('[data-radar-mais]')
     var status = raiz.querySelector('[data-radar-status]')
-    var BASE = filtros.getAttribute('data-classe-botao')
+    var fixo = +raiz.getAttribute('data-radar-limite') || 0
+    var BASE = filtros ? filtros.getAttribute('data-classe-botao') : ''
     var ATIVO = ' bg-[#0B3C34] text-white border border-[#0B3C34] shadow-md shadow-[#0B3C34]/10'
     var INATIVO = ' bg-white/40 text-[#0B3C34]/70 border border-[#0B4B3F]/10 hover:border-[#0B4B3F]/30 hover:text-[#0B3C34]'
-    var PASSO = window.innerWidth < 768 ? 4 : 9
+    var PASSO = fixo || (window.innerWidth < 768 ? 4 : 9)
     var dados = null, tema = 'Todas', mostrando = PASSO
     var seta = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg>'
-    function esc(t) { var d = document.createElement('div'); d.textContent = t; return d.innerHTML }
+    function esc(t) { var d = document.createElement('div'); d.textContent = t || ''; return d.innerHTML.replace(/"/g, '&quot;') }
     function quando(iso) {
       var min = Math.max(1, Math.round((Date.now() - new Date(iso)) / 60000))
       if (min < 60) return 'há ' + min + ' min'
@@ -279,31 +289,37 @@
       return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })
     }
     function desenhar() {
-      var itens = dados.noticias.filter(function (n) { return tema === 'Todas' || n.tema === tema })
+      var itens = dados.noticias.filter(function (n) { return n.imagem && (tema === 'Todas' || n.tema === tema) })
       lista.innerHTML = itens.length ? itens.slice(0, mostrando).map(function (n) {
+        var reserva = n.imagemReserva && n.imagemReserva !== n.imagem ? ' data-reserva="' + esc(n.imagemReserva) + '"' : ''
         return '<a class="radar-card" href="' + esc(n.link) + '" target="_blank" rel="noopener noreferrer">' +
-          '<div class="radar-topo"><span>' + esc(n.tema) + '</span><i></i><time datetime="' + n.data + '">' + quando(n.data) + '</time></div>' +
+          '<div class="radar-foto"><img src="' + esc(n.imagem) + '"' + reserva + ' alt="" loading="lazy" referrerpolicy="no-referrer" onerror="__radarImg(this)"/></div>' +
+          '<div class="radar-corpo"><div class="radar-topo"><span>' + esc(n.tema) + '</span><i></i><time datetime="' + n.data + '">' + quando(n.data) + '</time></div>' +
           '<h3 class="radar-titulo font-serif">' + esc(n.titulo) + '</h3>' +
-          '<div class="radar-fonte"><span>' + esc(n.fonte) + '</span>' + seta + '</div></a>'
-      }).join('') : '<div class="radar-vazio">Nenhuma notícia deste tema nas últimas 72 horas.</div>'
-      mais.hidden = itens.length <= mostrando
-      filtros.querySelectorAll('button').forEach(function (b) { b.className = BASE + (b.textContent === tema ? ATIVO : INATIVO) })
+          (fixo ? '' : '<p class="radar-resumo">' + esc(n.resumo) + '</p>') +
+          '<div class="radar-fonte"><span>' + esc(n.fonte) + '</span>' + seta + '</div></div></a>'
+      }).join('') : '<div class="radar-vazio">Nenhuma notícia deste tema nos últimos dias.</div>'
+      if (mais) mais.hidden = fixo || itens.length <= mostrando
+      if (filtros) filtros.querySelectorAll('button').forEach(function (b) { b.className = BASE + (b.textContent === tema ? ATIVO : INATIVO) })
     }
-    fetch(ENDPOINT_NOTICIAS).then(function (r) { return r.ok ? r.json() : Promise.reject(r.status) }).then(function (d) {
+    carregarNoticias().then(function (d) {
       dados = d
-      filtros.innerHTML = ['Todas'].concat(d.temas).map(function (t) { return '<button type="button">' + esc(t) + '</button>' }).join('')
-      var hora = new Date(d.atualizadoEm).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
-      status.textContent = 'Atualizado em ' + hora + ' · ' + d.noticias.length + ' notícias das últimas 72 h · os links abrem no veículo original'
+      if (filtros) filtros.innerHTML = ['Todas'].concat(d.temas).map(function (t) { return '<button type="button">' + esc(t) + '</button>' }).join('')
+      if (status) {
+        var hora = new Date(d.atualizadoEm).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+        status.textContent = 'Atualizado em ' + hora + ' · ' + d.noticias.length + ' notícias recentes · os links abrem no portal de origem'
+      }
       desenhar()
     }).catch(function () {
       lista.innerHTML = '<div class="radar-vazio">Não foi possível carregar as notícias agora. Tente novamente em alguns minutos.</div>'
     })
-    filtros.addEventListener('click', function (ev) {
+    if (filtros) filtros.addEventListener('click', function (ev) {
       var b = ev.target.closest('button'); if (!b || !dados) return
       tema = b.textContent; mostrando = PASSO; desenhar()
     })
-    mais.addEventListener('click', function () { mostrando += PASSO; desenhar() })
+    if (mais) mais.addEventListener('click', function () { mostrando += PASSO; desenhar() })
   }
+  function radares() { document.querySelectorAll('[data-radar]').forEach(radar) }
 
   document.addEventListener('submit', function (ev) {
     var form = ev.target
@@ -318,8 +334,8 @@
     if (ev.key === 'Escape') fecharMenu()
   })
 
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', radar)
-  else radar()
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', radares)
+  else radares()
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { animar() })
   else animar()
 })()

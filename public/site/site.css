@@ -17,7 +17,7 @@
 @media (min-width: 768px) { .radar-grade { grid-template-columns: repeat(2, 1fr); gap: 1.25rem; } }
 @media (min-width: 1024px) { .radar-grade { grid-template-columns: repeat(3, 1fr); } }
 .radar-card {
-  display: flex; flex-direction: column; gap: .85rem; min-height: 190px; padding: 1.5rem;
+  display: flex; flex-direction: column; min-height: 190px; overflow: hidden;
   border-radius: 1rem; background: rgba(255, 255, 255, .62); border: 1px solid rgba(11, 75, 63, .09);
   color: #0B3C34; text-decoration: none; transition: border-color .3s, transform .3s, box-shadow .3s, background .3s;
 }
@@ -35,3 +35,19 @@ a.radar-card:hover .radar-fonte svg { transform: translate(2px, -2px); }
 .radar-esqueleto::after { content: ''; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .55), transparent); animation: radarBrilho 1.4s infinite; }
 @keyframes radarBrilho { to { transform: translateX(100%); } }
 .radar-vazio { grid-column: 1 / -1; padding: 2rem; text-align: center; font-size: 14px; color: rgba(11, 60, 52, .7); }
+.radar-foto { position: relative; aspect-ratio: 16 / 9; overflow: hidden; background: rgba(11, 75, 63, .08); }
+.radar-foto img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .7s; }
+a.radar-card:hover .radar-foto img { transform: scale(1.04); }
+.radar-corpo { display: flex; flex-direction: column; gap: .75rem; flex: 1; padding: 1.25rem 1.4rem 1.3rem; }
+.radar-resumo { font-size: 13px; line-height: 1.55; color: rgba(11, 60, 52, .72); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.radar-esqueleto { min-height: 330px; }
+/* versão escura (vitrine da home, sobre fundo verde) */
+[data-radar-escuro] .radar-card { background: rgba(255, 255, 255, .03); border-color: rgba(255, 255, 255, .1); color: #fff; }
+[data-radar-escuro] a.radar-card:hover { background: rgba(255, 255, 255, .06); border-color: rgba(196, 185, 154, .35); }
+[data-radar-escuro] .radar-topo { color: #C4B99A; }
+[data-radar-escuro] .radar-topo i { background: rgba(255, 255, 255, .2); }
+[data-radar-escuro] .radar-topo time, [data-radar-escuro] .radar-fonte { color: rgba(213, 205, 186, .65); }
+[data-radar-escuro] .radar-fonte { border-top-color: rgba(255, 255, 255, .08); }
+[data-radar-escuro] .radar-esqueleto { background: rgba(255, 255, 255, .04); }
+[data-radar-escuro] .radar-esqueleto::after { background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .06), transparent); }
+[data-radar-escuro] .radar-vazio { color: rgba(213, 205, 186, .7); }
