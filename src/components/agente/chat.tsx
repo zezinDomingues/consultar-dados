@@ -1,9 +1,10 @@
 'use client'
+/* eslint-disable @next/next/no-img-element -- selo estático da marca (public/site/marca) */
 
 import { useEffect, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { ArrowUp, Check, LoaderCircle, RotateCcw, Sparkles, TriangleAlert, Wand2 } from 'lucide-react'
+import { ArrowUp, Check, LoaderCircle, RotateCcw, TriangleAlert, Wand2 } from 'lucide-react'
 import { CartaoEmpresa } from './cartao-empresa'
 import { PainelConsulta } from './painel-consulta'
 import { TabelaContadores } from './tabela-contadores'
@@ -159,9 +160,7 @@ export function Chat() {
     <div className='flex h-screen flex-col'>
       <header className='flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4'>
         <div className='flex items-center gap-3'>
-          <div className='fundo-marinho grid size-9 place-items-center rounded-full text-ouro'>
-            <Sparkles className='size-4.5' />
-          </div>
+          <img src='/site/marca/simbolo-escuro.svg' alt='' className='size-10 drop-shadow-sm' />
           <div>
             <h1 className='font-serif text-lg font-bold leading-tight text-marca-800'>Agente de IA</h1>
             <p className='text-xs text-slate-500'>Encontra empresas na base e tira dúvidas de tributação e prospecção</p>
@@ -183,9 +182,12 @@ export function Chat() {
           {turnos.length === 0 && (
             <div className='py-8'>
               <div className='text-center'>
-                <div className='fundo-marinho mx-auto grid size-16 place-items-center rounded-full text-ouro shadow-lg shadow-marca-900/25 ring-4 ring-ouro/25'>
-                  <Sparkles className='size-7' />
-                </div>
+                <img
+                  src='/site/marca/selo-3d-base.svg'
+                  alt=''
+                  className='mx-auto size-20'
+                  style={{ filter: 'drop-shadow(0 14px 22px rgba(11,18,37,.28))' }}
+                />
                 <h2 className='mt-5 font-serif text-[2rem] font-bold tracking-[-0.02em] text-marca-800'>O que você quer encontrar?</h2>
                 <p className='mx-auto mt-1 max-w-xl text-sm text-slate-500'>
                   Peça em português. O agente monta os filtros, consulta as 628 mil empresas e mostra o resultado igual à
@@ -301,9 +303,7 @@ function RespostaAgente({
 
   return (
     <div className='flex gap-3' data-turno='agente'>
-      <div className='grid size-8 shrink-0 place-items-center rounded-full bg-marca-50 text-marca-700'>
-        <Sparkles className='size-4' />
-      </div>
+      <img src='/site/marca/simbolo-escuro.svg' alt='OficialCert' className='size-8 shrink-0' />
       <div className='min-w-0 flex-1 space-y-3'>
         {turno.pendente && (
           <ol className='space-y-1.5 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm'>

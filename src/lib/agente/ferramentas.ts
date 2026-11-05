@@ -197,7 +197,15 @@ async function consultar(filtros: Filtros, ordem: Ordem, ctx: Contexto): Promise
 
 // ---------------------------------------------------------------- execução
 const ArgsConsulta = z.object({
-  filtros: FiltrosSchema.default({}),
+  // alguns modelos mandam os filtros como texto JSON em vez de objeto: aceita os dois
+  filtros: z.preprocess(v => {
+    if (typeof v !== 'string') return v
+    try {
+      return JSON.parse(v)
+    } catch {
+      return v
+    }
+  }, FiltrosSchema.default({})),
   ordem: z.enum(ORDENS_LISTA as [Ordem, ...Ordem[]]).optional().catch(undefined)
 })
 

@@ -1,5 +1,5 @@
 import { Suspense } from 'react'
-import { Sparkles } from 'lucide-react'
+import { Zap } from 'lucide-react'
 import { BarraAcoes } from '@/components/consulta/barra-acoes'
 import { AreaResultados, ConsultaProvider, LinkNav } from '@/components/consulta/contexto'
 import { FiltrosAtivos } from '@/components/consulta/filtros-ativos'
@@ -54,7 +54,7 @@ export default async function ConsultarPage({
           {semFiltro ? (
             <div className='flex flex-wrap items-center gap-2'>
               <span className='flex items-center gap-1.5 text-xs font-medium text-slate-500'>
-                <Sparkles className='size-3.5 text-ouro-escuro' /> Atalhos
+                <Zap className='size-3.5 text-ouro-escuro' /> Atalhos
               </span>
               {ATALHOS.map(a => (
                 <LinkNav

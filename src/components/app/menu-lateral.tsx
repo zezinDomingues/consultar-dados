@@ -3,7 +3,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Building2, LogOut, Search, Sparkles } from 'lucide-react'
+import { BotMessageSquare, Building2, LogOut, Search } from 'lucide-react'
 import { sair } from '@/app/login/actions'
 import { cn } from '@/lib/utils'
 import { ROTAS } from '@/lib/rotas'
@@ -11,7 +11,7 @@ import { ROTAS } from '@/lib/rotas'
 const ITENS = [
   { href: ROTAS.dashboard, rotulo: 'Consultar empresas', icone: Search, ativo: (p: string) => p === ROTAS.dashboard || p.startsWith(`${ROTAS.dashboard}/empresa`) },
   { href: ROTAS.contadores, rotulo: 'Contadores e grupos', icone: Building2, ativo: (p: string) => p.startsWith(ROTAS.contadores) },
-  { href: ROTAS.agente, rotulo: 'Agente de IA', icone: Sparkles, ativo: (p: string) => p.startsWith(ROTAS.agente), selo: 'novo' }
+  { href: ROTAS.agente, rotulo: 'Agente de IA', icone: BotMessageSquare, ativo: (p: string) => p.startsWith(ROTAS.agente) }
 ]
 
 export function MenuLateral({ email }: { email: string }) {
@@ -53,11 +53,6 @@ export function MenuLateral({ email }: { email: string }) {
               {ativo && <span className='absolute inset-y-2 left-0 w-[3px] rounded-full bg-ouro' />}
               <Icone className={cn('size-4', ativo ? 'text-ouro' : 'text-areia/60')} />
               <span className='flex-1 whitespace-nowrap'>{item.rotulo}</span>
-              {item.selo && (
-                <span className='whitespace-nowrap rounded-full border border-ouro/40 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-ouro'>
-                  {item.selo}
-                </span>
-              )}
             </Link>
           )
         })}
