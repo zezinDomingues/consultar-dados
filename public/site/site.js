@@ -6,9 +6,10 @@
   'use strict'
 
   // ================= CONFIGURAÇÃO — troque pelos seus dados =================
-  // ⚠️ Número copiado do site da GWT. Enquanto não trocar, os contatos do
-  //    formulário abrem conversa no WhatsApp DELES.
-  var WHATSAPP = '5515991529008'
+  // WhatsApp da OficialCert (só dígitos, com 55 + DDD). VAZIO por enquanto (04/11/2026): os formulários
+  // só gravam o contato em leads_site e mostram "entraremos em contato". Preenchido, o fluxo do
+  // WhatsApp (abrir conversa + botão "Reabrir WhatsApp") volta sozinho.
+  var WHATSAPP = ''
   // Mensagem de abertura da conversa (mesma ordem de campos do original).
   var MENSAGEM_ABERTURA = 'Olá! Preenchi o formulário no site da OficialCert e gostaria de falar com um especialista.'
   var ENDPOINT_LEAD = '/api/publico/lead'
@@ -121,13 +122,15 @@
       botao.disabled = true
       botao.textContent = 'Enviando...'
     }
-    var url = linkWhatsApp(d)
-    var aberto = false
-    try {
-      var w = window.open(url, '_blank')
-      aberto = !!(w && !w.closed && w.closed !== undefined)
-    } catch (e) {
-      aberto = false
+    var url = WHATSAPP ? linkWhatsApp(d) : ''
+    var aberto = !url
+    if (url) {
+      try {
+        var w = window.open(url, '_blank')
+        aberto = !!(w && !w.closed && w.closed !== undefined)
+      } catch (e) {
+        aberto = false
+      }
     }
     registrarLead('contato', form.getAttribute('data-origem') || 'site_contato', d).then(function () {
       form.reset()
@@ -138,7 +141,14 @@
         var aviso = tpl.content.firstElementChild.cloneNode(true)
         aviso.setAttribute('data-aviso-sucesso', '')
         var link = aviso.querySelector('a[href*="wa.me"], a[target=_blank]')
-        if (link) link.setAttribute('href', url)
+        if (link && url) link.setAttribute('href', url)
+        else if (link) {
+          // sem WhatsApp configurado: tira o botão e ajusta o texto do aviso
+          link.remove()
+          aviso.querySelectorAll('p').forEach(function (p) {
+            if (/WhatsApp/.test(p.textContent)) p.textContent = 'Recebemos seus dados. Nossa equipe entrará em contato em breve.'
+          })
+        }
         var idx = parseInt(tpl.getAttribute('data-indice') || '0', 10)
         form.insertBefore(aviso, form.children[idx] || null)
       }
@@ -146,7 +156,7 @@
         botao.disabled = false
         botao.innerHTML = original
       }
-      if (!aberto) window.location.href = url
+      if (!aberto && url) window.location.href = url
     })
   }
 

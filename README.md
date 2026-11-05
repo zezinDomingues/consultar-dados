@@ -105,11 +105,12 @@ Textos (04/11/2026, `scripts/clonar-site/trocar-textos.py`): saíram os números
 (R$ 1 bi+, 200+ empresas, 100%, 8 unidades, prazos de 48 h, "risco zero"/"glosa zero") e a afiliação aparece
 no destaque, numa seção própria da home, em Quem Somos e no rodapé. O carrossel "Empresas que confiam na GWT"
 e a liderança em Quem Somos ficam creditados à GWT. Políticas de privacidade e termos falam em nome
-da OficialCert (e-mail `contato@oficialcert.com`) — **revisar com o jurídico**.
+da OficialCert, sem e-mail por enquanto (o titular é orientado a usar o formulário) — **revisar com o jurídico**.
 
 - Textos: edite os `.html` em `public/site/` (um por página). Visual: CSS original em `public/site/css/`.
 - Comportamento (animações, menu do celular, abas, filtros, formulários): `public/site/site.js`.
-  **O número de WhatsApp está no topo desse arquivo** (`WHATSAPP`) — ainda é o da GWT (trocar pelo da OficialCert).
+  **O número de WhatsApp fica no topo desse arquivo** (`WHATSAPP`) — VAZIO por enquanto: os formulários só gravam
+  o contato e mostram "entraremos em contato"; preenchido, abrir o WhatsApp volta sozinho.
 - Formulários: abrem o WhatsApp ("Preenchi o formulário no site da OficialCert…") e gravam o contato na tabela
   `leads_site` do Supabase (rota pública `/api/publico/lead`, função `registrar_lead_site`, migração 002).
 - "Login" em todas as páginas leva para `/login` da plataforma.
