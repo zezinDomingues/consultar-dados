@@ -91,7 +91,7 @@ async function chamar(
         model: modelo,
         messages: mensagens,
         ...(ferramentas.length ? { tools: ferramentas, tool_choice: 'auto' } : {}),
-        temperature: 0.2,
+        temperature: 0, // mesma pergunta → mesmos filtros (com 0,2 "construtoras" às vezes incluía incorporadoras)
         max_tokens: 2000,
         ...(p.extra && (!p.extraSe || p.extraSe(modelo)) ? p.extra : {})
       }),
