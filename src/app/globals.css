@@ -15,6 +15,19 @@
   --color-marca-800: #184f95;
   --color-marca-900: #0d366b;
   --color-marca-950: #0a2547;
+
+  /* Identidade OficialCert (a mesma do site institucional em public/site) */
+  --font-serif: var(--font-playfair), ui-serif, Georgia, serif;
+  --color-oc-950: #080e1b;
+  --color-oc-900: #0e1931;
+  --color-oc-800: #182a53;
+  --color-oc-700: #1a2d5a;
+  --color-oc-600: #213870;
+  --color-oc-brilho: #365db9;
+  --color-ouro: #c4b99a;
+  --color-ouro-escuro: #b08d4a;
+  --color-areia: #d5cdba;
+  --color-creme: #f5f1e8;
 }
 
 body {
@@ -49,3 +62,26 @@ summary {
 .prose-agente code { background: #f1f5f9; border-radius: 4px; padding: 0 4px; font-size: 0.9em; }
 .prose-agente table { border-collapse: collapse; margin: 0.5em 0; font-size: 0.95em; }
 .prose-agente th, .prose-agente td { border: 1px solid #e2e8f0; padding: 4px 8px; text-align: left; }
+
+/* Login OficialCert: selo 3D flutuando (mesmo tratamento do destaque do site) */
+@keyframes selo-flutua {
+  0%, 100% { transform: rotateX(10deg) rotateY(-16deg) rotateZ(2.5deg) translateY(0); }
+  50% { transform: rotateX(13deg) rotateY(-10deg) rotateZ(2deg) translateY(-12px); }
+}
+.selo-3d { transform-style: preserve-3d; animation: selo-flutua 7s ease-in-out infinite; }
+.selo-3d-topo { transform: translateZ(28px); }
+/* qual selo aparece: no canto (notebooks, 1024–1799 px) ou grande ao lado do texto (≥ 1800 px) */
+.selo-canto, .selo-grande { display: none; }
+@media (min-width: 1024px) and (max-width: 1799.98px) { .selo-canto { display: block; } }
+@media (min-width: 1800px) { .selo-grande { display: block; } }
+@media (prefers-reduced-motion: reduce) { .selo-3d { animation: none; transform: rotateX(10deg) rotateY(-16deg); } }
+
+/* o preenchimento automático do Chrome pinta o campo de azul-claro; mantém o branco do formulário */
+.campo-oc:-webkit-autofill,
+.campo-oc:-webkit-autofill:hover,
+.campo-oc:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px #fff inset;
+  -webkit-text-fill-color: #1a2d5a;
+  caret-color: #1a2d5a;
+  transition: background-color 9999s;
+}
