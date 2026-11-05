@@ -20,10 +20,14 @@ export const MODELOS = {
   botao_texto: '✅ Quero a consulta',
   pergunta_nome: '{Ótimo|Perfeito}! 🙌 Vamos começar a sua consulta.\n\nQual é o seu *nome completo*?',
   pergunta_cnpj: 'Obrigado, {primeiro_nome}! Agora me informe o *CNPJ da empresa* que deseja consultar (só os números já servem).',
+  pergunta_contato: 'Obrigado, {primeiro_nome}! Poderia nos informar um *número para entrarmos em contato*?',
+  botao_mesmo_numero: 'Usar este número',
+  botao_outro_numero: 'Informar outro',
+  pergunta_telefone: 'Claro! Me envie o número com DDD, por favor. Ex.: (11) 98765-4321',
   mensagem_obrigado:
-    'Pronto, {primeiro_nome}! ✅ Recebemos o pedido de consulta do CNPJ *{cnpj}*.\n\n' +
-    'Nossa equipe já está analisando e em breve retornamos aqui mesmo com o resultado.\n\n' +
-    'Enquanto isso, se quiser conhecer a OficialCert e a nossa plataforma, é só tocar no botão abaixo. 👇',
+    'Pronto, {primeiro_nome}! ✅ Recebemos o seu pedido de consulta.\n\n' +
+    'Nossa equipe já está analisando e vai entrar em contato pelo número *{telefone}* com o resultado.\n\n' +
+    'Enquanto isso, conheça a OficialCert e a nossa plataforma 👇',
   botao_site_texto: 'Acessar a plataforma',
   mensagem_nao:
     'Tudo bem, obrigado pelo retorno! Não enviaremos mais mensagens. Se um dia quiser a consulta, é só responder aqui. 👋',
@@ -48,7 +52,10 @@ export type CampanhaEditavel = Pick<
   | 'rodape'
   | 'botao_texto'
   | 'pergunta_nome'
-  | 'pergunta_cnpj'
+  | 'pergunta_contato'
+  | 'botao_mesmo_numero'
+  | 'botao_outro_numero'
+  | 'pergunta_telefone'
   | 'mensagem_obrigado'
   | 'botao_site_texto'
   | 'site_url'
@@ -61,7 +68,8 @@ export const campanhaPadrao = (nome: string, base: string): CampanhaEditavel => 
   nome,
   ordem: 'score',
   excluir_compartilhados: true,
-  formato: 'botao',
+  // botões do WAHA não aparecem no celular (achado de 05/11): o padrão é texto
+  formato: 'texto',
   imagem_url: imagemPadrao(base),
   limite_total: null,
   site_url: base.replace(/\/+$/, ''),
@@ -69,7 +77,10 @@ export const campanhaPadrao = (nome: string, base: string): CampanhaEditavel => 
   rodape: MODELOS.rodape,
   botao_texto: MODELOS.botao_texto,
   pergunta_nome: MODELOS.pergunta_nome,
-  pergunta_cnpj: MODELOS.pergunta_cnpj,
+  pergunta_contato: MODELOS.pergunta_contato,
+  botao_mesmo_numero: MODELOS.botao_mesmo_numero,
+  botao_outro_numero: MODELOS.botao_outro_numero,
+  pergunta_telefone: MODELOS.pergunta_telefone,
   mensagem_obrigado: MODELOS.mensagem_obrigado,
   botao_site_texto: MODELOS.botao_site_texto,
   mensagem_nao: MODELOS.mensagem_nao
@@ -81,9 +92,11 @@ export const RESPOSTAS = {
   voto_ilegivel:
     'Recebi seu toque na enquete, mas não consegui ler a opção 😅\n\nSe quer a consulta gratuita, responda *SIM* ' +
     'aqui. Se não tem interesse, pode ignorar esta mensagem.',
-  sem_botao: 'Deseja fazer a consulta? Responda *SIM*.',
+  sem_botao: 'Responda *SIM* para fazer a sua consulta.',
   nome_invalido: 'Pode me dizer o seu *nome completo*, por favor? (nome e sobrenome)',
   cnpj_invalido: 'Esse CNPJ não parece válido 🤔 Confira e me envie os 14 números, por favor.',
+  telefone_invalido: 'Não consegui entender o número 🤔 Me envie com DDD, por favor. Ex.: (11) 98765-4321',
+  contato_sem_botao: (fone: string) => `Responda *1* para usar este número (${fone}) ou *2* para informar outro.`,
   desistiu_da_coleta: 'Sem problemas! Um especialista da OficialCert vai falar com você por aqui para confirmar os dados. 🙂'
 } as const
 
@@ -92,11 +105,11 @@ export const VARIAVEIS = [
   { nome: '{saudacao}', texto: 'Bom dia / Boa tarde / Boa noite' },
   { nome: '{municipio}', texto: 'cidade da empresa' },
   { nome: '{primeiro_nome}', texto: 'primeiro nome informado (depois do nome)' },
-  { nome: '{cnpj}', texto: 'CNPJ informado (mensagem final)' }
+  { nome: '{telefone}', texto: 'número de contato escolhido (mensagem final)' }
 ] as const
 
 export type Variaveis = Partial<
-  Record<'empresa' | 'saudacao' | 'municipio' | 'link' | 'nome' | 'primeiro_nome' | 'cnpj', string>
+  Record<'empresa' | 'saudacao' | 'municipio' | 'link' | 'nome' | 'primeiro_nome' | 'cnpj' | 'telefone', string>
 >
 
 /** Dígitos verificadores do CNPJ. */

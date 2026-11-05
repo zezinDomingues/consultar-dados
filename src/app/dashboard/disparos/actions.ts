@@ -54,7 +54,10 @@ const CampanhaSchema = z.object({
     .transform(v => v || null),
   botao_texto: texto(20, 'Botão da 1ª mensagem (limite do WhatsApp: 20)'),
   pergunta_nome: texto(1000, 'Pergunta do nome'),
-  pergunta_cnpj: texto(1000, 'Pergunta do CNPJ'),
+  pergunta_contato: texto(1000, 'Pergunta do número de contato'),
+  botao_mesmo_numero: texto(20, 'Botão "este número" (limite do WhatsApp: 20)'),
+  botao_outro_numero: texto(20, 'Botão "outro número" (limite do WhatsApp: 20)'),
+  pergunta_telefone: texto(1000, 'Pergunta do outro número'),
   mensagem_obrigado: texto(1024, 'Mensagem final'),
   botao_site_texto: texto(20, 'Botão do site (limite do WhatsApp: 20)'),
   site_url: url('Site'),
@@ -69,7 +72,7 @@ const CampanhaSchema = z.object({
 
 const CAMPOS = [
   'id', 'nome', 'filtros', 'ordem', 'formato', 'imagem_url', 'mensagem', 'rodape', 'botao_texto', 'pergunta_nome',
-  'pergunta_cnpj', 'mensagem_obrigado', 'botao_site_texto', 'site_url', 'mensagem_nao', 'limite_total'
+  'pergunta_contato', 'botao_mesmo_numero', 'botao_outro_numero', 'pergunta_telefone', 'mensagem_obrigado', 'botao_site_texto', 'site_url', 'mensagem_nao', 'limite_total'
 ]
 
 function lerCampanha(fd: FormData) {

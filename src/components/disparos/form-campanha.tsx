@@ -5,7 +5,7 @@ import { useActionState, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { CheckCircle2, ExternalLink, FlaskConical, LoaderCircle, Play, Reply, Save, SlidersHorizontal } from 'lucide-react'
 import { enviarTeste, salvarCampanha, type Retorno } from '@/app/dashboard/disparos/actions'
-import { fmtCnpj, montar, RESPOSTAS, saudacao, VARIAVEIS, type CampanhaEditavel } from '@/lib/disparos/mensagens'
+import { montar, RESPOSTAS, saudacao, VARIAVEIS, type CampanhaEditavel } from '@/lib/disparos/mensagens'
 import { ORDENS, type Filtros } from '@/lib/empresas/filtros'
 import { fmtInt } from '@/lib/formatar'
 import { cn } from '@/lib/utils'
@@ -44,7 +44,7 @@ export function FormCampanha({
 
   // pré-visualização com uma empresa real dos filtros (sempre a 1ª variação, para não "piscar" enquanto digita)
   const vars = useMemo(
-    () => ({ ...exemplo, saudacao: saudacao(), primeiro_nome: 'Maria', nome: 'Maria Souza', cnpj: fmtCnpj('11222333000181') }),
+    () => ({ ...exemplo, saudacao: saudacao(), primeiro_nome: 'Maria', nome: 'Maria Souza', telefone: '(11) 98765-4321' }),
     [exemplo]
   )
   const fixo = () => 0
@@ -52,7 +52,7 @@ export function FormCampanha({
   const previa = {
     primeira: botao || /\bSIM\b/.test(primeira) ? primeira : `${primeira}\n\n${RESPOSTAS.sem_botao}`,
     nome: montar(v.pergunta_nome, vars, fixo),
-    cnpj: montar(v.pergunta_cnpj, vars, fixo),
+    contato: montar(v.pergunta_contato, vars, fixo),
     final: botao ? montar(v.mensagem_obrigado, vars, fixo) : `${montar(v.mensagem_obrigado, vars, fixo)}\n\n👉 ${v.site_url}`
   }
   const disponiveis = elegiveis ? (v.excluir_compartilhados ? elegiveis.elegiveis : elegiveis.elegiveis_sem_excluir) : null
@@ -147,8 +147,8 @@ export function FormCampanha({
           <div className='grid grid-cols-2 gap-2'>
             {(
               [
-                ['botao', 'Com botão', 'Logo + texto + botão “Quero a consulta”'],
-                ['texto', 'Responder SIM', 'Logo + texto pedindo “SIM” (se o celular não mostrar botões)']
+                ['texto', 'Responder por texto', 'Logo + texto; a pessoa responde SIM, 1 ou 2. Funciona no WAHA'],
+                ['botao', 'Com botões', 'Só com provedor que mostre botões (Z-API). No WAHA a mensagem chega invisível']
               ] as const
             ).map(([f, titulo, nota]) => (
               <button
@@ -187,9 +187,22 @@ export function FormCampanha({
         <section className='space-y-4 rounded-2xl border border-slate-200 bg-white p-5'>
           <p className='text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500'>2 · Depois do “quero”: coleta pela conversa</p>
           <Texto rotulo='Pergunta do nome completo' nome='pergunta_nome' valor={v.pergunta_nome} onChange={set('pergunta_nome')} linhas={3} max={1000} />
-          <Texto rotulo='Pergunta do CNPJ' nome='pergunta_cnpj' valor={v.pergunta_cnpj} onChange={set('pergunta_cnpj')} linhas={3} max={1000} />
+          <Texto rotulo='Pergunta do número de contato' nome='pergunta_contato' valor={v.pergunta_contato} onChange={set('pergunta_contato')} linhas={3} max={1000} />
+          {botao ? (
+            <div className='grid gap-3 sm:grid-cols-2'>
+              <Linha rotulo='Botão “este número” (até 20)' nome='botao_mesmo_numero' valor={v.botao_mesmo_numero} onChange={set('botao_mesmo_numero')} max={20} />
+              <Linha rotulo='Botão “outro número” (até 20)' nome='botao_outro_numero' valor={v.botao_outro_numero} onChange={set('botao_outro_numero')} max={20} />
+            </div>
+          ) : (
+            <>
+              <input type='hidden' name='botao_mesmo_numero' value={v.botao_mesmo_numero} />
+              <input type='hidden' name='botao_outro_numero' value={v.botao_outro_numero} />
+            </>
+          )}
+          <Texto rotulo='Se escolher outro número' nome='pergunta_telefone' valor={v.pergunta_telefone} onChange={set('pergunta_telefone')} linhas={2} max={1000} />
           <p className='text-xs text-slate-400'>
-            O telefone vem da própria conversa. Nome sem sobrenome ou CNPJ inválido: o robô pede de novo (até 3 vezes; depois chama a equipe).
+            Nome sem sobrenome ou número inválido: o robô pede de novo (até 3 vezes; depois chama a equipe). Se a pessoa já mandar o número
+            direto, ele é aceito.
           </p>
         </section>
 
@@ -245,8 +258,13 @@ export function FormCampanha({
             <BolhaCliente texto={botao ? v.botao_texto : 'Sim'} />
             <Bolha texto={previa.nome} />
             <BolhaCliente texto='Maria Souza' />
-            <Bolha texto={previa.cnpj} />
-            <BolhaCliente texto='11.222.333/0001-81' />
+            <Bolha
+              texto={botao ? previa.contato : `${previa.contato}\n\n${RESPOSTAS.contato_sem_botao('(11) 99999-0000')}`}
+              botoes={botao ? [v.botao_mesmo_numero, v.botao_outro_numero] : undefined}
+            />
+            <BolhaCliente texto={botao ? v.botao_outro_numero : '2'} />
+            <Bolha texto={v.pergunta_telefone} />
+            <BolhaCliente texto='(11) 98765-4321' />
             <Bolha imagem={v.imagem_url} texto={previa.final} botao={botao ? { texto: v.botao_site_texto, link: true } : undefined} />
           </div>
         </div>
@@ -258,7 +276,7 @@ export function FormCampanha({
           {editando ? (
             <>
               <p className='mt-1 text-xs text-slate-400'>
-                Salva os textos e manda a 1ª mensagem de verdade. Responda no celular como um cliente (toque no botão, mande nome e CNPJ).
+                Salva os textos e manda a 1ª mensagem de verdade. Responda no celular como um cliente (SIM, nome, número).
                 Fica fora do funil.
               </p>
               {numeros.length ? (
@@ -373,12 +391,14 @@ function Bolha({
   texto,
   imagem,
   rodape,
-  botao
+  botao,
+  botoes
 }: {
   texto: string
   imagem?: string | null
   rodape?: string | null
   botao?: { texto: string; link?: boolean }
+  botoes?: string[]
 }) {
   return (
     <div className='max-w-[88%] overflow-hidden rounded-xl rounded-tl-sm bg-white text-[13px] leading-relaxed text-slate-800 shadow-sm'>
@@ -392,6 +412,11 @@ function Bolha({
         )}
         {rodape && botao && <span className='block pt-1.5 text-[11.5px] text-slate-400'>{rodape}</span>}
       </div>
+      {botoes?.map(b => (
+        <p key={b} className='flex items-center justify-center gap-1.5 border-t border-slate-100 py-2 text-[13px] font-medium text-[#0b8a5f]'>
+          <Reply className='size-3.5' /> {b}
+        </p>
+      ))}
       {botao && (
         <p className='flex items-center justify-center gap-1.5 border-t border-slate-100 py-2 text-[13px] font-medium text-[#0b8a5f]'>
           {botao.link ? <ExternalLink className='size-3.5' /> : <Reply className='size-3.5' />} {botao.texto}

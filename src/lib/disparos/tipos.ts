@@ -89,7 +89,7 @@ export type Disparo = {
   lead_whatsapp: string | null
   lead_ip: string | null
   /** coleta pela conversa: qual pergunta está aberta */
-  etapa: 'nome' | 'cnpj' | null
+  etapa: 'nome' | 'contato' | 'telefone' | 'cnpj' | null
   lead_cnpj: string | null
   tentativas: number
   /** conversa de teste do administrador (fora do funil) */
@@ -123,6 +123,10 @@ export type Campanha = {
   rodape: string | null
   pergunta_nome: string
   pergunta_cnpj: string
+  pergunta_contato: string
+  botao_mesmo_numero: string
+  botao_outro_numero: string
+  pergunta_telefone: string
   botao_site_texto: string
   site_url: string
   status: StatusCampanha

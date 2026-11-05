@@ -30,10 +30,11 @@ export default async function DisparoPage({ params }: { params: Promise<{ id: st
     { rotulo: 'Lido', em: d.lido_em },
     { rotulo: 'Respondeu', em: d.respondido_em },
     { rotulo: 'Quis a consulta', em: d.interessado_em },
-    { rotulo: 'Enviou nome e CNPJ', em: d.preenchido_em }
+    { rotulo: 'Enviou nome e contato', em: d.preenchido_em }
   ]
 
-  const etapaAberta = d.etapa === 'nome' ? 'Esperando o nome completo' : d.etapa === 'cnpj' ? 'Esperando o CNPJ' : null
+  const ETAPAS: Record<string, string> = { nome: 'Esperando o nome completo', contato: 'Esperando a escolha do número de contato', telefone: 'Esperando o outro número', cnpj: 'Esperando o CNPJ' }
+  const etapaAberta = d.etapa ? ETAPAS[d.etapa] : null
 
   const bloqueioResposta =
     d.status === 'descadastrado'
@@ -113,14 +114,9 @@ export default async function DisparoPage({ params }: { params: Promise<{ id: st
               </p>
               <dl className='mt-3 grid gap-3 text-sm sm:grid-cols-2'>
                 <Campo rotulo='Nome completo' valor={d.lead_nome} />
+                {d.lead_cnpj && <Campo rotulo='CNPJ informado' valor={fmtCnpj(d.lead_cnpj)} link={ROTAS.empresa(d.lead_cnpj)} interno />}
                 <Campo
-                  rotulo='CNPJ informado'
-                  valor={d.lead_cnpj ? fmtCnpj(d.lead_cnpj) : null}
-                  link={d.lead_cnpj ? ROTAS.empresa(d.lead_cnpj) : undefined}
-                  interno
-                />
-                <Campo
-                  rotulo='WhatsApp'
+                  rotulo={d.lead_whatsapp && d.lead_whatsapp !== d.telefone ? 'Número de contato (informado)' : 'Número de contato (o mesmo)'}
                   valor={fmtFone(d.lead_whatsapp ?? d.telefone)}
                   link={`https://wa.me/55${d.lead_whatsapp ?? d.telefone}`}
                 />

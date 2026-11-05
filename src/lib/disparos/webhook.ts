@@ -4,9 +4,8 @@
 import 'server-only'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import {
-  cnpjValido,
   cortesia,
-  fmtCnpj,
+  fmtFone,
   intencao,
   montar,
   nomeCompleto,
@@ -20,6 +19,7 @@ import {
 } from './mensagens'
 import { canalDe, carregarCampanha, carregarNumero, mensagemFinal, registrarEvento, responder } from './motor'
 import type { Campanha, Disparo, NumeroComChave } from './tipos'
+import type { MensagemRica } from './waha'
 import { chaveDoId, telefoneDoLid } from './waha'
 
 export type EventoWaha = { event?: string; session?: string; payload?: Record<string, unknown> | null }
@@ -223,61 +223,98 @@ async function marcarInteressado(d: Disparo, n: NumeroComChave | null, c: Campan
   return 'interessado: pedindo o nome'
 }
 
-/** Coleta pela conversa: nome completo → CNPJ → mensagem final (logo + análise + botão do site). */
+/** Pergunta do número de contato: com 2 botões (formato botão) ou pedindo 1/2 por escrito (formato texto). */
+function perguntaContato(c: Campanha, d: Disparo, nome: string): MensagemRica {
+  const texto = montar(c.pergunta_contato, { primeiro_nome: primeiroNome(nome), nome, empresa: nomeEmpresa(d) })
+  if (c.formato === 'botao') {
+    return {
+      texto,
+      botoes: [
+        { tipo: 'resposta', texto: c.botao_mesmo_numero },
+        { tipo: 'resposta', texto: c.botao_outro_numero }
+      ]
+    }
+  }
+  return { texto: `${texto}\n\n${RESPOSTAS.contato_sem_botao(fmtFone(d.telefone))}` }
+}
+
+const ESTE = /^(1|um|este|esse|mesmo|o mesmo|este mesmo|esse mesmo|pode ser esse|pode ser este|pode|sim|s|ok|isso|este numero|esse numero|usar este|usar esse|usar este numero|usar esse numero|pode usar|pode usar esse|pode usar este)$/
+const OUTRO = /^(2|dois|outro|outro numero|informar outro|usar outro|usar outro numero|nao|n|quero outro|prefiro outro)$/
+
+/** Coleta pela conversa: nome completo → número de contato (este ou outro) → mensagem final (logo + análise + site). */
 async function coletar(d: Disparo, n: NumeroComChave | null, c: Campanha, corpo: string, tocouBotao: boolean, depois: Depois) {
-  const pergunta = () =>
+  const responda = (m: string | MensagemRica) => {
+    if (n) depois(() => responder(d, n, m))
+  }
+  const repetir = () =>
     d.etapa === 'nome'
       ? montar(c.pergunta_nome, { empresa: nomeEmpresa(d), saudacao: saudacao() })
-      : montar(c.pergunta_cnpj, { primeiro_nome: primeiroNome(d.lead_nome ?? ''), empresa: nomeEmpresa(d) })
-  // "não quero mais" no meio da coleta não é nome
-  if (intencao(corpo) === 'nao') return marcarSemInteresse(d, n, c.mensagem_nao, depois)
-  // tocou o botão de novo / "sim" de novo: repete a pergunta aberta
-  if (tocouBotao || intencao(corpo) === 'sim') {
-    if (n) depois(() => responder(d, n, pergunta()))
-    return `pergunta repetida (${d.etapa})`
-  }
-  const errou = async (aviso: string) => {
+      : d.etapa === 'telefone'
+        ? c.pergunta_telefone
+        : perguntaContato(c, d, d.lead_nome ?? '')
+  const errou = async (aviso: string | MensagemRica) => {
     const tentativas = (d.tentativas ?? 0) + 1
     if (tentativas >= 3) {
       // não insiste: chama a equipe
       await atualizar(d.id, { etapa: null, tentativas, atencao: true })
-      if (n) depois(() => responder(d, n, RESPOSTAS.desistiu_da_coleta))
-      return `coleta interrompida no ${d.etapa}: equipe avisada`
+      responda(RESPOSTAS.desistiu_da_coleta)
+      return `coleta interrompida (${d.etapa}): equipe avisada`
     }
     await atualizar(d.id, { tentativas })
-    if (n) depois(() => responder(d, n, aviso))
+    responda(aviso)
     return `${d.etapa} inválido (${tentativas}/3)`
   }
+  const concluir = async (fone: string) => {
+    await atualizar(d.id, { lead_whatsapp: fone, etapa: null, tentativas: 0, status: 'preencheu', preenchido_em: d.preenchido_em ?? agora() })
+    await registrarEvento({
+      disparo_id: d.id,
+      numero_id: n?.id ?? d.numero_id,
+      tipo: 'formulario',
+      direcao: 'entrada',
+      texto: `${d.lead_nome} · contato ${fmtFone(fone)}`,
+      dados: { nome: d.lead_nome, contato: fone, mesmo_numero: fone === d.telefone }
+    })
+    responda(mensagemFinal(c, { ...d, lead_whatsapp: fone }))
+    return 'dados recebidos: mensagem final enviada'
+  }
+  const t = normalizar(corpo)
 
   if (d.etapa === 'nome') {
+    // "não quero mais" no meio não é nome; tocar o botão / "sim" de novo repete a pergunta
+    if (intencao(corpo) === 'nao') return marcarSemInteresse(d, n, c.mensagem_nao, depois)
+    if (tocouBotao || intencao(corpo) === 'sim') {
+      responda(repetir())
+      return 'pergunta repetida (nome)'
+    }
     const nome = nomeCompleto(corpo)
     if (!nome) return errou(RESPOSTAS.nome_invalido)
-    await atualizar(d.id, { lead_nome: nome, etapa: 'cnpj', tentativas: 0 })
-    if (n) depois(() => responder(d, n, montar(c.pergunta_cnpj, { primeiro_nome: primeiroNome(nome), nome, empresa: nomeEmpresa(d) })))
-    return 'nome recebido: pedindo o CNPJ'
+    await atualizar(d.id, { lead_nome: nome, etapa: 'contato', tentativas: 0 })
+    responda(perguntaContato(c, d, nome))
+    return 'nome recebido: perguntando o número de contato'
   }
 
-  const cnpj = corpo.replace(/\D/g, '')
-  if (!cnpjValido(cnpj)) return errou(RESPOSTAS.cnpj_invalido)
-  const agoraIso = agora()
-  await atualizar(d.id, {
-    lead_cnpj: cnpj,
-    lead_whatsapp: d.telefone,
-    etapa: null,
-    tentativas: 0,
-    status: 'preencheu',
-    preenchido_em: d.preenchido_em ?? agoraIso
-  })
-  await registrarEvento({
-    disparo_id: d.id,
-    numero_id: n?.id ?? d.numero_id,
-    tipo: 'formulario',
-    direcao: 'entrada',
-    texto: `${d.lead_nome} · CNPJ ${fmtCnpj(cnpj)} · WhatsApp ${d.telefone}`,
-    dados: { nome: d.lead_nome, cnpj, whatsapp: d.telefone }
-  })
-  if (n) depois(() => responder(d, n, mensagemFinal(c, { ...d, lead_cnpj: cnpj })))
-  return 'dados recebidos: mensagem final enviada'
+  if (d.etapa === 'contato') {
+    const fone = foneDoJid(corpo)
+    if (fone && corpo.replace(/\D/g, '').length >= 10) return concluir(fone) // já mandou o número direto
+    if (t === normalizar(c.botao_mesmo_numero) || ESTE.test(t)) return concluir(d.telefone)
+    if (t === normalizar(c.botao_outro_numero) || OUTRO.test(t)) {
+      await atualizar(d.id, { etapa: 'telefone', tentativas: 0 })
+      responda(c.pergunta_telefone)
+      return 'vai informar outro número'
+    }
+    return errou(perguntaContato(c, d, d.lead_nome ?? ''))
+  }
+
+  if (d.etapa === 'telefone') {
+    const fone = foneDoJid(corpo)
+    if (!fone) return errou(RESPOSTAS.telefone_invalido)
+    return concluir(fone)
+  }
+
+  // etapa antiga (CNPJ) de campanhas anteriores: encerra pedindo o contato
+  await atualizar(d.id, { etapa: 'contato', tentativas: 0 })
+  responda(perguntaContato(c, d, d.lead_nome ?? ''))
+  return 'etapa antiga: perguntando o contato'
 }
 
 async function marcarSemInteresse(d: Disparo, n: NumeroComChave | null, modelo: string, depois: Depois) {

@@ -4,7 +4,7 @@
 import 'server-only'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { dentroDaJanela, inicioDoDiaBrasilia } from './config'
-import { fmtCnpj, montar, nomeEmpresa, primeiroNome, RESPOSTAS, saudacao } from './mensagens'
+import { fmtCnpj, fmtFone, montar, nomeEmpresa, primeiroNome, RESPOSTAS, saudacao } from './mensagens'
 import type { Campanha, Disparo, EventoDisparo, NumeroComChave } from './tipos'
 import {
   digitar,
@@ -115,13 +115,14 @@ export function primeiraMensagem(c: Campanha, d: Pick<Disparo, 'razao_social' | 
 /** Mensagem final (depois do CNPJ): logo + agradecimento + botão que abre o site. */
 export function mensagemFinal(
   c: Campanha,
-  d: Pick<Disparo, 'razao_social' | 'nome_fantasia' | 'municipio' | 'lead_nome' | 'lead_cnpj'>
+  d: Pick<Disparo, 'razao_social' | 'nome_fantasia' | 'municipio' | 'lead_nome' | 'lead_cnpj' | 'lead_whatsapp' | 'telefone'>
 ): MensagemRica {
   const nome = d.lead_nome ?? ''
   const texto = montar(c.mensagem_obrigado, {
     primeiro_nome: primeiroNome(nome),
     nome,
     cnpj: fmtCnpj(d.lead_cnpj),
+    telefone: fmtFone(d.lead_whatsapp ?? d.telefone),
     empresa: nomeEmpresa(d),
     saudacao: saudacao()
   })

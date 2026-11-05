@@ -205,7 +205,7 @@ export default async function PainelDisparos({ searchParams }: { searchParams: P
                     {d.preenchido_em ? (
                       <span className='block text-slate-700'>
                         <strong className='font-semibold text-emerald-800'>{d.lead_nome}</strong>
-                        <span className='block truncate text-slate-500'>{d.lead_cnpj ? `CNPJ ${fmtCnpj(d.lead_cnpj)}` : d.lead_email}</span>
+                        <span className='block truncate text-slate-500'>{d.lead_whatsapp ? `contato ${fmtFone(d.lead_whatsapp)}` : d.lead_cnpj ? `CNPJ ${fmtCnpj(d.lead_cnpj)}` : d.lead_email}</span>
                       </span>
                     ) : d.ultima_resposta ? (
                       <span className='line-clamp-2 text-slate-600'>“{d.ultima_resposta}”</span>
@@ -257,7 +257,7 @@ function Funil({ r, capacidade }: { r: ResumoDisparos; capacidade: number }) {
     { rotulo: 'Lidos', valor: r.lidos, nota: `${fmtPct(r.lidos, r.enviados)} dos enviados`, icone: Eye },
     { rotulo: 'Responderam', valor: r.responderam, nota: `${fmtPct(r.responderam, r.enviados)} · ${fmtInt(r.aguardando)} sem resposta`, icone: MessageCircleReply },
     { rotulo: 'Querem a consulta', valor: r.interessados, nota: `${fmtPct(r.interessados, r.enviados)} dos enviados`, icone: Hand },
-    { rotulo: 'Enviaram nome e CNPJ', valor: r.preencheram, nota: `${fmtPct(r.preencheram, r.enviados)} dos enviados`, icone: ClipboardCheck, ouro: true },
+    { rotulo: 'Enviaram nome e contato', valor: r.preencheram, nota: `${fmtPct(r.preencheram, r.enviados)} dos enviados`, icone: ClipboardCheck, ouro: true },
     { rotulo: 'Recusaram / saíram', valor: r.sem_interesse + r.descadastrados, nota: `${fmtInt(r.descadastrados)} pediram para sair`, icone: MailX },
     { rotulo: 'Não entregues', valor: r.sem_whatsapp + r.falhas, nota: `${fmtInt(r.sem_whatsapp)} sem WhatsApp · ${fmtInt(r.falhas)} falhas`, icone: TriangleAlert }
   ]
