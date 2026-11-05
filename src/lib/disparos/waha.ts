@@ -6,20 +6,17 @@
 // - conversa direta pode chegar endereçada por LID (`123@lid`), que não é telefone: o número real vem em
 //   `_data.key.remoteJidAlt` ou sai de `/api/{sessão}/lids/{lid}` (este exige o store do NOWEB ligado);
 // - com LID o voto da enquete às vezes chega ilegível (`poll.vote.failed`, sem a opção) → o webhook pede "SIM".
+//
+// Número da Z-API (provedor 'zapi'): cada função abaixo despacha para ./zapi.ts — o resto da plataforma não precisa
+// saber qual provedor está do outro lado.
 import 'server-only'
+import { ErroEnvio } from './erro'
+import * as Z from './zapi'
 
-export type Canal = { url: string; sessao: string; apiKey: string | null }
+export type Canal = { url: string; sessao: string; apiKey: string | null; provedor?: 'waha' | 'zapi'; clientToken?: string | null }
 
-/** `enviado: 'talvez'` = a requisição pode ter chegado ao WhatsApp (timeout/conexão caída no meio). */
-export class ErroWaha extends Error {
-  constructor(
-    message: string,
-    readonly status?: number,
-    readonly enviado: 'nao' | 'talvez' = 'nao'
-  ) {
-    super(message)
-  }
-}
+export const ErroWaha = ErroEnvio
+const zapi = (c: Canal) => c.provedor === 'zapi'
 
 // Falhas da fase de CONEXÃO: a requisição nem saiu daqui.
 const ERROS_DE_CONEXAO = new Set([
@@ -72,12 +69,15 @@ export type SessaoWaha = {
   status: string
   me?: { id?: string; pushName?: string } | null
   config?: Record<string, unknown> | null
+  detalhe?: string | null
 }
 
-export const lerSessao = (canal: Canal) => chamar<SessaoWaha>(canal, 'GET', `/api/sessions/${sessao(canal)}`, undefined, 10_000)
+export const lerSessao = (canal: Canal): Promise<SessaoWaha> =>
+  zapi(canal) ? Z.lerSessao(canal) : chamar<SessaoWaha>(canal, 'GET', `/api/sessions/${sessao(canal)}`, undefined, 10_000)
 
 /** Telefone (DDD + número, sem 55) → existe no WhatsApp? Devolve o chatId certo (com ou sem o 9). */
 export async function verificarNumero(canal: Canal, telefone: string) {
+  if (zapi(canal)) return Z.verificarNumero(canal, telefone)
   const r = await chamar<{ numberExists?: boolean; chatId?: string }>(
     canal,
     'GET',
@@ -104,6 +104,7 @@ const espera = (ms: number) => new Promise(r => setTimeout(r, ms))
 
 /** "digitando…" por alguns segundos antes de mandar — como uma pessoa faria. Falha aqui não impede o envio. */
 export async function digitar(canal: Canal, chatId: string, ms: number) {
+  if (zapi(canal)) return espera(Math.min(ms, 2500)) // a Z-API simula o "digitando" no próprio envio
   try {
     await chamar(canal, 'POST', '/api/startTyping', { session: canal.sessao, chatId }, 8_000)
     await espera(ms)
@@ -114,6 +115,7 @@ export async function digitar(canal: Canal, chatId: string, ms: number) {
 }
 
 export async function marcarVisto(canal: Canal, chatId: string) {
+  if (zapi(canal)) return
   try {
     await chamar(canal, 'POST', '/api/sendSeen', { session: canal.sessao, chatId }, 8_000)
   } catch {
@@ -122,6 +124,7 @@ export async function marcarVisto(canal: Canal, chatId: string) {
 }
 
 export async function enviarTexto(canal: Canal, chatId: string, texto: string) {
+  if (zapi(canal)) return Z.enviarTexto(canal, chatId, texto)
   const r = await chamar<unknown>(canal, 'POST', '/api/sendText', { session: canal.sessao, chatId, text: texto, linkPreview: true }, 30_000)
   return chaveMensagem(r)
 }
@@ -148,6 +151,7 @@ const arquivo = (url: string) => ({
 
 /** Imagem com legenda (o WAHA baixa a imagem pela URL — ela precisa ser pública). */
 export async function enviarImagem(canal: Canal, chatId: string, url: string, legenda: string) {
+  if (zapi(canal)) return Z.enviarImagem(canal, chatId, url, legenda)
   const r = await chamar<unknown>(canal, 'POST', '/api/sendImage', { session: canal.sessao, chatId, file: arquivo(url), caption: legenda }, 45_000)
   return chaveMensagem(r)
 }
@@ -158,6 +162,7 @@ export async function enviarImagem(canal: Canal, chatId: string, url: string, le
  * celular confirma; por isso a campanha tem o formato "texto" como alternativa.
  */
 export async function enviarBotoes(canal: Canal, chatId: string, m: MensagemRica) {
+  if (zapi(canal)) return Z.enviarBotoes(canal, chatId, m)
   const r = await chamar<unknown>(
     canal,
     'POST',
@@ -177,6 +182,7 @@ export async function enviarBotoes(canal: Canal, chatId: string, m: MensagemRica
 
 /** `123@lid` → `5511999999999` (com 55). Só funciona com o store do NOWEB ligado. */
 export async function telefoneDoLid(canal: Canal, lid: string) {
+  if (zapi(canal)) return null
   try {
     const chave = lid.replace(/@.*$/, '')
     const r = await chamar<{ pn?: string }>(canal, 'GET', `/api/${sessao(canal)}/lids/${encodeURIComponent(`${chave}@lid`)}`, undefined, 10_000)
@@ -195,6 +201,8 @@ export const EVENTOS_WEBHOOK = ['message', 'poll.vote', 'poll.vote.failed', 'mes
  * configuração — ela volta a WORKING em ~20 s, sem parear de novo.
  */
 export async function configurarWebhook(canal: Canal, url: string, segredo: string) {
+  // Z-API não assina o webhook: o segredo vai na URL, e a rota é a própria dela
+  if (zapi(canal)) return Z.configurarWebhook(canal, `${url.replace('/api/sistema/whatsapp', '/api/sistema/zapi')}&token=${encodeURIComponent(segredo)}`)
   const atual = await lerSessao(canal)
   const config = { ...(atual?.config ?? {}) } as Record<string, unknown>
   const destino = new URL(url)

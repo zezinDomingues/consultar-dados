@@ -45,7 +45,8 @@ export default async function ConsultarPage({
               <span className='rotulo-secao'>Base de empresas</span>
               <h1 className='mt-2 font-serif text-[2rem] font-bold leading-tight tracking-[-0.02em] text-marca-800'>Consultar empresas</h1>
               <p className='mt-1 text-sm text-slate-500'>
-                {fmtInt(opcoes.total_base)} empresas de SP com Lucro Real ou Presumido · uma por CNPJ raiz
+                {fmtInt(opcoes.total_base)} empresas com Lucro Real ou Presumido em{' '}
+                {(opcoes.ufs ?? []).map(u => u.chave).join(', ') || 'SP'} · uma por CNPJ raiz em cada estado
               </p>
             </div>
             <BarraAcoes consulta={consulta} admin={!!usuario?.admin} />

@@ -8,7 +8,11 @@ import { ROTAS } from '@/lib/rotas'
 export const PORTES = ['Microempresa', 'Empresa de pequeno porte', 'Demais (médio/grande)'] as const
 export const REGIMES = ['Lucro Real', 'Lucro Presumido', 'Tributação mista'] as const
 export const SITUACOES = ['Recente (ECF 2024)', 'ECF 2023', 'Antigo (ECF ≤ 2022)', 'Hoje no Simples'] as const
-export const LOCALIZACOES = ['Capital', 'Grande SP', 'Litoral', 'Interior'] as const
+export const LOCALIZACOES = ['Capital', 'Região metropolitana', 'Litoral', 'Interior'] as const
+/** Siglas aceitas no filtro de estado (a base recebe os estados aos poucos; as opções vêm do banco). */
+// prettier-ignore
+export const UFS = ['AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI',
+  'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'] as const
 export const PRIORIDADES = ['A', 'B', 'C', 'D'] as const
 export const TIPOS_NEGOCIO = [
   'Operacional',
@@ -29,9 +33,11 @@ export const FiltrosSchema = z.object({
   cnaes: lista('Atividade principal = subclasse CNAE (7 dígitos). Ex.: ["4771702"] farmácia de manipulação'),
   cnae_secundario: z.string().regex(/^\d{4,7}$/).optional()
     .describe('Código CNAE (4 a 7 dígitos) que a empresa tem como atividade SECUNDÁRIA'),
-  municipios: lista('Municípios de SP, escritos com acento. Ex.: ["Campinas", "São José dos Campos"]'),
-  regioes: lista('Regiões intermediárias do IBGE. Ex.: ["Campinas", "Ribeirão Preto", "São Paulo"]'),
-  localizacoes: z.array(z.enum(LOCALIZACOES)).optional().describe('Capital, Grande SP, Litoral ou Interior'),
+  ufs: z.array(z.enum(UFS)).optional().describe('Estados (sigla). Ex.: ["SP"], ["BA", "MG"]'),
+  municipios: lista('Municípios com acento, como "Nome" (qualquer estado) ou "Nome/UF". Ex.: ["Campinas"], ["Salvador/BA"]'),
+  regioes: lista('Regiões intermediárias do IBGE. Ex.: ["Campinas", "Ribeirão Preto", "Belo Horizonte", "Salvador"]'),
+  localizacoes: z.array(z.enum(LOCALIZACOES)).optional()
+    .describe('Capital do estado, região metropolitana da capital (Grande SP, Grande BH, Grande Salvador…), litoral (só SP) ou interior'),
   portes: z.array(z.enum(PORTES)).optional().describe('Porte no cadastro da Receita'),
   regimes: z.array(z.enum(REGIMES)).optional().describe('Regime declarado na ECF (histórico, 2016–2024)'),
   situacoes_regime: z.array(z.enum(SITUACOES)).optional()
@@ -42,7 +48,7 @@ export const FiltrosSchema = z.object({
   capital_max: z.number().min(0).optional().describe('Capital social máximo em reais'),
   idade_min: inteiro('Idade mínima da empresa, em anos'),
   idade_max: inteiro('Idade máxima da empresa, em anos'),
-  estab_min: inteiro('Mínimo de estabelecimentos (matriz + filiais) em SP'),
+  estab_min: inteiro('Mínimo de estabelecimentos (matriz + filiais) no estado'),
   com_whatsapp: z.boolean().optional().describe('Só empresas com celular válido (WhatsApp provável)'),
   com_email: z.boolean().optional().describe('Só empresas com e-mail válido'),
   contato_proprio: z.boolean().optional()
@@ -70,7 +76,7 @@ export const LIMITE_EXPORTACAO = 20_000
 export type Consulta = { filtros: Filtros; ordem: Ordem; pagina: number; por: number }
 
 const LISTAS = [
-  'setores', 'ramos', 'segmentos', 'cnaes', 'municipios', 'regioes', 'localizacoes', 'portes', 'regimes',
+  'setores', 'ramos', 'segmentos', 'cnaes', 'ufs', 'municipios', 'regioes', 'localizacoes', 'portes', 'regimes',
   'situacoes_regime', 'prioridades', 'tipos_negocio'
 ] as const satisfies readonly ChaveFiltro[]
 const NUMEROS = ['capital_min', 'capital_max', 'idade_min', 'idade_max', 'estab_min'] as const satisfies readonly ChaveFiltro[]

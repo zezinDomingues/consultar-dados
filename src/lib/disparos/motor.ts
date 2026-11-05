@@ -24,11 +24,20 @@ const sorteio = (min: number, max: number) => min + Math.random() * Math.max(0, 
 const espera = (ms: number) => new Promise(r => setTimeout(r, ms))
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e)).slice(0, 500)
 
-export const canalDe = (n: Pick<NumeroComChave, 'waha_url' | 'waha_sessao' | 'waha_api_key'>): Canal => ({
+export const canalDe = (n: Pick<NumeroComChave, 'waha_url' | 'waha_sessao' | 'waha_api_key' | 'provedor' | 'client_token'>): Canal => ({
   url: n.waha_url,
   sessao: n.waha_sessao,
-  apiKey: n.waha_api_key
+  apiKey: n.waha_api_key,
+  provedor: n.provedor ?? 'waha',
+  clientToken: n.client_token
 })
+
+/**
+ * Formato que vale para ESTE número: botões só saem pela Z-API. No WAHA a mensagem com botão é entregue mas não
+ * aparece no celular (05/11/2026), então a campanha "com botões" cai para texto quando o número é do WAHA.
+ */
+export const comFormatoDoNumero = (c: Campanha, n: Pick<NumeroComChave, 'provedor'> | null): Campanha =>
+  c.formato === 'botao' && n?.provedor !== 'zapi' ? { ...c, formato: 'texto' } : c
 
 export async function carregarNumero(id: number) {
   const { data, error } = await supabaseAdmin().from('disparo_numeros').select('*').eq('id', id).maybeSingle()
@@ -238,7 +247,7 @@ async function enviarPrimeira(
   // Reserva que NÃO chegou ao WhatsApp pode voltar para a fila: não houve contato. É o único DELETE do livro.
   const devolver = () => db.from('disparos').delete().eq('id', d.id).eq('status', 'reservado')
 
-  const c = await carregarCampanha(d.campanha_id)
+  const c = comFormatoDoNumero(await carregarCampanha(d.campanha_id), n)
 
   // 1) O número tem WhatsApp? (e qual é o chatId certo, com ou sem o 9)
   let chat: string

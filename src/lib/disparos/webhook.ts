@@ -17,7 +17,7 @@ import {
   respostaSimples,
   saudacao
 } from './mensagens'
-import { canalDe, carregarCampanha, carregarNumero, mensagemFinal, registrarEvento, responder } from './motor'
+import { canalDe, carregarCampanha, carregarNumero, comFormatoDoNumero, mensagemFinal, registrarEvento, responder } from './motor'
 import type { Campanha, Disparo, NumeroComChave } from './tipos'
 import type { MensagemRica } from './waha'
 import { chaveDoId, telefoneDoLid } from './waha'
@@ -121,7 +121,7 @@ export async function processarEvento(ev: EventoWaha, numeroId: number | null, d
       if (de.endsWith('@lid') && !d.lid) await atualizar(d.id, { lid: de.replace(/@.*$/, '') })
 
       const n = await numeroDoDisparo(d, numero)
-      const c = await carregarCampanha(d.campanha_id)
+      const c = comFormatoDoNumero(await carregarCampanha(d.campanha_id), n)
       if (ilegivel) {
         // Sabemos QUEM tocou, não EM QUÊ. Pede por escrito, uma vez só.
         if (['enviado', 'respondeu'].includes(d.status) && n) {
@@ -177,7 +177,7 @@ export async function processarEvento(ev: EventoWaha, numeroId: number | null, d
       d = { ...d, respostas: d.respostas + 1, respondido_em: d.respondido_em ?? agora() }
 
       const n = await numeroDoDisparo(d, numero)
-      const c = await carregarCampanha(d.campanha_id)
+      const c = comFormatoDoNumero(await carregarCampanha(d.campanha_id), n)
       const quer = corpo ? intencao(corpo) : 'outro'
       if (quer === 'sair') return marcarDescadastro(d, n, depois)
       const educado = !!corpo && cortesia(corpo)

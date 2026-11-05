@@ -9,8 +9,8 @@ import type { ContadorGrupo, Empresa, EmpresaLista, Opcoes, Resumo } from './tip
 
 export const COLUNAS_LISTA =
   'cnpj,cnpj_formatado,prioridade,score,razao_social,nome_fantasia,tipo_negocio,setor,ramo,cnae_fmt,' +
-  'atividade_principal,municipio,regiao_intermediaria,porte,capital_social,regime,situacao_regime,idade_anos,' +
-  'estabelecimentos_sp,telefone1,whatsapp,whatsapp_link,email,email_tipo,empresas_mesmo_email'
+  'atividade_principal,municipio,uf,regiao_intermediaria,porte,capital_social,regime,situacao_regime,idade_anos,' +
+  'estabelecimentos_uf,telefone1,whatsapp,whatsapp_link,email,email_tipo,empresas_mesmo_email'
 
 export class SemAcessoError extends Error {
   constructor() {

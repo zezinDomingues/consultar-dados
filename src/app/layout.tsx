@@ -9,7 +9,7 @@ const playfair = Playfair_Display({ subsets: ['latin'], style: ['normal', 'itali
 
 export const metadata: Metadata = {
   title: { default: 'OficialCert', template: '%s · OficialCert' },
-  description: 'Consulta de empresas de SP por setor, ramo, porte, região e contato.'
+  description: 'Consulta de empresas por estado, setor, ramo, porte, região e contato.'
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

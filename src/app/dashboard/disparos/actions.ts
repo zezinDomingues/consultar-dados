@@ -203,9 +203,11 @@ const NumeroSchema = z
   .object({
     id: z.coerce.number().int().positive().optional(),
     rotulo: texto(60, 'Nome'),
+    provedor: z.enum(['waha', 'zapi']).default('waha'),
     waha_url: z.string().trim().url('URL do WAHA inválida (ex.: https://waha3.mindloop.com.br).').transform(u => u.replace(/\/+$/, '')),
-    waha_sessao: z.string().trim().min(1).max(60).default('default'),
+    waha_sessao: z.string().trim().min(1, 'Informe a sessão (WAHA) ou o ID da instância (Z-API).').max(80).default('default'),
     waha_api_key: z.string().trim().max(200).optional(),
+    client_token: z.string().trim().max(200).optional(),
     limite_diario: z.coerce.number().int().min(1).max(2000),
     intervalo_min_s: z.coerce.number().int().min(20, 'Intervalo mínimo: 20 s.'),
     intervalo_max_s: z.coerce.number().int().min(20),
@@ -215,12 +217,16 @@ const NumeroSchema = z
 
 export async function salvarNumero(_: Retorno, fd: FormData): Promise<Retorno> {
   await exigirAdmin()
-  const obj = Object.fromEntries(['id', 'rotulo', 'waha_url', 'waha_sessao', 'waha_api_key', 'limite_diario', 'intervalo_min_s', 'intervalo_max_s'].map(k => [k, fd.get(k) ?? undefined]).filter(([, v]) => v !== '' && v !== undefined))
+  const campos = ['id', 'rotulo', 'provedor', 'waha_url', 'waha_sessao', 'waha_api_key', 'client_token', 'limite_diario', 'intervalo_min_s', 'intervalo_max_s']
+  const obj: Record<string, unknown> = Object.fromEntries(campos.map(k => [k, fd.get(k) ?? undefined]).filter(([, v]) => v !== '' && v !== undefined))
+  if (obj.provedor === 'zapi') obj.waha_url = 'https://api.z-api.io' // na Z-API o endereço é fixo
   const p = NumeroSchema.safeParse({ ...obj, ativo: fd.get('ativo') === 'on' ? true : '' })
   if (!p.success) return { erro: p.error.issues[0]?.message ?? 'Dados inválidos.' }
-  const { id, waha_api_key, ...n } = p.data
+  const { id, waha_api_key, client_token, ...n } = p.data
+  if (!id && !waha_api_key) return { erro: n.provedor === 'zapi' ? 'Informe o token da instância.' : 'Informe a API key do WAHA.' }
+  if (!id && n.provedor === 'zapi' && !client_token) return { erro: 'Informe o Client-Token (Segurança → token da conta).' }
   const supabase = await createClient()
-  const linha = { ...n, ...(waha_api_key ? { waha_api_key } : {}) }
+  const linha = { ...n, ...(waha_api_key ? { waha_api_key } : {}), ...(client_token ? { client_token } : {}) }
   let numeroId = id
   if (id) {
     const { error } = await supabase.from('disparo_numeros').update(linha).eq('id', id)
@@ -249,7 +255,7 @@ export async function testarNumero(id: number): Promise<Retorno> {
       .from('disparo_numeros')
       .update({
         status: s?.status ?? 'DESCONHECIDO',
-        status_detalhe: s?.status === 'WORKING' ? null : 'conecte o número no painel do WAHA (código de 8 dígitos)',
+        status_detalhe: s?.status === 'WORKING' ? null : (s?.detalhe ?? (n.provedor === 'zapi' ? 'conecte o número pelo QR no painel da Z-API' : 'conecte o número no painel do WAHA (código de 8 dígitos)')),
         status_em: agora,
         ...(telefone ? { telefone } : {}),
         ...(s?.me?.pushName ? { nome_perfil: s.me.pushName } : {})
@@ -258,11 +264,11 @@ export async function testarNumero(id: number): Promise<Retorno> {
     atualizarTelas()
     return s?.status === 'WORKING'
       ? { ok: true, mensagem: `Conectado: sessão WORKING${telefone ? ` no número ${telefone}` : ''}.` }
-      : { erro: `O WAHA respondeu, mas a sessão está ${s?.status ?? 'sem status'}. Conecte o número no painel do WAHA.` }
+      : { erro: `${n.provedor === 'zapi' ? 'A Z-API' : 'O WAHA'} respondeu, mas a sessão está ${s?.status ?? 'sem status'}. Conecte o número no painel ${n.provedor === 'zapi' ? 'da Z-API (QR code)' : 'do WAHA'}.` }
   } catch (e) {
     await db.from('disparo_numeros').update({ status: 'ERRO', status_detalhe: erroDe(e).slice(0, 300), status_em: agora }).eq('id', id)
     atualizarTelas()
-    return { erro: `Não consegui falar com o WAHA: ${erroDe(e)}` }
+    return { erro: `Não consegui falar com ${n.provedor === 'zapi' ? 'a Z-API' : 'o WAHA'}: ${erroDe(e)}` }
   }
 }
 
@@ -276,7 +282,7 @@ export async function conectarWebhook(id: number): Promise<Retorno> {
     await configurarWebhook(canalDe(n), urlWebhook(id), segredoDisparos()!)
     await supabaseAdmin().from('disparo_numeros').update({ webhook_em: new Date().toISOString() }).eq('id', id)
     atualizarTelas()
-    return { ok: true, mensagem: 'Webhook configurado. O WAHA reinicia a sessão (volta a WORKING em ~20 s, sem parear de novo).' }
+    return { ok: true, mensagem: n.provedor === 'zapi' ? 'Webhooks da Z-API apontados para a plataforma (recebidas, status, conexão).' : 'Webhook configurado. O WAHA reinicia a sessão (volta a WORKING em ~20 s, sem parear de novo).' }
   } catch (e) {
     return { erro: `Falha ao configurar o webhook: ${erroDe(e)}` }
   }

@@ -41,12 +41,15 @@ export default async function NumerosPage() {
               <div className='min-w-0'>
                 <div className='flex flex-wrap items-center gap-2'>
                   <h3 className='font-semibold text-slate-800'>{n.rotulo}</h3>
+                  <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-semibold', n.provedor === 'zapi' ? 'bg-emerald-50 text-emerald-800' : 'bg-slate-100 text-slate-600')}>
+                    {n.provedor === 'zapi' ? 'Z-API · botões' : 'WAHA · texto'}
+                  </span>
                   <SeloSessao status={n.status} />
                   {!n.ativo && <span className='rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500'>Pausado</span>}
                 </div>
                 <p className='mt-0.5 text-xs text-slate-500'>
                   {n.telefone ? fmtFone(n.telefone) : 'telefone aparece após o teste'}
-                  {n.nome_perfil ? ` · ${n.nome_perfil}` : ''} · <span className='font-mono'>{n.waha_url}</span> ({n.waha_sessao})
+                  {n.nome_perfil ? ` · ${n.nome_perfil}` : ''} · <span className='font-mono'>{n.provedor === 'zapi' ? `instância ${n.waha_sessao}` : `${n.waha_url} (${n.waha_sessao})`}</span>
                 </p>
                 {n.status_detalhe && <p className='mt-1 text-xs text-red-600'>{n.status_detalhe}</p>}
               </div>
@@ -57,7 +60,7 @@ export default async function NumerosPage() {
                 <BotaoAcao
                   acao={conectarWebhook.bind(null, n.id)}
                   variante={n.webhook_em ? 'secundario' : 'primario'}
-                  confirmar='Configurar o webhook reinicia a sessão no WAHA (volta sozinha em ~20 s). Continuar?'
+                  confirmar={n.provedor === 'zapi' ? undefined : 'Configurar o webhook reinicia a sessão no WAHA (volta sozinha em ~20 s). Continuar?'}
                 >
                   <Webhook className='size-3.5' /> {n.webhook_em ? 'Reconfigurar webhook' : 'Conectar webhook'}
                 </BotaoAcao>
@@ -79,7 +82,7 @@ export default async function NumerosPage() {
               <Dado rotulo='Último webhook' valor={n.ultimo_evento_em ? fmtRelativo(n.ultimo_evento_em) : n.webhook_em ? 'nenhum ainda' : 'não configurado'} />
             </dl>
             <p className='mt-2 truncate text-[11px] text-slate-400'>
-              Webhook: <span className='font-mono'>{urlWebhook(n.id)}</span>
+              Webhook: <span className='font-mono'>{n.provedor === 'zapi' ? urlWebhook(n.id).replace('/whatsapp', '/zapi') + '&token=…' : urlWebhook(n.id)}</span>
               {n.webhook_em ? ` · configurado ${fmtDataHora(n.webhook_em)}` : ''}
             </p>
           </article>

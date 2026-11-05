@@ -12,9 +12,11 @@ export function rotulosFiltros(f: Filtros, opcoes: Opcoes): RotuloFiltro[] {
     setores: nomes(opcoes.setores),
     ramos: nomes(opcoes.ramos),
     segmentos: nomes(opcoes.segmentos),
-    cnaes: new Map(opcoes.atividades.map(o => [o.chave, `${o.cod} ${o.nome}`]))
+    cnaes: new Map(opcoes.atividades.map(o => [o.chave, `${o.cod} ${o.nome}`])),
+    municipios: nomes(opcoes.municipios),
+    regioes: nomes(opcoes.regioes)
   }
-  const prefixo: Partial<Record<ChaveFiltro, string>> = { prioridades: 'Prioridade ' }
+  const prefixo: Partial<Record<ChaveFiltro, string>> = { prioridades: 'Prioridade ', ufs: 'Estado: ' }
   const r: RotuloFiltro[] = []
 
   for (const [k, v] of Object.entries(f) as [ChaveFiltro, unknown][]) {

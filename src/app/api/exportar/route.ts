@@ -11,7 +11,7 @@ const COLUNAS: [string, string][] = [
   ['Regime (ECF)', 'regime'], ['Ano ECF', 'ano_ecf'], ['Simples out/2026', 'simples_out2026'],
   ['Situação do regime', 'situacao_regime'], ['Porte', 'porte'], ['Capital social', 'capital_social'],
   ['Abertura', 'data_abertura'], ['Idade (anos)', 'idade_anos'], ['Matriz/Filial', 'matriz_filial'],
-  ['Estab. em SP', 'estabelecimentos_sp'], ['Município', 'municipio'], ['Região (IBGE)', 'regiao_intermediaria'],
+  ['Estab. no estado', 'estabelecimentos_uf'], ['UF', 'uf'], ['Município', 'municipio'], ['Região (IBGE)', 'regiao_intermediaria'],
   ['Localização', 'localizacao'], ['Endereço', 'endereco'], ['Bairro', 'bairro'], ['CEP', 'cep'],
   ['Telefone 1', 'telefone1'], ['Telefone 2', 'telefone2'], ['WhatsApp', 'whatsapp'], ['E-mail', 'email'],
   ['Tipo de e-mail', 'email_tipo'], ['Empresas c/ mesmo e-mail', 'empresas_mesmo_email']

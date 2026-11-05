@@ -58,7 +58,9 @@ export function LinhaEmpresa({ e }: { e: EmpresaLista }) {
         </p>
       </td>
       <td className='px-3 py-3'>
-        <p className='text-sm text-slate-700'>{e.municipio}</p>
+        <p className='text-sm text-slate-700'>
+          {e.municipio}/{e.uf}
+        </p>
         <p className='text-xs text-slate-400'>{e.regiao_intermediaria}</p>
       </td>
       <td className='w-[170px] px-3 py-3'>
@@ -66,7 +68,7 @@ export function LinhaEmpresa({ e }: { e: EmpresaLista }) {
         <p className='text-xs text-slate-400'>
           {fmtMoeda(e.capital_social, true)}
           {e.idade_anos != null && ` · ${e.idade_anos} anos`}
-          {(e.estabelecimentos_sp ?? 1) > 1 && ` · ${e.estabelecimentos_sp} unid.`}
+          {(e.estabelecimentos_uf ?? 1) > 1 && ` · ${e.estabelecimentos_uf} unid.`}
         </p>
         <p className='mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-slate-600'>
           {e.regime}

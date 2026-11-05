@@ -36,7 +36,7 @@ const EXEMPLOS = [
       'Transportadoras de carga com Lucro Real no interior',
       'Clínicas em Campinas com contato direto, as maiores primeiro',
       'Indústrias de alimentos médias ou grandes com WhatsApp',
-      'Quantas construtoras com mais de 20 anos existem na Grande SP?'
+      'Quantas construtoras com mais de 20 anos existem na Grande BH?'
     ]
   },
   {

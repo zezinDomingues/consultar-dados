@@ -153,6 +153,8 @@ export type NumerosCampanha = {
 export type Numero = {
   id: number
   rotulo: string
+  /** 'waha' (só texto/imagem) ou 'zapi' (botões aparecem) */
+  provedor: 'waha' | 'zapi'
   waha_url: string
   waha_sessao: string
   telefone: string | null
@@ -171,7 +173,7 @@ export type Numero = {
   criado_em: string
 }
 
-export type NumeroComChave = Numero & { waha_api_key: string | null }
+export type NumeroComChave = Numero & { waha_api_key: string | null; client_token: string | null }
 
 export type ConfigDisparo = {
   id: 1

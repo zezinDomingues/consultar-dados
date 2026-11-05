@@ -12,7 +12,7 @@ import { ROTAS } from '@/lib/rotas'
 export function CartaoEmpresa({ e }: { e: Empresa }) {
   const contador = e.email_tipo === 'Escritório contábil' || e.email_tipo === 'Compartilhado (grupo/terceiro)'
   const mapa = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-    [e.endereco, e.bairro, e.municipio, 'SP', e.cep].filter(Boolean).join(', ')
+    [e.endereco, e.bairro, e.municipio, e.uf, e.cep].filter(Boolean).join(', ')
   )}`
 
   return (
@@ -55,7 +55,7 @@ export function CartaoEmpresa({ e }: { e: Empresa }) {
           </p>
           <p className='text-xs text-slate-500'>
             Aberta em {fmtData(e.data_abertura)}
-            {e.idade_anos != null && ` (${e.idade_anos} anos)`} · {fmtInt(e.estabelecimentos_sp)} unid. em SP
+            {e.idade_anos != null && ` (${e.idade_anos} anos)`} · {fmtInt(e.estabelecimentos_uf)} unid. em {e.uf}
           </p>
           <p className='mt-1 text-xs text-slate-600'>
             {e.regime} · ECF {e.ano_ecf} · Simples: {e.simples_out2026}
@@ -64,7 +64,7 @@ export function CartaoEmpresa({ e }: { e: Empresa }) {
         <Bloco titulo='Endereço'>
           <p className='text-slate-700'>{e.endereco}</p>
           <p className='text-xs text-slate-500'>
-            {e.bairro} · {e.municipio}/SP · {e.cep}
+            {e.bairro} · {e.municipio}/{e.uf} · {e.cep}
           </p>
           <a href={mapa} target='_blank' rel='noreferrer' className='mt-1 inline-flex items-center gap-1 text-xs font-medium text-marca-700 hover:underline'>
             <MapPin className='size-3.5' /> Ver no mapa

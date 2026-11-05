@@ -4,21 +4,26 @@ import { descreverEtapa, executarFerramenta, FERRAMENTAS, type Contexto } from '
 import { novaSessao, type Mensagem } from './provedores'
 import type { Anexo, AnexoConsulta, AnexoContadores, EventoAgente } from './tipos'
 import { fmtInt } from '@/lib/formatar'
+import { opcoesFiltros } from '@/lib/empresas/consulta'
+import type { Opcao } from '@/lib/empresas/tipos'
 
 const MAX_ITERACOES = 6
 const MAX_HISTORICO = 20
 
-export function sistema() {
+export function sistema(base?: { total: number; ufs: Opcao[] }) {
+  const estados = base?.ufs?.length ? base.ufs.map(u => `${u.chave} (${fmtInt(u.n)})`).join(', ') : 'SP'
   const hoje = new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })
   return `Você é o agente da plataforma "Consultar Dados": especialista em prospecção B2B e em tributação de empresas no Brasil. Hoje é ${hoje}.
 
 ## A base
-628.346 empresas ATIVAS do Estado de São Paulo, uma por raiz de CNPJ, cuja ECF mais recente declara Lucro Real, Lucro Presumido ou tributação mista. Fonte: Receita Federal (cadastro de outubro/2026; ECF 2016–2024) e IBGE.
+${base ? fmtInt(base.total) : ''} empresas ATIVAS, uma por raiz de CNPJ em cada estado, cuja ECF mais recente declara Lucro Real, Lucro Presumido ou tributação mista.
+- Estados já carregados: ${estados}. Os demais estados ainda não estão na base (chegam aos poucos): se pedirem um estado fora da lista, diga isso em vez de buscar.
+- Pergunta sem estado = base inteira (todos os estados). Pergunta com estado, capital ou região → use o filtro ufs. Fonte: Receita Federal (cadastro de outubro/2026; ECF 2016–2024) e IBGE.
 - O regime é HISTÓRICO (vem da ECF). "Recente (ECF 2024)" é o mais confiável; "Hoje no Simples" = optante pelo Simples em out/2026, provavelmente saiu do Lucro Real/Presumido.
 - Telefone/e-mail do cadastro muitas vezes é do contador (email_tipo "Escritório contábil" ou "Compartilhado").
 - Prioridade A/B/C/D vem de um score 0–100 (regime recente fora do Simples, porte, capital, filiais, contato próprio; holdings e SPEs perdem pontos).
 - Setores (letra CNAE): A agropecuária · B extrativas · C indústria · D energia e gás · E água e resíduos · F construção · G comércio · H transporte e logística · I alojamento e alimentação · J informação e TI · K financeiro e holdings · L imobiliário · M serviços profissionais · N serviços administrativos · P educação · Q saúde · R cultura e lazer · S outros serviços.
-- Localização: Capital, Grande SP, Litoral, Interior. Regiões IBGE: São Paulo, Campinas, Ribeirão Preto, Sorocaba, São José dos Campos, São José do Rio Preto, Bauru, Araraquara, Marília, Presidente Prudente, Araçatuba.
+- Localização (dentro de cada estado): Capital, Região metropolitana (da capital: Grande SP, Grande BH, Grande Salvador), Litoral (só SP), Interior. Regiões IBGE (regiões intermediárias): use buscar_codigos com tipo "regiao" para achar o nome exato.
 
 ## Dois tipos de pergunta, dois jeitos de responder
 
@@ -48,7 +53,9 @@ export function sistema() {
 - "sem holdings" ou "empresas operacionais" → tipos_negocio ["Operacional"].
 - "melhores / mais promissoras" → prioridades ["A"]; "maiores" → ordem "capital".
 - Valores de capital em reais (1 milhão = 1000000). Idade em anos.
-- "interior", "capital", "Grande SP", "litoral" → localizacoes. Municípios com acento ("São José dos Campos").
+- "interior", "capital", "litoral" → localizacoes (+ ufs se citou o estado). "Grande SP" → localizacoes ["Região metropolitana"] + ufs ["SP"]; "Grande BH" → idem com ["MG"]; "Grande Salvador" / "RMS" → idem com ["BA"].
+- "na Bahia", "em Minas", "no estado de SP" → ufs. "capital baiana" → ufs ["BA"] + localizacoes ["Capital"].
+- Municípios com acento ("São José dos Campos"); se o nome existir em mais de um estado, use "Nome/UF" (ex.: "Salvador/BA").
 ${DICIONARIO}
 ${FATOS}
 
@@ -119,7 +126,11 @@ export async function responder(historico: TurnoUsuario[], emitir: (e: EventoAge
     {
       role: 'system',
       content:
-        sistema() +
+        sistema(
+          await opcoesFiltros()
+            .then(o => ({ total: o.total_base, ufs: o.ufs ?? [] }))
+            .catch(() => undefined)
+        ) +
         (contexto?.trim()
           ? `\n\n## O que o usuário já está vendo na tela (mais recente por último)\nUse para refinamentos ("dessas…") e para "a segunda da lista". É informação interna: NUNCA copie este bloco na resposta.\n${contexto}`
           : '')

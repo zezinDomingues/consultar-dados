@@ -14,10 +14,13 @@ import {
   REGIMES,
   SITUACOES,
   TIPOS_NEGOCIO,
+  UFS,
   type Consulta,
   type Filtros
 } from '@/lib/empresas/filtros'
 import type { Opcoes } from '@/lib/empresas/tipos'
+
+type Uf = (typeof UFS)[number]
 import { cn } from '@/lib/utils'
 
 /** Remove chaves vazias: lista vazia, false, '' e undefined = "sem filtro". */
@@ -82,10 +85,17 @@ export function PainelFiltros({ consulta, opcoes }: { consulta: Consulta; opcoes
       return opcoes.atividades.filter(a => f.setores!.includes(setorDoRamo.get(ramoDoSegmento.get(a.pai!)!)!))
     return opcoes.atividades
   }, [f.segmentos, f.ramos, f.setores, opcoes, ramoDoSegmento, setorDoRamo])
-  const municipios = useMemo(
-    () => (f.regioes ? opcoes.municipios.filter(m => f.regioes!.includes(m.pai!)) : opcoes.municipios),
-    [f.regioes, opcoes]
+  const ufs = useMemo(() => (opcoes.ufs ?? []).map(u => u.chave as Uf), [opcoes])
+  const regioes = useMemo(
+    () => (f.ufs ? opcoes.regioes.filter(r => f.ufs!.includes(r.uf as Uf)) : opcoes.regioes),
+    [f.ufs, opcoes]
   )
+  const municipios = useMemo(() => {
+    let m = opcoes.municipios
+    if (f.ufs) m = m.filter(x => f.ufs!.includes(x.uf as Uf))
+    if (f.regioes) m = m.filter(x => f.regioes!.includes(x.pai!))
+    return m
+  }, [f.ufs, f.regioes, opcoes])
 
   const total = contarFiltros(f)
 
@@ -176,7 +186,7 @@ export function PainelFiltros({ consulta, opcoes }: { consulta: Consulta; opcoes
             aoAplicar={(min, max) => aplicar({ idade_min: min, idade_max: max })}
           />
           <Faixa
-            rotulo='Estabelecimentos em SP (mínimo)'
+            rotulo='Estabelecimentos no estado (mínimo)'
             min={f.estab_min}
             inteiro
             soMinimo
@@ -200,7 +210,15 @@ export function PainelFiltros({ consulta, opcoes }: { consulta: Consulta; opcoes
           />
         </Secao>
 
-        <Secao titulo='Onde fica' ativos={[f.localizacoes, f.regioes, f.municipios]}>
+        <Secao titulo='Onde fica' ativos={[f.ufs, f.localizacoes, f.regioes, f.municipios]}>
+          {ufs.length > 1 && (
+            <Chips
+              rotulo='Estado'
+              valores={ufs}
+              selecionados={f.ufs}
+              aoAlternar={v => aplicar({ ufs: alternar(f.ufs, v) })}
+            />
+          )}
           <Chips
             rotulo='Localização'
             valores={LOCALIZACOES}
@@ -209,7 +227,7 @@ export function PainelFiltros({ consulta, opcoes }: { consulta: Consulta; opcoes
           />
           <MultiSelect
             rotulo='Região (IBGE)'
-            opcoes={opcoes.regioes}
+            opcoes={regioes}
             selecionados={f.regioes}
             aoMudar={v => aplicar({ regioes: v })}
           />

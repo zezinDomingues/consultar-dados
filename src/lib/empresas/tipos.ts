@@ -1,7 +1,8 @@
-export type Opcao = { chave: string; nome: string; n: number; pai?: string; cod?: string }
+export type Opcao = { chave: string; nome: string; n: number; pai?: string; cod?: string; uf?: string }
 
 export type Opcoes = {
   total_base: number
+  ufs: Opcao[]
   setores: Opcao[]
   ramos: Opcao[]
   segmentos: Opcao[]
@@ -13,7 +14,7 @@ export type Opcoes = {
 export type ItemResumo = { chave: string; nome: string; n: number }
 
 export type DimensaoResumo =
-  | 'setor' | 'ramo' | 'porte' | 'regime' | 'situacao_regime' | 'prioridade' | 'regiao' | 'localizacao' | 'municipio'
+  | 'setor' | 'ramo' | 'porte' | 'regime' | 'situacao_regime' | 'prioridade' | 'regiao' | 'localizacao' | 'municipio' | 'uf'
 
 export type Resumo = {
   total: {
@@ -40,13 +41,14 @@ export type EmpresaLista = {
   cnae_fmt: string | null
   atividade_principal: string | null
   municipio: string | null
+  uf: string
   regiao_intermediaria: string | null
   porte: string | null
   capital_social: number | null
   regime: string | null
   situacao_regime: string | null
   idade_anos: number | null
-  estabelecimentos_sp: number | null
+  estabelecimentos_uf: number | null
   telefone1: string | null
   whatsapp: string | null
   whatsapp_link: string | null
@@ -73,7 +75,6 @@ export type Empresa = EmpresaLista & {
   data_situacao: string | null
   data_abertura: string | null
   faixa_capital: string | null
-  uf: string
   regiao_imediata: string | null
   localizacao: string | null
   tipo_logradouro: string | null

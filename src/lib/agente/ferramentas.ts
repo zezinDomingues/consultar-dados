@@ -145,7 +145,7 @@ const top = (r: Resumo, k: keyof Resumo['dims'], n: number) =>
 /** Distribuições aparadas para a tela (o resumo completo do município tem até 645 itens). */
 function aparar(r: Resumo): Resumo {
   const dims: Resumo['dims'] = {}
-  const limites = { setor: 8, ramo: 8, municipio: 8, regiao: 11, porte: 3, regime: 3, situacao_regime: 4, prioridade: 4, localizacao: 4 } as const
+  const limites = { setor: 8, ramo: 8, municipio: 8, regiao: 11, porte: 3, regime: 3, situacao_regime: 4, prioridade: 4, localizacao: 4, uf: 27 } as const
   for (const [k, n] of Object.entries(limites) as [keyof Resumo['dims'], number][]) {
     if (r.dims[k]) dims[k] = r.dims[k]!.slice(0, n)
   }
@@ -281,9 +281,10 @@ export async function executarFerramenta(nome: string, argsTexto: string, ctx: C
           ramo: top(r, 'ramo', 3),
           regiao: top(r, 'regiao', 3),
           municipio: top(r, 'municipio', 3),
+          uf: top(r, 'uf', 27),
           porte: top(r, 'porte', 3)
         },
-        primeiras_empresas: a.empresas.map((e, i) => `${i + 1}. ${e.razao_social} (CNPJ ${e.cnpj}, ${e.municipio})`)
+        primeiras_empresas: a.empresas.map((e, i) => `${i + 1}. ${e.razao_social} (CNPJ ${e.cnpj}, ${e.municipio}/${e.uf})`)
       }
     }
 
@@ -304,7 +305,7 @@ export async function executarFerramenta(nome: string, argsTexto: string, ctx: C
         atividade: `${e.cnae_fmt} ${e.atividade_principal}`,
         ramo: e.ramo,
         municipio: e.municipio,
-        endereco: [e.endereco, e.bairro, e.municipio, e.cep].filter(Boolean).join(', '),
+        endereco: [e.endereco, e.bairro, `${e.municipio}/${e.uf}`, e.cep].filter(Boolean).join(', '),
         porte: e.porte,
         capital_social: e.capital_social,
         abertura: e.data_abertura,

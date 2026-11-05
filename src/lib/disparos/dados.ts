@@ -37,7 +37,7 @@ export const migracaoAplicada = cache(async () => {
 })
 
 const COLUNAS_NUMERO =
-  'id,rotulo,waha_url,waha_sessao,telefone,nome_perfil,ativo,limite_diario,intervalo_min_s,intervalo_max_s,status,' +
+  'id,rotulo,provedor,waha_url,waha_sessao,telefone,nome_perfil,ativo,limite_diario,intervalo_min_s,intervalo_max_s,status,' +
   'status_detalhe,status_em,webhook_em,ultimo_evento_em,proximo_envio_em,ultimo_envio_em,criado_em'
 
 export async function resumoDisparos(campanha?: number) {

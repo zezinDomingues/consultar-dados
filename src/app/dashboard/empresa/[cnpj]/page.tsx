@@ -25,7 +25,7 @@ export default async function EmpresaPage({ params }: Props) {
 
   const contador = e.email_tipo === 'Escritório contábil' || e.email_tipo === 'Compartilhado (grupo/terceiro)'
   const mapa = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-    [e.endereco, e.bairro, e.municipio, 'SP', e.cep].filter(Boolean).join(', ')
+    [e.endereco, e.bairro, e.municipio, e.uf, e.cep].filter(Boolean).join(', ')
   )}`
 
   return (
@@ -108,7 +108,7 @@ export default async function EmpresaPage({ params }: Props) {
                   ['Capital social', fmtMoeda(e.capital_social)],
                   ['Faixa de capital', e.faixa_capital],
                   ['Abertura', `${fmtData(e.data_abertura)}${e.idade_anos != null ? ` (${e.idade_anos} anos)` : ''}`],
-                  ['Estabelecimentos em SP', fmtInt(e.estabelecimentos_sp)]
+                  [`Estabelecimentos em ${e.uf}`, fmtInt(e.estabelecimentos_uf)]
                 ]}
               />
             </Cartao>
@@ -179,7 +179,7 @@ export default async function EmpresaPage({ params }: Props) {
             <div className='space-y-1 text-sm text-slate-700'>
               <p>{e.endereco}</p>
               <p>
-                {e.bairro} · {e.municipio}/SP · {e.cep}
+                {e.bairro} · {e.municipio}/{e.uf} · {e.cep}
               </p>
               <p className='text-xs text-slate-400'>
                 {e.localizacao} · região de {e.regiao_intermediaria} ({e.regiao_imediata})
