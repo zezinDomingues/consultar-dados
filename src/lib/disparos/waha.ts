@@ -137,6 +137,44 @@ export async function enviarEnquete(canal: Canal, chatId: string, pergunta: stri
   return chaveMensagem(r)
 }
 
+export type Botao = { tipo: 'resposta'; texto: string } | { tipo: 'link'; texto: string; url: string }
+export type MensagemRica = { imagem?: string | null; texto: string; rodape?: string | null; botoes?: Botao[] }
+
+const arquivo = (url: string) => ({
+  url,
+  mimetype: /\.png(\?|$)/i.test(url) ? 'image/png' : 'image/jpeg',
+  filename: /\.png(\?|$)/i.test(url) ? 'oficialcert.png' : 'oficialcert.jpg'
+})
+
+/** Imagem com legenda (o WAHA baixa a imagem pela URL — ela precisa ser pública). */
+export async function enviarImagem(canal: Canal, chatId: string, url: string, legenda: string) {
+  const r = await chamar<unknown>(canal, 'POST', '/api/sendImage', { session: canal.sessao, chatId, file: arquivo(url), caption: legenda }, 45_000)
+  return chaveMensagem(r)
+}
+
+/**
+ * Mensagem com botões (até 3): de RESPOSTA (o toque volta como mensagem com o texto do botão) ou de LINK (abre a
+ * URL). Imagem opcional no topo. ATENÇÃO: o WAHA aceita (201) mesmo quando o aparelho não desenha os botões — só o
+ * celular confirma; por isso a campanha tem o formato "texto" como alternativa.
+ */
+export async function enviarBotoes(canal: Canal, chatId: string, m: MensagemRica) {
+  const r = await chamar<unknown>(
+    canal,
+    'POST',
+    '/api/sendButtons',
+    {
+      session: canal.sessao,
+      chatId,
+      body: m.texto,
+      ...(m.rodape ? { footer: m.rodape } : {}),
+      ...(m.imagem ? { headerImage: arquivo(m.imagem) } : {}),
+      buttons: (m.botoes ?? []).slice(0, 3).map(b => (b.tipo === 'link' ? { type: 'url', text: b.texto, url: b.url } : { type: 'reply', text: b.texto }))
+    },
+    45_000
+  )
+  return chaveMensagem(r)
+}
+
 /** `123@lid` → `5511999999999` (com 55). Só funciona com o store do NOWEB ligado. */
 export async function telefoneDoLid(canal: Canal, lid: string) {
   try {

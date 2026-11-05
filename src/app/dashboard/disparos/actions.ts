@@ -5,10 +5,10 @@ import { redirect } from 'next/navigation'
 import { z } from 'zod'
 import { pendenciasServidor, segredoDisparos, urlWebhook } from '@/lib/disparos/config'
 import { exigirAdmin } from '@/lib/disparos/dados'
-import { montar, nomeEmpresa, normalizarFone, RESPOSTAS, saudacao } from '@/lib/disparos/mensagens'
-import { canalDe, carregarNumero, responder } from '@/lib/disparos/motor'
+import { fmtFone, MODELOS, nomeEmpresa, normalizarFone } from '@/lib/disparos/mensagens'
+import { canalDe, carregarNumero, enviarPrimeiraDeTeste, responder } from '@/lib/disparos/motor'
 import type { Disparo } from '@/lib/disparos/tipos'
-import { configurarWebhook, enviarEnquete, enviarTexto, lerSessao, verificarNumero } from '@/lib/disparos/waha'
+import { configurarWebhook, lerSessao } from '@/lib/disparos/waha'
 import { buscarEmpresas } from '@/lib/empresas/consulta'
 import { FiltrosSchema, ORDENS } from '@/lib/empresas/filtros'
 import { ROTAS } from '@/lib/rotas'
@@ -25,47 +25,73 @@ const atualizarTelas = () => revalidatePath(ROTAS.disparos, 'layout')
 // ---------------------------------------------------------------------------------------------------------------
 
 const texto = (max: number, nome: string) => z.string().trim().min(1, `${nome}: obrigatório.`).max(max, `${nome}: até ${max} caracteres.`)
+const url = (nome: string) => z.string().trim().url(`${nome}: endereço inválido (comece com https://).`)
 
-const CampanhaSchema = z
-  .object({
-    id: z.coerce.number().int().positive().optional(),
-    nome: texto(120, 'Nome'),
-    filtros: z.string().transform((s, ctx) => {
-      try {
-        const r = FiltrosSchema.safeParse(JSON.parse(s || '{}'))
-        if (r.success) return r.data
-      } catch {}
-      ctx.addIssue({ code: 'custom', message: 'Filtros inválidos.' })
-      return z.NEVER
-    }),
-    ordem: z.enum(Object.keys(ORDENS) as [keyof typeof ORDENS, ...(keyof typeof ORDENS)[]]).default('score'),
-    excluir_compartilhados: z.coerce.boolean(),
-    usar_enquete: z.coerce.boolean(),
-    mensagem: texto(3000, 'Mensagem inicial'),
-    enquete_pergunta: texto(250, 'Pergunta da enquete'),
-    opcao_sim: texto(100, 'Opção "sim"'),
-    opcao_nao: texto(100, 'Opção "não"'),
-    mensagem_sim: texto(3000, 'Mensagem do "sim"').refine(v => v.includes('{link}'), 'A mensagem do "sim" precisa ter {link} — é por ela que o formulário chega.'),
-    mensagem_nao: texto(3000, 'Mensagem do "não"'),
-    mensagem_obrigado: texto(3000, 'Agradecimento'),
-    limite_total: z
-      .string()
-      .trim()
-      .transform(v => (v ? Number(v) : null))
-      .pipe(z.number().int().positive('Limite deve ser maior que zero.').nullable()),
-    ativar: z.coerce.boolean()
-  })
-  .refine(c => c.opcao_sim.trim() !== c.opcao_nao.trim(), { message: 'As duas opções da enquete precisam ser diferentes.' })
+const CampanhaSchema = z.object({
+  id: z.coerce.number().int().positive().optional(),
+  nome: texto(120, 'Nome'),
+  filtros: z.string().transform((s, ctx) => {
+    try {
+      const r = FiltrosSchema.safeParse(JSON.parse(s || '{}'))
+      if (r.success) return r.data
+    } catch {}
+    ctx.addIssue({ code: 'custom', message: 'Filtros inválidos.' })
+    return z.NEVER
+  }),
+  ordem: z.enum(Object.keys(ORDENS) as [keyof typeof ORDENS, ...(keyof typeof ORDENS)[]]).default('score'),
+  excluir_compartilhados: z.coerce.boolean(),
+  formato: z.enum(['botao', 'texto']),
+  imagem_url: z
+    .string()
+    .trim()
+    .transform(v => v || null)
+    .pipe(z.string().url('Imagem: endereço inválido (precisa ser público, https://…).').nullable()),
+  mensagem: texto(1024, '1ª mensagem'),
+  rodape: z
+    .string()
+    .trim()
+    .max(60, 'Rodapé: até 60 caracteres (limite do WhatsApp).')
+    .transform(v => v || null),
+  botao_texto: texto(20, 'Botão da 1ª mensagem (limite do WhatsApp: 20)'),
+  pergunta_nome: texto(1000, 'Pergunta do nome'),
+  pergunta_cnpj: texto(1000, 'Pergunta do CNPJ'),
+  mensagem_obrigado: texto(1024, 'Mensagem final'),
+  botao_site_texto: texto(20, 'Botão do site (limite do WhatsApp: 20)'),
+  site_url: url('Site'),
+  mensagem_nao: texto(1000, 'Resposta ao "não"'),
+  limite_total: z
+    .string()
+    .trim()
+    .transform(v => (v ? Number(v) : null))
+    .pipe(z.number().int().positive('Limite deve ser maior que zero.').nullable()),
+  ativar: z.coerce.boolean()
+})
+
+const CAMPOS = [
+  'id', 'nome', 'filtros', 'ordem', 'formato', 'imagem_url', 'mensagem', 'rodape', 'botao_texto', 'pergunta_nome',
+  'pergunta_cnpj', 'mensagem_obrigado', 'botao_site_texto', 'site_url', 'mensagem_nao', 'limite_total'
+]
 
 function lerCampanha(fd: FormData) {
   const obj: Record<string, unknown> = {}
-  for (const k of ['id', 'nome', 'filtros', 'ordem', 'mensagem', 'enquete_pergunta', 'opcao_sim', 'opcao_nao', 'mensagem_sim', 'mensagem_nao', 'mensagem_obrigado', 'limite_total']) {
+  for (const k of CAMPOS) {
     const v = fd.get(k)
     if (v !== null && !(k === 'id' && v === '')) obj[k] = String(v)
   }
-  for (const k of ['excluir_compartilhados', 'usar_enquete', 'ativar']) obj[k] = fd.get(k) === 'on' || fd.get(k) === 'true' ? true : ''
+  for (const k of ['excluir_compartilhados', 'ativar']) obj[k] = fd.get(k) === 'on' || fd.get(k) === 'true' ? true : ''
   return CampanhaSchema.safeParse(obj)
 }
+
+/** Colunas antigas (enquete/link) continuam NOT NULL: preenche com os modelos. */
+const colunas = (c: Omit<z.infer<typeof CampanhaSchema>, 'id' | 'ativar'>) => ({
+  ...c,
+  usar_enquete: false,
+  enquete_pergunta: MODELOS.enquete_pergunta,
+  opcao_sim: MODELOS.opcao_sim,
+  opcao_nao: MODELOS.opcao_nao,
+  mensagem_sim: c.pergunta_nome,
+  atualizada_em: new Date().toISOString()
+})
 
 export async function salvarCampanha(_: Retorno, fd: FormData): Promise<Retorno> {
   await exigirAdmin()
@@ -73,15 +99,14 @@ export async function salvarCampanha(_: Retorno, fd: FormData): Promise<Retorno>
   if (!p.success) return { erro: p.error.issues[0]?.message ?? 'Dados inválidos.' }
   const { id, ativar, ...c } = p.data
   const supabase = await createClient()
-  const linha = { ...c, atualizada_em: new Date().toISOString() }
   let novoId = id
   if (id) {
-    const { error } = await supabase.from('disparo_campanhas').update(linha).eq('id', id)
+    const { error } = await supabase.from('disparo_campanhas').update(colunas(c)).eq('id', id)
     if (error) return { erro: error.message }
   } else {
     const { data, error } = await supabase
       .from('disparo_campanhas')
-      .insert({ ...linha, status: ativar ? 'ativa' : 'pausada' })
+      .insert({ ...colunas(c), status: ativar ? 'ativa' : 'pausada' })
       .select('id')
       .single()
     if (error) return { erro: error.message }
@@ -107,31 +132,63 @@ export async function mudarStatusCampanha(id: number, status: 'ativa' | 'pausada
   return { ok: true, mensagem: status === 'ativa' ? 'Campanha ativada.' : status === 'pausada' ? 'Campanha pausada.' : 'Campanha encerrada.' }
 }
 
-/** Manda a 1ª mensagem (e a enquete) para um WhatsApp de teste, SEM entrar no livro. */
+/**
+ * Teste da CONVERSA INTEIRA no WhatsApp do administrador: salva os textos da tela, abre um registro de teste
+ * (fora do funil) e manda a 1ª mensagem de verdade. Daí em diante é o fluxo real: tocar no botão, responder nome
+ * e CNPJ, receber a mensagem final. Um teste novo para o mesmo telefone apaga o anterior.
+ */
 export async function enviarTeste(_: Retorno, fd: FormData): Promise<Retorno> {
   await exigirAdmin()
   const p = lerCampanha(fd)
   if (!p.success) return { erro: p.error.issues[0]?.message ?? 'Dados inválidos.' }
+  if (!p.data.id) return { erro: 'Crie a campanha (pode ser pausada) e teste pela tela dela — o teste usa os textos salvos.' }
   const telefone = normalizarFone(String(fd.get('teste_telefone') ?? ''))
   if (!telefone) return { erro: 'Informe o WhatsApp de teste com DDD.' }
   const numeroId = Number(fd.get('teste_numero'))
   if (!numeroId) return { erro: 'Cadastre e escolha um número de envio.' }
   if (pendenciasServidor().includes('SUPABASE_SECRET_KEY')) return { erro: 'Falta a SUPABASE_SECRET_KEY no servidor.' }
+
+  const { id, ativar: _ativar, ...c } = p.data
+  const supabase = await createClient()
+  const { error: erroSalvar } = await supabase.from('disparo_campanhas').update(colunas(c)).eq('id', id)
+  if (erroSalvar) return { erro: erroSalvar.message }
+
+  const db = supabaseAdmin()
   try {
+    // um número que já está no livro de verdade não pode virar teste (a regra "nunca duas vezes" vale para ele)
+    const { data: existente } = await db.from('disparos').select('id, teste').eq('telefone', telefone).maybeSingle()
+    if (existente && !existente.teste) return { erro: 'Esse telefone já recebeu um disparo de verdade; use outro para testar.' }
+    if (existente) {
+      await db.from('disparo_bloqueios').delete().eq('telefone', telefone).eq('observacao', `disparo #${existente.id}`)
+      await db.from('disparos').delete().eq('id', existente.id)
+    }
+    const [exemplo] = await buscarEmpresas({ ...c.filtros, com_whatsapp: true }, c.ordem, 1, 1, 'razao_social,nome_fantasia,municipio')
+    const { data: d, error } = await db
+      .from('disparos')
+      .insert({
+        campanha_id: id,
+        numero_id: numeroId,
+        cnpj: `TESTE-${telefone}`,
+        telefone,
+        teste: true,
+        razao_social: exemplo?.razao_social ?? 'EMPRESA EXEMPLO LTDA',
+        nome_fantasia: exemplo?.nome_fantasia ?? null,
+        municipio: exemplo?.municipio ?? 'São Paulo'
+      })
+      .select('*')
+      .single()
+    if (error) return { erro: error.message }
     const n = await carregarNumero(numeroId)
     if (!n) return { erro: 'Número não encontrado.' }
-    const canal = canalDe(n)
-    const v = await verificarNumero(canal, telefone)
-    if (!v.existe || !v.chatId) return { erro: 'Esse número não tem WhatsApp.' }
-    const [exemplo] = await buscarEmpresas(p.data.filtros, p.data.ordem, 1, 1, 'razao_social,nome_fantasia,municipio')
-    const vars = { empresa: nomeEmpresa(exemplo ?? { razao_social: 'Empresa Exemplo' }), saudacao: saudacao(), municipio: exemplo?.municipio ?? '' }
-    let texto = montar(p.data.mensagem, vars)
-    if (!p.data.usar_enquete && !/\bSIM\b/.test(texto)) texto += `\n\n${RESPOSTAS.sem_enquete}`
-    await enviarTexto(canal, v.chatId, texto)
-    if (p.data.usar_enquete) await enviarEnquete(canal, v.chatId, p.data.enquete_pergunta, [p.data.opcao_sim, p.data.opcao_nao])
-    return { ok: true, mensagem: `Teste enviado para ${telefone} (exemplo: ${vars.empresa}). Respostas ao teste não entram no livro.` }
+    const r = await enviarPrimeiraDeTeste(d as Disparo, n)
+    atualizarTelas()
+    if (r.resultado !== 'enviado') return { erro: `Teste não saiu: ${r.resultado}` }
+    return {
+      ok: true,
+      mensagem: `Teste enviado para ${fmtFone(telefone)} (exemplo: ${nomeEmpresa(d as Disparo)}). Responda no celular como um cliente faria — a conversa aparece no Painel com o selo "teste".`
+    }
   } catch (e) {
-    return { erro: `Falha no envio de teste: ${erroDe(e)}` }
+    return { erro: `Falha no teste: ${erroDe(e)}` }
   }
 }
 

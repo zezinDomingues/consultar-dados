@@ -5,54 +5,74 @@ import type { Campanha } from './tipos'
 /**
  * Modelos padrão de uma campanha nova (todos editáveis na tela).
  *
- * O texto diz que empresas como a dela COSTUMAM ter valores a recuperar — não afirma que ela tem. Além de ser o
- * que dá para sustentar antes da análise, mensagem fria prometendo "dinheiro do governo" é o formato dos golpes
- * que circulam no WhatsApp: quem recebe denuncia, e denúncia é o que derruba o número.
+ * Fluxo (05/11, desenho do usuário): 1ª mensagem com a logo + texto + UM botão → o robô pergunta nome completo e
+ * CNPJ pela própria conversa → final com a logo + "em análise" + botão que abre o site.
+ * O texto fala em "perfil para valores a serem restituídos" em vez de afirmar um valor antes da análise: mensagem
+ * fria prometendo dinheiro do governo é o formato dos golpes no WhatsApp, e denúncia derruba o número.
  */
 export const MODELOS = {
   mensagem:
-    '{saudacao}! {Tudo bem?|Como vai?} Aqui é da *OficialCert*, especialista em recuperação de créditos tributários.\n\n' +
-    'Muitas empresas como a *{empresa}* pagam tributos a mais — PIS, COFINS, INSS e outros — e têm direito a ' +
-    'receber esse dinheiro de volta do governo, corrigido pela Selic.\n\n' +
-    'Fazemos uma *consulta gratuita e sem compromisso* para verificar se a sua empresa tem valores a restituir.\n\n' +
-    '_Se não quiser mais receber mensagens, responda SAIR._',
+    '{saudacao}! Aqui é da *OficialCert*, especialista em recuperação de créditos tributários.\n\n' +
+    'Identificamos que a *{empresa}* tem perfil para *valores a serem restituídos* pelo governo — tributos pagos ' +
+    'a mais nos últimos 5 anos (PIS, COFINS, INSS e outros), devolvidos com correção pela Selic.\n\n' +
+    'Deseja fazer uma *consulta gratuita* para saber quanto a sua empresa tem a receber?',
+  rodape: 'Responda SAIR para não receber mais mensagens.',
+  botao_texto: '✅ Quero a consulta',
+  pergunta_nome: '{Ótimo|Perfeito}! 🙌 Vamos começar a sua consulta.\n\nQual é o seu *nome completo*?',
+  pergunta_cnpj: 'Obrigado, {primeiro_nome}! Agora me informe o *CNPJ da empresa* que deseja consultar (só os números já servem).',
+  mensagem_obrigado:
+    'Pronto, {primeiro_nome}! ✅ Recebemos o pedido de consulta do CNPJ *{cnpj}*.\n\n' +
+    'Nossa equipe já está analisando e em breve retornamos aqui mesmo com o resultado.\n\n' +
+    'Enquanto isso, se quiser conhecer a OficialCert e a nossa plataforma, é só tocar no botão abaixo. 👇',
+  botao_site_texto: 'Acessar a plataforma',
+  mensagem_nao:
+    'Tudo bem, obrigado pelo retorno! Não enviaremos mais mensagens. Se um dia quiser a consulta, é só responder aqui. 👋',
+  // formato antigo (enquete) — fica para compatibilidade
   enquete_pergunta: 'Quer fazer a consulta gratuita?',
   opcao_sim: '✅ Sim, quero consultar',
   opcao_nao: 'Não tenho interesse',
-  mensagem_sim:
-    '{Ótimo|Perfeito}! 🙌 Para iniciarmos a consulta gratuita da *{empresa}*, preencha seus dados neste link ' +
-    '(leva menos de 1 minuto):\n\n{link}\n\nAssim que recebermos, um especialista da OficialCert entra em contato.',
-  mensagem_nao:
-    'Tudo bem, obrigado pelo retorno! Não enviaremos mais mensagens. Se um dia quiser a consulta, é só responder aqui. 👋',
-  mensagem_obrigado:
-    'Recebemos seus dados, {primeiro_nome}! ✅ Um especialista da OficialCert vai analisar a *{empresa}* e falar ' +
-    'com você em breve.'
+  mensagem_sim: '{Ótimo|Perfeito}! 🙌 Vamos começar a sua consulta.\n\nQual é o seu *nome completo*?'
 } as const
+
+/** Logo enviada no alto da 1ª e da última mensagem (precisa ser um endereço público: o WAHA baixa a imagem). */
+export const imagemPadrao = (base: string) => `${base.replace(/\/+$/, '')}/site/marca/whatsapp-logo.jpg`
 
 export type CampanhaEditavel = Pick<
   Campanha,
   | 'nome'
   | 'ordem'
   | 'excluir_compartilhados'
-  | 'usar_enquete'
+  | 'formato'
+  | 'imagem_url'
   | 'mensagem'
-  | 'enquete_pergunta'
-  | 'opcao_sim'
-  | 'opcao_nao'
-  | 'mensagem_sim'
-  | 'mensagem_nao'
+  | 'rodape'
+  | 'botao_texto'
+  | 'pergunta_nome'
+  | 'pergunta_cnpj'
   | 'mensagem_obrigado'
+  | 'botao_site_texto'
+  | 'site_url'
+  | 'mensagem_nao'
   | 'limite_total'
 > & { id?: number }
 
-/** Campanha nova já com os modelos padrão. */
-export const campanhaPadrao = (nome: string): CampanhaEditavel => ({
+/** Campanha nova já com os modelos padrão. `base` = endereço público do site (APP_URL). */
+export const campanhaPadrao = (nome: string, base: string): CampanhaEditavel => ({
   nome,
   ordem: 'score',
   excluir_compartilhados: true,
-  usar_enquete: true,
+  formato: 'botao',
+  imagem_url: imagemPadrao(base),
   limite_total: null,
-  ...MODELOS
+  site_url: base.replace(/\/+$/, ''),
+  mensagem: MODELOS.mensagem,
+  rodape: MODELOS.rodape,
+  botao_texto: MODELOS.botao_texto,
+  pergunta_nome: MODELOS.pergunta_nome,
+  pergunta_cnpj: MODELOS.pergunta_cnpj,
+  mensagem_obrigado: MODELOS.mensagem_obrigado,
+  botao_site_texto: MODELOS.botao_site_texto,
+  mensagem_nao: MODELOS.mensagem_nao
 })
 
 /** Respostas fixas do robô (não variam por campanha). */
@@ -61,18 +81,55 @@ export const RESPOSTAS = {
   voto_ilegivel:
     'Recebi seu toque na enquete, mas não consegui ler a opção 😅\n\nSe quer a consulta gratuita, responda *SIM* ' +
     'aqui. Se não tem interesse, pode ignorar esta mensagem.',
-  sem_enquete: 'Quer fazer a consulta gratuita? Responda *SIM* que eu te envio o link.'
+  sem_botao: 'Deseja fazer a consulta? Responda *SIM*.',
+  nome_invalido: 'Pode me dizer o seu *nome completo*, por favor? (nome e sobrenome)',
+  cnpj_invalido: 'Esse CNPJ não parece válido 🤔 Confira e me envie os 14 números, por favor.',
+  desistiu_da_coleta: 'Sem problemas! Um especialista da OficialCert vai falar com você por aqui para confirmar os dados. 🙂'
 } as const
 
 export const VARIAVEIS = [
-  { nome: '{empresa}', texto: 'nome da empresa (fantasia ou razão social)' },
+  { nome: '{empresa}', texto: 'nome da empresa contatada' },
   { nome: '{saudacao}', texto: 'Bom dia / Boa tarde / Boa noite' },
   { nome: '{municipio}', texto: 'cidade da empresa' },
-  { nome: '{link}', texto: 'link do formulário (mensagem do "Sim")' },
-  { nome: '{primeiro_nome}', texto: 'quem preencheu (mensagem de agradecimento)' }
+  { nome: '{primeiro_nome}', texto: 'primeiro nome informado (depois do nome)' },
+  { nome: '{cnpj}', texto: 'CNPJ informado (mensagem final)' }
 ] as const
 
-export type Variaveis = Partial<Record<'empresa' | 'saudacao' | 'municipio' | 'link' | 'nome' | 'primeiro_nome', string>>
+export type Variaveis = Partial<
+  Record<'empresa' | 'saudacao' | 'municipio' | 'link' | 'nome' | 'primeiro_nome' | 'cnpj', string>
+>
+
+/** Dígitos verificadores do CNPJ. */
+export function cnpjValido(v: string) {
+  const d = v.replace(/\D/g, '')
+  if (d.length !== 14 || /^(\d)\1{13}$/.test(d)) return false
+  const dv = (n: number) => {
+    let soma = 0
+    let peso = n - 7
+    for (let i = 0; i < n; i++) {
+      soma += Number(d[i]) * peso--
+      if (peso < 2) peso = 9
+    }
+    const r = soma % 11
+    return r < 2 ? 0 : 11 - r
+  }
+  return dv(12) === Number(d[12]) && dv(13) === Number(d[13])
+}
+
+export const fmtCnpj = (c: string | null | undefined) =>
+  !c ? '—' : c.length === 14 ? `${c.slice(0, 2)}.${c.slice(2, 5)}.${c.slice(5, 8)}/${c.slice(8, 12)}-${c.slice(12)}` : c
+
+/** "joão  DA silva" → "João da Silva"; null se não parecer nome completo (2+ palavras, só letras). */
+export function nomeCompleto(texto: string) {
+  const t = texto.replace(/\s+/g, ' ').trim()
+  if (t.length < 5 || t.length > 120 || /[\d@#$%&*=+<>{}[\]\\/|_]/.test(t)) return null
+  const partes = t.split(' ').filter(p => /\p{L}/u.test(p))
+  if (partes.length < 2) return null
+  const pequenas = new Set(['da', 'de', 'do', 'das', 'dos', 'e'])
+  return partes
+    .map((p, i) => (i > 0 && pequenas.has(p.toLowerCase()) ? p.toLowerCase() : p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()))
+    .join(' ')
+}
 
 /**
  * Monta o texto: primeiro sorteia as variações `{a|b|c}` (o que tem barra), depois troca as variáveis `{empresa}`.

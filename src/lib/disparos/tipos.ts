@@ -20,7 +20,7 @@ export const ROTULO_STATUS: Record<StatusDisparo, string> = {
   sem_whatsapp: 'Sem WhatsApp',
   falhou: 'Falhou',
   interessado: 'Quer a consulta',
-  preencheu: 'Preencheu',
+  preencheu: 'Enviou os dados',
   sem_interesse: 'Sem interesse',
   respondeu: 'Respondeu',
   descadastrado: 'Pediu para sair'
@@ -48,7 +48,7 @@ export const GRUPOS = {
     status: ['interessado', 'preencheu', 'sem_interesse', 'respondeu', 'descadastrado']
   },
   interessados: { rotulo: 'Querem a consulta', status: ['interessado'] },
-  leads: { rotulo: 'Preencheram', status: ['preencheu'] },
+  leads: { rotulo: 'Enviaram os dados', status: ['preencheu'] },
   atencao: { rotulo: 'Precisam de atenção', status: null },
   recusaram: { rotulo: 'Recusaram / saíram', status: ['sem_interesse', 'descadastrado'] },
   nao_entregues: { rotulo: 'Não entregues', status: ['sem_whatsapp', 'falhou', 'reservado'] }
@@ -88,10 +88,19 @@ export type Disparo = {
   lead_email: string | null
   lead_whatsapp: string | null
   lead_ip: string | null
+  /** coleta pela conversa: qual pergunta está aberta */
+  etapa: 'nome' | 'cnpj' | null
+  lead_cnpj: string | null
+  tentativas: number
+  /** conversa de teste do administrador (fora do funil) */
+  teste: boolean
   atualizado_em: string
 }
 
 export type StatusCampanha = 'ativa' | 'pausada' | 'concluida'
+
+/** Como a 1ª mensagem chega: logo + texto + botão, ou logo + texto pedindo "SIM" (enquete = formato antigo). */
+export type FormatoCampanha = 'botao' | 'texto' | 'enquete'
 
 export type Campanha = {
   id: number
@@ -108,6 +117,14 @@ export type Campanha = {
   mensagem_nao: string
   mensagem_obrigado: string
   limite_total: number | null
+  formato: FormatoCampanha
+  imagem_url: string | null
+  botao_texto: string
+  rodape: string | null
+  pergunta_nome: string
+  pergunta_cnpj: string
+  botao_site_texto: string
+  site_url: string
   status: StatusCampanha
   motivo_status: string | null
   ultima_reserva_em: string | null

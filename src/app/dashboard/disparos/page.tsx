@@ -19,7 +19,7 @@ import {
 import { SeloStatus } from '@/components/disparos/selos'
 import { dentroDaJanela } from '@/lib/disparos/config'
 import { lerConfig, listarDisparos, listarNumeros, nomesCampanhas, resumoDisparos, type ConsultaDisparos } from '@/lib/disparos/dados'
-import { fmtFone } from '@/lib/disparos/mensagens'
+import { fmtCnpj, fmtFone } from '@/lib/disparos/mensagens'
 import { GRUPOS, type Grupo, type ResumoDisparos } from '@/lib/disparos/tipos'
 import { fmtDataHora, fmtInt, fmtPct, fmtRelativo } from '@/lib/formatar'
 import { ROTAS } from '@/lib/rotas'
@@ -171,6 +171,7 @@ export default async function PainelDisparos({ searchParams }: { searchParams: P
                     <Link href={ROTAS.disparo(d.id)} className='block'>
                       <span className='flex items-center gap-1.5'>
                         {d.atencao && <BellRing className='size-3.5 shrink-0 text-amber-500' aria-label='Precisa de atenção' />}
+                        {d.teste && <span className='shrink-0 rounded-full bg-violet-100 px-1.5 text-[10px] font-semibold text-violet-800'>teste</span>}
                         <span className='truncate font-medium text-slate-800 hover:text-marca-700'>{d.nome_fantasia || d.razao_social}</span>
                       </span>
                       <span className='block truncate text-xs text-slate-400'>
@@ -204,7 +205,7 @@ export default async function PainelDisparos({ searchParams }: { searchParams: P
                     {d.preenchido_em ? (
                       <span className='block text-slate-700'>
                         <strong className='font-semibold text-emerald-800'>{d.lead_nome}</strong>
-                        <span className='block truncate text-slate-500'>{d.lead_email}</span>
+                        <span className='block truncate text-slate-500'>{d.lead_cnpj ? `CNPJ ${fmtCnpj(d.lead_cnpj)}` : d.lead_email}</span>
                       </span>
                     ) : d.ultima_resposta ? (
                       <span className='line-clamp-2 text-slate-600'>“{d.ultima_resposta}”</span>
@@ -255,8 +256,8 @@ function Funil({ r, capacidade }: { r: ResumoDisparos; capacidade: number }) {
     { rotulo: 'Entregues', valor: r.entregues, nota: `${fmtPct(r.entregues, r.enviados)} dos enviados`, icone: CheckCheck },
     { rotulo: 'Lidos', valor: r.lidos, nota: `${fmtPct(r.lidos, r.enviados)} dos enviados`, icone: Eye },
     { rotulo: 'Responderam', valor: r.responderam, nota: `${fmtPct(r.responderam, r.enviados)} · ${fmtInt(r.aguardando)} sem resposta`, icone: MessageCircleReply },
-    { rotulo: 'Querem a consulta', valor: r.interessados, nota: `${fmtInt(r.links_abertos)} abriram o link`, icone: Hand },
-    { rotulo: 'Preencheram', valor: r.preencheram, nota: `${fmtPct(r.preencheram, r.enviados)} dos enviados`, icone: ClipboardCheck, ouro: true },
+    { rotulo: 'Querem a consulta', valor: r.interessados, nota: `${fmtPct(r.interessados, r.enviados)} dos enviados`, icone: Hand },
+    { rotulo: 'Enviaram nome e CNPJ', valor: r.preencheram, nota: `${fmtPct(r.preencheram, r.enviados)} dos enviados`, icone: ClipboardCheck, ouro: true },
     { rotulo: 'Recusaram / saíram', valor: r.sem_interesse + r.descadastrados, nota: `${fmtInt(r.descadastrados)} pediram para sair`, icone: MailX },
     { rotulo: 'Não entregues', valor: r.sem_whatsapp + r.falhas, nota: `${fmtInt(r.sem_whatsapp)} sem WhatsApp · ${fmtInt(r.falhas)} falhas`, icone: TriangleAlert }
   ]

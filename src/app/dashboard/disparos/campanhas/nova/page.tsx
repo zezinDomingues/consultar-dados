@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { FormCampanha } from '@/components/disparos/form-campanha'
+import { urlApp } from '@/lib/disparos/config'
 import { contarElegiveis, listarNumeros } from '@/lib/disparos/dados'
 import { campanhaPadrao, nomeEmpresa } from '@/lib/disparos/mensagens'
 import { buscarEmpresas, opcoesFiltros } from '@/lib/empresas/consulta'
@@ -25,7 +26,7 @@ export default async function NovaCampanhaPage({ searchParams }: { searchParams:
 
   return (
     <FormCampanha
-      inicial={{ ...campanhaPadrao(nome), ordem }}
+      inicial={{ ...campanhaPadrao(nome, urlApp()), ordem }}
       filtros={filtros}
       rotulos={rotulos}
       hrefAjustar={hrefConsulta({ filtros: { ...filtros, com_whatsapp: true }, ordem })}

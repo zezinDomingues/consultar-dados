@@ -4,9 +4,21 @@
 import 'server-only'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { dentroDaJanela, inicioDoDiaBrasilia } from './config'
-import { montar, nomeEmpresa, RESPOSTAS, saudacao } from './mensagens'
+import { fmtCnpj, montar, nomeEmpresa, primeiroNome, RESPOSTAS, saudacao } from './mensagens'
 import type { Campanha, Disparo, EventoDisparo, NumeroComChave } from './tipos'
-import { digitar, enviarEnquete, enviarTexto, ErroWaha, lerSessao, marcarVisto, verificarNumero, type Canal } from './waha'
+import {
+  digitar,
+  enviarBotoes,
+  enviarEnquete,
+  enviarImagem,
+  enviarTexto,
+  ErroWaha,
+  lerSessao,
+  marcarVisto,
+  verificarNumero,
+  type Canal,
+  type MensagemRica
+} from './waha'
 
 const sorteio = (min: number, max: number) => min + Math.random() * Math.max(0, max - min)
 const espera = (ms: number) => new Promise(r => setTimeout(r, ms))
@@ -52,28 +64,69 @@ export async function registrarEvento(e: NovoEvento) {
   return (data?.length ?? 0) > 0
 }
 
-/** Manda um texto como pessoa (visto → digitando → texto) e registra na conversa. */
+/** Manda uma mensagem como pessoa (visto → digitando → mensagem) e registra na conversa. Texto puro ou rica. */
 export async function responder(
   d: Pick<Disparo, 'id' | 'chat_id'>,
   numero: NumeroComChave,
-  texto: string,
+  conteudo: string | MensagemRica,
   opcoes: { autor?: string; visto?: boolean } = {}
 ) {
   if (!d.chat_id) throw new Error('conversa sem chat_id')
+  const m: MensagemRica = typeof conteudo === 'string' ? { texto: conteudo } : conteudo
   const canal = canalDe(numero)
   if (opcoes.visto !== false) await marcarVisto(canal, d.chat_id)
-  await digitar(canal, d.chat_id, Math.min(1200 + texto.length * 15, 4000))
-  const id = await enviarTexto(canal, d.chat_id, texto)
+  await digitar(canal, d.chat_id, Math.min(1200 + m.texto.length * 15, 4000))
+  const id = await enviarRica(canal, d.chat_id, m)
   await registrarEvento({
     disparo_id: d.id,
     numero_id: numero.id,
     tipo: 'enviada',
     direcao: 'saida',
-    texto,
+    texto: descrever(m),
     wa_id: id,
     autor: opcoes.autor ?? null
   })
   return id
+}
+
+/** Botões → sendButtons; só imagem → sendImage (rodapé vira itálico); só texto → sendText. */
+export async function enviarRica(canal: Canal, chatId: string, m: MensagemRica) {
+  if (m.botoes?.length) return enviarBotoes(canal, chatId, m)
+  const texto = m.rodape ? `${m.texto}\n\n_${m.rodape}_` : m.texto
+  if (m.imagem) return enviarImagem(canal, chatId, m.imagem, texto)
+  return enviarTexto(canal, chatId, texto)
+}
+
+/** Como a mensagem aparece na conversa da plataforma. */
+export const descrever = (m: MensagemRica) =>
+  [m.imagem ? '🖼️ [logo]' : '', m.texto, m.rodape ? `_${m.rodape}_` : '', ...(m.botoes ?? []).map(b => `[ ${b.texto} ]${b.tipo === 'link' ? ` → ${b.url}` : ''}`)]
+    .filter(Boolean)
+    .join('\n')
+
+/** 1ª mensagem da campanha, já montada para a empresa. */
+export function primeiraMensagem(c: Campanha, d: Pick<Disparo, 'razao_social' | 'nome_fantasia' | 'municipio'>): MensagemRica {
+  const texto = montar(c.mensagem, { empresa: nomeEmpresa(d), saudacao: saudacao(), municipio: d.municipio ?? '' })
+  if (c.formato === 'botao') {
+    return { imagem: c.imagem_url, texto, rodape: c.rodape, botoes: [{ tipo: 'resposta', texto: c.botao_texto }] }
+  }
+  return { imagem: c.imagem_url, texto: /\bSIM\b/.test(texto) ? texto : `${texto}\n\n${RESPOSTAS.sem_botao}`, rodape: c.rodape }
+}
+
+/** Mensagem final (depois do CNPJ): logo + agradecimento + botão que abre o site. */
+export function mensagemFinal(
+  c: Campanha,
+  d: Pick<Disparo, 'razao_social' | 'nome_fantasia' | 'municipio' | 'lead_nome' | 'lead_cnpj'>
+): MensagemRica {
+  const nome = d.lead_nome ?? ''
+  const texto = montar(c.mensagem_obrigado, {
+    primeiro_nome: primeiroNome(nome),
+    nome,
+    cnpj: fmtCnpj(d.lead_cnpj),
+    empresa: nomeEmpresa(d),
+    saudacao: saudacao()
+  })
+  if (c.formato === 'botao') return { imagem: c.imagem_url, texto, botoes: [{ tipo: 'link', texto: c.botao_site_texto, url: c.site_url }] }
+  return { imagem: c.imagem_url, texto: `${texto}\n\n👉 ${c.site_url}` }
 }
 
 type Resultado = { numero: number; rotulo: string; resultado: string; disparo?: number }
@@ -137,6 +190,7 @@ async function cicloDoNumero(n: NumeroComChave, agora: Date): Promise<Resultado>
     .from('disparos')
     .select('id', { count: 'exact', head: true })
     .eq('numero_id', n.id)
+    .eq('teste', false)
     .gte('enviado_em', inicioDoDiaBrasilia(agora))
   if ((hoje ?? 0) >= n.limite_diario) {
     await adiar(20 * 60)
@@ -201,34 +255,44 @@ async function enviarPrimeira(
     return r(`falha ao verificar o número: ${msg(e)}`)
   }
 
-  // 2) Primeira mensagem
-  let texto = montar(c.mensagem, { empresa: nomeEmpresa(d), saudacao: saudacao(), municipio: d.municipio ?? '' })
-  if (!c.usar_enquete && !/\bSIM\b/.test(texto)) texto += `\n\n${RESPOSTAS.sem_enquete}`
+  // 2) Primeira mensagem (logo + texto + botão, ou logo + "responda SIM", ou o formato antigo de enquete)
+  const enquete = c.formato === 'enquete'
+  let m: MensagemRica = enquete
+    ? { texto: montar(c.mensagem, { empresa: nomeEmpresa(d), saudacao: saudacao(), municipio: d.municipio ?? '' }) }
+    : primeiraMensagem(c, d)
 
   await digitar(canal, chat, sorteio(2500, 5000))
   let msgId: string | null
   try {
-    msgId = await enviarTexto(canal, chat, texto)
+    try {
+      msgId = await enviarRica(canal, chat, m)
+    } catch (e) {
+      // Botão recusado pelo WAHA (4xx = formato): manda logo + texto pedindo SIM, para não perder o contato
+      if (!(m.botoes?.length && e instanceof ErroWaha && e.status && e.status < 500)) throw e
+      m = primeiraMensagem({ ...c, formato: 'texto' }, d)
+      msgId = await enviarRica(canal, chat, m)
+      await registrarEvento({ disparo_id: d.id, numero_id: n.id, tipo: 'erro', texto: `botão recusado, foi como texto: ${msg(e)}` })
+    }
   } catch (e) {
     const erro = msg(e)
     if (e instanceof ErroWaha && e.enviado === 'nao' && (!e.status || e.status >= 500)) {
       // problema do WAHA/sessão, e a mensagem não saiu: devolve a empresa e dá um tempo ao número
       await devolver()
-      await adiar(10 * 60, { status: 'ERRO', status_detalhe: `sendText: ${erro}`, status_em: agoraIso() })
+      await adiar(10 * 60, { status: 'ERRO', status_detalhe: `envio: ${erro}`, status_em: agoraIso() })
       return r(`WAHA recusou o envio: ${erro}`)
     }
     // recusado para ESTE destinatário (4xx) ou pode ter saído (timeout): registra e nunca reenvia
-    await atualizar({ status: 'falhou', erro: `sendText: ${erro}`, chat_id: chat })
+    await atualizar({ status: 'falhou', erro: `envio: ${erro}`, chat_id: chat })
     await adiar(sorteio(60, 120))
     return r(`falhou: ${erro}`, d.id)
   }
 
   const enviadoEm = agoraIso()
   await atualizar({ status: 'enviado', chat_id: chat, msg_id: msgId, enviado_em: enviadoEm, erro: null })
-  await registrarEvento({ disparo_id: d.id, numero_id: n.id, tipo: 'enviada', direcao: 'saida', texto, wa_id: msgId })
+  await registrarEvento({ disparo_id: d.id, numero_id: n.id, tipo: 'enviada', direcao: 'saida', texto: descrever(m), wa_id: msgId })
 
-  // 3) Enquete (o "botão" do WhatsApp comum). Se não sair, pede SIM por escrito.
-  if (c.usar_enquete) {
+  // 3) Formato antigo: enquete logo depois
+  if (enquete) {
     await espera(sorteio(1200, 2500))
     try {
       const enqueteId = await enviarEnquete(canal, chat, c.enquete_pergunta, [c.opcao_sim, c.opcao_nao])
@@ -245,7 +309,7 @@ async function enviarPrimeira(
     } catch (e) {
       await atualizar({ erro: `enquete não saiu: ${msg(e)}` })
       try {
-        await responder({ id: d.id, chat_id: chat }, n, RESPOSTAS.sem_enquete, { visto: false })
+        await responder({ id: d.id, chat_id: chat }, n, RESPOSTAS.sem_botao, { visto: false })
       } catch {
         // a 1ª mensagem já saiu; a pessoa ainda pode responder
       }
@@ -259,4 +323,10 @@ async function enviarPrimeira(
     status_em: enviadoEm
   })
   return r('enviado', d.id)
+}
+
+/** Teste do administrador no próprio WhatsApp: a mesma 1ª mensagem do ciclo, sem mexer no relógio do número. */
+export async function enviarPrimeiraDeTeste(d: Disparo, n: NumeroComChave) {
+  const r = (resultado: string, disparo?: number): Resultado => ({ numero: n.id, rotulo: n.rotulo, resultado, disparo })
+  return enviarPrimeira(d, n, canalDe(n), async () => {}, r)
 }

@@ -8,15 +8,13 @@ import { SeloStatus } from '@/components/disparos/selos'
 import { marcarComoVisto } from '@/app/dashboard/disparos/actions'
 import { linkFormulario } from '@/lib/disparos/config'
 import { obterDisparo } from '@/lib/disparos/dados'
-import { fmtFone } from '@/lib/disparos/mensagens'
+import { fmtCnpj, fmtFone } from '@/lib/disparos/mensagens'
 import type { EventoDisparo } from '@/lib/disparos/tipos'
 import { fmtDataHora } from '@/lib/formatar'
 import { ROTAS } from '@/lib/rotas'
 import { cn } from '@/lib/utils'
 
 export const metadata: Metadata = { title: 'Contato' }
-
-const fmtCnpj = (c: string) => `${c.slice(0, 2)}.${c.slice(2, 5)}.${c.slice(5, 8)}/${c.slice(8, 12)}-${c.slice(12)}`
 
 export default async function DisparoPage({ params }: { params: Promise<{ id: string }> }) {
   const id = Number((await params).id)
@@ -32,9 +30,10 @@ export default async function DisparoPage({ params }: { params: Promise<{ id: st
     { rotulo: 'Lido', em: d.lido_em },
     { rotulo: 'Respondeu', em: d.respondido_em },
     { rotulo: 'Quis a consulta', em: d.interessado_em },
-    { rotulo: 'Abriu o link', em: d.link_aberto_em },
-    { rotulo: 'Preencheu', em: d.preenchido_em }
+    { rotulo: 'Enviou nome e CNPJ', em: d.preenchido_em }
   ]
+
+  const etapaAberta = d.etapa === 'nome' ? 'Esperando o nome completo' : d.etapa === 'cnpj' ? 'Esperando o CNPJ' : null
 
   const bloqueioResposta =
     d.status === 'descadastrado'
@@ -61,7 +60,10 @@ export default async function DisparoPage({ params }: { params: Promise<{ id: st
                   CNPJ {fmtCnpj(d.cnpj)} · {d.municipio}
                 </p>
               </div>
-              <SeloStatus status={d.status} className='text-xs' />
+              <div className='flex items-center gap-1.5'>
+                {d.teste && <span className='rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-semibold text-violet-800'>teste</span>}
+                <SeloStatus status={d.status} className='text-xs' />
+              </div>
             </div>
             <dl className='mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-sm'>
               <div>
@@ -100,19 +102,30 @@ export default async function DisparoPage({ params }: { params: Promise<{ id: st
                 </BotaoAcao>
               )}
             </div>
+            {etapaAberta && <p className='mt-4 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800'>Robô: {etapaAberta.toLowerCase()}…</p>}
             {d.erro && <p className='mt-4 rounded-xl bg-red-50 px-3 py-2 text-xs text-red-700'>{d.erro}</p>}
           </div>
 
           {d.preenchido_em && (
             <div className='rounded-2xl border border-ouro/60 bg-white p-5 ring-1 ring-ouro/30'>
               <p className='flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-ouro-escuro'>
-                <ClipboardCheck className='size-4' /> Dados do formulário
+                <ClipboardCheck className='size-4' /> Dados enviados
               </p>
               <dl className='mt-3 grid gap-3 text-sm sm:grid-cols-2'>
-                <Campo rotulo='Nome' valor={d.lead_nome} />
-                <Campo rotulo='Empresa' valor={d.lead_empresa} />
-                <Campo rotulo='E-mail' valor={d.lead_email} link={d.lead_email ? `mailto:${d.lead_email}` : undefined} />
-                <Campo rotulo='WhatsApp' valor={fmtFone(d.lead_whatsapp)} link={d.lead_whatsapp ? `https://wa.me/55${d.lead_whatsapp}` : undefined} />
+                <Campo rotulo='Nome completo' valor={d.lead_nome} />
+                <Campo
+                  rotulo='CNPJ informado'
+                  valor={d.lead_cnpj ? fmtCnpj(d.lead_cnpj) : null}
+                  link={d.lead_cnpj ? ROTAS.empresa(d.lead_cnpj) : undefined}
+                  interno
+                />
+                <Campo
+                  rotulo='WhatsApp'
+                  valor={fmtFone(d.lead_whatsapp ?? d.telefone)}
+                  link={`https://wa.me/55${d.lead_whatsapp ?? d.telefone}`}
+                />
+                {d.lead_email && <Campo rotulo='E-mail' valor={d.lead_email} link={`mailto:${d.lead_email}`} />}
+                {d.lead_empresa && <Campo rotulo='Empresa (formulário)' valor={d.lead_empresa} />}
               </dl>
               <p className='mt-3 text-xs text-slate-400'>Enviado em {fmtDataHora(d.preenchido_em)}</p>
             </div>
@@ -161,12 +174,16 @@ export default async function DisparoPage({ params }: { params: Promise<{ id: st
   )
 }
 
-function Campo({ rotulo, valor, link }: { rotulo: string; valor: string | null; link?: string }) {
+function Campo({ rotulo, valor, link, interno }: { rotulo: string; valor: string | null; link?: string; interno?: boolean }) {
   return (
     <div className='min-w-0'>
       <dt className='text-[11px] uppercase tracking-wide text-slate-400'>{rotulo}</dt>
       <dd className='truncate font-medium text-slate-800'>
-        {link ? (
+        {link && interno ? (
+          <Link href={link} className='text-marca-700 hover:underline' title='Ver a empresa na base'>
+            {valor}
+          </Link>
+        ) : link ? (
           <a href={link} target='_blank' rel='noreferrer' className='hover:text-marca-700 hover:underline'>
             {valor}
           </a>

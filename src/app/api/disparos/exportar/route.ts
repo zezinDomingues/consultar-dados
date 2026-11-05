@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { listarDisparos, SemAdminError } from '@/lib/disparos/dados'
 import { ROTULO_STATUS, GRUPOS, type Grupo } from '@/lib/disparos/tipos'
-import { fmtFone } from '@/lib/disparos/mensagens'
+import { fmtCnpj, fmtFone } from '@/lib/disparos/mensagens'
 
 // CSV dos contatos da aba atual do painel (só administradores; o RLS garante o mesmo).
 export const dynamic = 'force-dynamic'
@@ -19,8 +19,8 @@ export async function GET(request: NextRequest) {
     const linhas: string[] = [
       [
         'CNPJ', 'Razão social', 'Nome fantasia', 'Município', 'WhatsApp', 'Situação', 'Enviado em', 'Entregue em', 'Lido em',
-        'Respondeu em', 'Última resposta', 'Quis a consulta em', 'Preencheu em', 'Lead - nome', 'Lead - empresa', 'Lead - e-mail',
-        'Lead - WhatsApp', 'Erro'
+        'Respondeu em', 'Última resposta', 'Quis a consulta em', 'Enviou os dados em', 'Nome completo', 'CNPJ informado', 'Lead - empresa',
+        'Lead - e-mail', 'Lead - WhatsApp', 'Teste', 'Erro'
       ].join(';')
     ]
     for (let pagina = 1; pagina <= 40; pagina++) {
@@ -30,14 +30,14 @@ export async function GET(request: NextRequest) {
           [
             d.cnpj, d.razao_social, d.nome_fantasia, d.municipio, fmtFone(d.telefone), ROTULO_STATUS[d.status], data(d.enviado_em),
             data(d.entregue_em), data(d.lido_em), data(d.respondido_em), d.ultima_resposta, data(d.interessado_em), data(d.preenchido_em),
-            d.lead_nome, d.lead_empresa, d.lead_email, d.lead_whatsapp ? fmtFone(d.lead_whatsapp) : '', d.erro
+            d.lead_nome, d.lead_cnpj ? fmtCnpj(d.lead_cnpj) : '', d.lead_empresa, d.lead_email, d.lead_whatsapp ? fmtFone(d.lead_whatsapp) : '', d.teste ? 'sim' : '', d.erro
           ].map(campo).join(';')
         )
       }
       if (itens.length < 500) break
     }
     const nome = `disparos-${grupo}-${new Date().toISOString().slice(0, 10)}.csv`
-    return new NextResponse('﻿' + linhas.join('\r\n'), {
+    return new NextResponse('\uFEFF' + linhas.join('\r\n'), {
       headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="${nome}"` }
     })
   } catch (e) {

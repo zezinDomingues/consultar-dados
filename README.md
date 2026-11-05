@@ -73,10 +73,15 @@ Tempos medidos: filtros comuns ~25 ms; resumo 0,4–2 s (fica 15 min em cache no
 
 Prospecção ativa pelo WhatsApp, só para usuários `admin` em `app_usuarios` (o menu ganha a seção **Administrativo**).
 
-**Fluxo:** campanha (filtros da Consulta + textos) → a cada minuto o **pg_cron** do Supabase chama o ciclo → cada
-número pronto manda a 1ª mensagem para a melhor empresa ainda não contatada (+ uma **enquete** "Sim / Não") → quem
-toca "Sim" (ou responde SIM) recebe o link `/consulta-gratuita/<token>` → o formulário (nome, empresa, e-mail
-corporativo, WhatsApp) grava no mesmo registro → agradecimento automático pelo WhatsApp.
+**Fluxo (05/11/2026):** campanha (filtros da Consulta + textos) → a cada minuto o **pg_cron** do Supabase chama o
+ciclo → cada número pronto manda a 1ª mensagem para a melhor empresa ainda não contatada: **logo + texto + UM botão**
+("✅ Quero a consulta"; formato "texto" = logo + "responda SIM", para aparelhos sem botão) → quem toca/responde SIM
+recebe as perguntas pela própria conversa: **nome completo** e **CNPJ** (validado pelos dígitos; 3 respostas ruins →
+"Precisam de atenção") → mensagem final com **logo + "em análise" + botão que abre o site**. O telefone é o da
+conversa. O formulário `/consulta-gratuita/<token>` continua no ar, mas saiu do fluxo.
+
+**Teste no próprio WhatsApp:** na tela da campanha (salva, pode estar pausada) → "Testar a conversa no meu WhatsApp".
+Cria um registro `teste` (fora do funil e do limite diário) e manda a 1ª mensagem de verdade; o resto é o fluxo real.
 
 **Regra de ouro — ninguém recebe duas vezes:** a tabela `disparos` é um livro com índice ÚNICO em `telefone` e em
 `cnpj`. A reserva (`disparo_reservar`) acontece no banco antes do envio; corrida entre ciclos é decidida pelo índice.
@@ -89,8 +94,9 @@ Peças:
   `006_disparos_agendamento.sql` — pg_cron + pg_net, só chama a Vercel quando há o que fazer.
 - `src/lib/disparos/motor.ts` — o ciclo: trava por número, limite diário, sessão WORKING, check-exists (acha o chatId
   com/sem o 9), "digitando…", texto, enquete, intervalo aleatório.
-- `src/lib/disparos/webhook.ts` — entrega/leitura (`message.ack`), voto (`poll.vote`; `poll.vote.failed` com LID → pede
-  SIM por escrito), mensagens escritas (SIM/NÃO/SAIR/cortesia; o resto vai para "Precisam de atenção").
+- `src/lib/disparos/webhook.ts` — entrega/leitura (`message.ack`), toque no botão (vem no `body` ou no `nativeFlow`),
+  coleta nome → CNPJ (`disparos.etapa`), SIM/NÃO/SAIR/cortesia; o resto vai para "Precisam de atenção".
+- `supabase/migrations/007_disparos_conversa.sql` — formato da campanha, imagem, botões, perguntas, `etapa`, `lead_cnpj`, `teste`.
 - `src/lib/disparos/mensagens.ts` — modelos padrão, variáveis `{empresa}` `{saudacao}` `{link}` `{primeiro_nome}`,
   variações `{Olá|Oi}` sorteadas por envio, leitura da intenção das respostas.
 - `src/lib/disparos/waha.ts` — cliente do WAHA por número (URL + sessão + API key; no CORE, uma instância por número).

@@ -3,10 +3,23 @@
 // "digitando…") vão para `depois`, que a rota executa após devolver 200 ao WAHA.
 import 'server-only'
 import { supabaseAdmin } from '@/lib/supabase/admin'
-import { linkFormulario } from './config'
-import { cortesia, intencao, montar, nomeEmpresa, normalizar, normalizarFone as foneDoJid, RESPOSTAS, respostaSimples, saudacao } from './mensagens'
-import { canalDe, carregarCampanha, carregarNumero, registrarEvento, responder } from './motor'
-import type { Disparo, NumeroComChave } from './tipos'
+import {
+  cnpjValido,
+  cortesia,
+  fmtCnpj,
+  intencao,
+  montar,
+  nomeCompleto,
+  nomeEmpresa,
+  normalizar,
+  normalizarFone as foneDoJid,
+  primeiroNome,
+  RESPOSTAS,
+  respostaSimples,
+  saudacao
+} from './mensagens'
+import { canalDe, carregarCampanha, carregarNumero, mensagemFinal, registrarEvento, responder } from './motor'
+import type { Campanha, Disparo, NumeroComChave } from './tipos'
 import { chaveDoId, telefoneDoLid } from './waha'
 
 export type EventoWaha = { event?: string; session?: string; payload?: Record<string, unknown> | null }
@@ -17,6 +30,28 @@ const texto = (v: unknown) => (typeof v === 'string' ? v : '')
 const idSerial = (v: unknown) => (typeof v === 'string' ? v : texto((v as { _serialized?: unknown } | null)?._serialized))
 /** Emoji às vezes vem com o seletor de variação (U+FE0F), às vezes sem: compara sem ele. */
 const opcaoIgual = (a: string, b: string) => normalizar(a.replace(/️/g, '')) === normalizar(b.replace(/️/g, ''))
+
+/** Texto que a pessoa mandou — ou o do botão que ela tocou (o NOWEB entrega em lugares diferentes). */
+function textoRecebido(p: Record<string, unknown>) {
+  const corpo = texto(p.body).trim()
+  if (corpo) return corpo
+  const m = ((p._data as { message?: Record<string, unknown> } | undefined)?.message ?? {}) as Record<string, Record<string, unknown> | undefined>
+  const candidatos = [
+    m.buttonsResponseMessage?.selectedDisplayText,
+    m.templateButtonReplyMessage?.selectedDisplayText,
+    (m.interactiveResponseMessage?.body as { text?: unknown } | undefined)?.text
+  ]
+  const achado = candidatos.find(v => typeof v === 'string' && v.trim())
+  if (achado) return String(achado).trim()
+  // nativeFlow: o id do botão vem num JSON
+  const params = texto((m.interactiveResponseMessage?.nativeFlowResponseMessage as { paramsJson?: unknown } | undefined)?.paramsJson)
+  try {
+    const j = JSON.parse(params) as { id?: string; display_text?: string }
+    return (j.display_text ?? j.id ?? '').trim()
+  } catch {
+    return ''
+  }
+}
 
 async function disparoPor(coluna: 'telefone' | 'lid' | 'enquete_id' | 'chat_id', valor: string) {
   const { data } = await supabaseAdmin().from('disparos').select('*').eq(coluna, valor).limit(1).maybeSingle()
@@ -95,7 +130,7 @@ export async function processarEvento(ev: EventoWaha, numeroId: number | null, d
         }
         return 'voto ilegível'
       }
-      if (opcoes.some(o => opcaoIgual(o, c.opcao_sim))) return marcarInteressado(d, n, c.mensagem_sim, false, depois)
+      if (opcoes.some(o => opcaoIgual(o, c.opcao_sim))) return marcarInteressado(d, n, c, false, depois)
       if (opcoes.some(o => opcaoIgual(o, c.opcao_nao))) return marcarSemInteresse(d, n, c.mensagem_nao, depois)
       return 'voto sem opção conhecida'
     }
@@ -122,7 +157,7 @@ export async function processarEvento(ev: EventoWaha, numeroId: number | null, d
       if (!d) return 'mensagem de quem não está no livro'
       if (lid && !d.lid) await atualizar(d.id, { lid })
 
-      const corpo = texto(p.body).trim()
+      const corpo = textoRecebido(p)
       const conteudo = corpo || (p.hasMedia ? '[mídia: áudio, imagem ou arquivo]' : '[mensagem sem texto]')
       const novo = await registrarEvento({
         disparo_id: d.id,
@@ -146,6 +181,9 @@ export async function processarEvento(ev: EventoWaha, numeroId: number | null, d
       const quer = corpo ? intencao(corpo) : 'outro'
       if (quer === 'sair') return marcarDescadastro(d, n, depois)
       const educado = !!corpo && cortesia(corpo)
+      const tocouBotao = !!corpo && normalizar(corpo) === normalizar(c.botao_texto)
+      // Coleta aberta (nome → CNPJ): a mensagem é a resposta da pergunta, não um "sim/não"
+      if (d.etapa) return coletar(d, n, c, corpo, tocouBotao, depois)
       // Depois de preencher (ou de sair), o robô não fala mais: só chama a equipe se não for um "obrigado".
       if (d.status === 'preencheu' || d.status === 'descadastrado') {
         if (!educado) await atualizar(d.id, { atencao: true })
@@ -153,15 +191,7 @@ export async function processarEvento(ev: EventoWaha, numeroId: number | null, d
       }
       // "ok" depois do nosso "tudo bem, não mandaremos mais" é despedida, não mudança de ideia
       if (d.status === 'sem_interesse' && educado) return 'cortesia'
-      if (quer === 'sim') {
-        // "ok" logo depois de receber o link não é pedido de outro link
-        const linkRecente = d.status === 'interessado' && d.interessado_em && Date.now() - Date.parse(d.interessado_em) < 30 * 60_000
-        if (linkRecente) {
-          if (!respostaSimples(corpo)) await atualizar(d.id, { atencao: true })
-          return 'sim repetido'
-        }
-        return marcarInteressado(d, n, c.mensagem_sim, !respostaSimples(corpo), depois)
-      }
+      if (quer === 'sim' || tocouBotao) return marcarInteressado(d, n, c, !tocouBotao && !respostaSimples(corpo), depois)
       if (quer === 'nao') return marcarSemInteresse(d, n, c.mensagem_nao, depois)
       if (educado && d.status !== 'enviado') return 'cortesia'
       // Pergunta, áudio, comentário: alguém da equipe precisa ler e responder pela plataforma.
@@ -174,27 +204,80 @@ export async function processarEvento(ev: EventoWaha, numeroId: number | null, d
   }
 }
 
-async function marcarInteressado(d: Disparo, n: NumeroComChave | null, modelo: string, atencao: boolean, depois: Depois) {
-  // Quem já preencheu ou pediu para sair e volta a escrever é caso para gente, não para o robô.
+async function marcarInteressado(d: Disparo, n: NumeroComChave | null, c: Campanha, atencao: boolean, depois: Depois) {
+  // Quem já mandou os dados ou pediu para sair e volta a escrever é caso para gente, não para o robô.
   if (d.status === 'preencheu' || d.status === 'descadastrado') {
     await atualizar(d.id, { atencao: true })
     return 'sim de quem já encerrou: equipe avisada'
   }
   await atualizar(d.id, {
     status: 'interessado',
+    etapa: 'nome',
+    tentativas: 0,
     interessado_em: d.interessado_em ?? agora(),
     respondido_em: d.respondido_em ?? agora(),
     encerrado_em: null,
     ...(atencao ? { atencao: true } : {})
   })
-  if (n) {
-    const texto = montar(modelo, { empresa: nomeEmpresa(d), saudacao: saudacao(), municipio: d.municipio ?? '', link: linkFormulario(d.token) })
-    depois(async () => {
-      await responder(d, n, texto)
-      await registrarEvento({ disparo_id: d.id, numero_id: n.id, tipo: 'link', texto: linkFormulario(d.token) })
-    })
+  if (n) depois(() => responder(d, n, montar(c.pergunta_nome, { empresa: nomeEmpresa(d), saudacao: saudacao() })))
+  return 'interessado: pedindo o nome'
+}
+
+/** Coleta pela conversa: nome completo → CNPJ → mensagem final (logo + análise + botão do site). */
+async function coletar(d: Disparo, n: NumeroComChave | null, c: Campanha, corpo: string, tocouBotao: boolean, depois: Depois) {
+  const pergunta = () =>
+    d.etapa === 'nome'
+      ? montar(c.pergunta_nome, { empresa: nomeEmpresa(d), saudacao: saudacao() })
+      : montar(c.pergunta_cnpj, { primeiro_nome: primeiroNome(d.lead_nome ?? ''), empresa: nomeEmpresa(d) })
+  // "não quero mais" no meio da coleta não é nome
+  if (intencao(corpo) === 'nao') return marcarSemInteresse(d, n, c.mensagem_nao, depois)
+  // tocou o botão de novo / "sim" de novo: repete a pergunta aberta
+  if (tocouBotao || intencao(corpo) === 'sim') {
+    if (n) depois(() => responder(d, n, pergunta()))
+    return `pergunta repetida (${d.etapa})`
   }
-  return 'interessado: link enviado'
+  const errou = async (aviso: string) => {
+    const tentativas = (d.tentativas ?? 0) + 1
+    if (tentativas >= 3) {
+      // não insiste: chama a equipe
+      await atualizar(d.id, { etapa: null, tentativas, atencao: true })
+      if (n) depois(() => responder(d, n, RESPOSTAS.desistiu_da_coleta))
+      return `coleta interrompida no ${d.etapa}: equipe avisada`
+    }
+    await atualizar(d.id, { tentativas })
+    if (n) depois(() => responder(d, n, aviso))
+    return `${d.etapa} inválido (${tentativas}/3)`
+  }
+
+  if (d.etapa === 'nome') {
+    const nome = nomeCompleto(corpo)
+    if (!nome) return errou(RESPOSTAS.nome_invalido)
+    await atualizar(d.id, { lead_nome: nome, etapa: 'cnpj', tentativas: 0 })
+    if (n) depois(() => responder(d, n, montar(c.pergunta_cnpj, { primeiro_nome: primeiroNome(nome), nome, empresa: nomeEmpresa(d) })))
+    return 'nome recebido: pedindo o CNPJ'
+  }
+
+  const cnpj = corpo.replace(/\D/g, '')
+  if (!cnpjValido(cnpj)) return errou(RESPOSTAS.cnpj_invalido)
+  const agoraIso = agora()
+  await atualizar(d.id, {
+    lead_cnpj: cnpj,
+    lead_whatsapp: d.telefone,
+    etapa: null,
+    tentativas: 0,
+    status: 'preencheu',
+    preenchido_em: d.preenchido_em ?? agoraIso
+  })
+  await registrarEvento({
+    disparo_id: d.id,
+    numero_id: n?.id ?? d.numero_id,
+    tipo: 'formulario',
+    direcao: 'entrada',
+    texto: `${d.lead_nome} · CNPJ ${fmtCnpj(cnpj)} · WhatsApp ${d.telefone}`,
+    dados: { nome: d.lead_nome, cnpj, whatsapp: d.telefone }
+  })
+  if (n) depois(() => responder(d, n, mensagemFinal(c, { ...d, lead_cnpj: cnpj })))
+  return 'dados recebidos: mensagem final enviada'
 }
 
 async function marcarSemInteresse(d: Disparo, n: NumeroComChave | null, modelo: string, depois: Depois) {
@@ -203,14 +286,14 @@ async function marcarSemInteresse(d: Disparo, n: NumeroComChave | null, modelo: 
     return 'não de quem já encerrou: equipe avisada'
   }
   const jaEstava = d.status === 'sem_interesse'
-  await atualizar(d.id, { status: 'sem_interesse', encerrado_em: d.encerrado_em ?? agora(), respondido_em: d.respondido_em ?? agora() })
+  await atualizar(d.id, { status: 'sem_interesse', etapa: null, encerrado_em: d.encerrado_em ?? agora(), respondido_em: d.respondido_em ?? agora() })
   if (n && !jaEstava) depois(() => responder(d, n, montar(modelo, { empresa: nomeEmpresa(d), saudacao: saudacao() })))
   return 'sem interesse'
 }
 
 async function marcarDescadastro(d: Disparo, n: NumeroComChave | null, depois: Depois) {
   const jaEstava = d.status === 'descadastrado'
-  await atualizar(d.id, { status: 'descadastrado', encerrado_em: d.encerrado_em ?? agora(), atencao: false })
+  await atualizar(d.id, { status: 'descadastrado', etapa: null, encerrado_em: d.encerrado_em ?? agora(), atencao: false })
   await supabaseAdmin()
     .from('disparo_bloqueios')
     .upsert({ telefone: d.telefone, motivo: 'pediu para sair', observacao: `disparo #${d.id}` }, { onConflict: 'telefone', ignoreDuplicates: true })
