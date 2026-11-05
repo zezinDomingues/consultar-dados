@@ -182,12 +182,18 @@ export function Chat() {
           {turnos.length === 0 && (
             <div className='py-8'>
               <div className='text-center'>
-                <img
-                  src='/site/marca/selo-3d-base.svg'
-                  alt=''
-                  className='mx-auto size-20'
-                  style={{ filter: 'drop-shadow(0 14px 22px rgba(11,18,37,.28))' }}
-                />
+                {/* selo 3D completo (base + frente com o OC), flutuando como no destaque do site */}
+                <div className='mx-auto size-24' style={{ perspective: '1200px' }} aria-hidden>
+                  <div className='selo-3d relative size-full'>
+                    <img
+                      src='/site/marca/selo-3d-base.svg'
+                      alt=''
+                      className='absolute inset-0 size-full object-contain'
+                      style={{ filter: 'drop-shadow(0 14px 22px rgba(11,18,37,.28))' }}
+                    />
+                    <img src='/site/marca/selo-3d-topo.svg' alt='' className='selo-3d-topo absolute inset-0 size-full object-contain' />
+                  </div>
+                </div>
                 <h2 className='mt-5 font-serif text-[2rem] font-bold tracking-[-0.02em] text-marca-800'>O que você quer encontrar?</h2>
                 <p className='mx-auto mt-1 max-w-xl text-sm text-slate-500'>
                   Peça em português. O agente monta os filtros, consulta as 628 mil empresas e mostra o resultado igual à

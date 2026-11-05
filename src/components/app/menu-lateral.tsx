@@ -3,7 +3,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { BotMessageSquare, Building2, LogOut, Search } from 'lucide-react'
+import { Building2, LogOut, MessagesSquare, Search } from 'lucide-react'
 import { sair } from '@/app/login/actions'
 import { cn } from '@/lib/utils'
 import { ROTAS } from '@/lib/rotas'
@@ -11,7 +11,7 @@ import { ROTAS } from '@/lib/rotas'
 const ITENS = [
   { href: ROTAS.dashboard, rotulo: 'Consultar empresas', icone: Search, ativo: (p: string) => p === ROTAS.dashboard || p.startsWith(`${ROTAS.dashboard}/empresa`) },
   { href: ROTAS.contadores, rotulo: 'Contadores e grupos', icone: Building2, ativo: (p: string) => p.startsWith(ROTAS.contadores) },
-  { href: ROTAS.agente, rotulo: 'Agente de IA', icone: BotMessageSquare, ativo: (p: string) => p.startsWith(ROTAS.agente) }
+  { href: ROTAS.agente, rotulo: 'Agente de IA', icone: MessagesSquare, ativo: (p: string) => p.startsWith(ROTAS.agente) }
 ]
 
 export function MenuLateral({ email }: { email: string }) {
