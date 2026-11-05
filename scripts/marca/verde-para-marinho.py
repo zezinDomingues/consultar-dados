@@ -34,13 +34,15 @@ def converter(r, g, b):
 
 
 def hexa(m):
-    h = m.group(1)
-    if len(h) == 3:
-        h = ''.join(c * 2 for c in h)
+    h, alfa = m.group(1), ''
+    if len(h) in (3, 4):
+        h, alfa = ''.join(c * 2 for c in h[:3]), (h[3] * 2 if len(h) == 4 else '')
+    elif len(h) == 8:
+        h, alfa = h[:6], h[6:]
     novo = converter(*(int(h[i:i + 2], 16) for i in (0, 2, 4)))
     if not novo:
         return m.group(0)
-    out = '#%02x%02x%02x' % novo
+    out = '#%02x%02x%02x' % novo + alfa
     return out.upper() if m.group(1).isupper() else out
 
 
@@ -89,7 +91,7 @@ def oklab(m):  # cores com transparência compiladas pelo Tailwind: oklab(L% a b
 
 def trocar(texto):
     texto = re.sub(r'oklab\(([\d.]+)% (-?[\d.]+) (-?[\d.]+)(\s*/[^)]*\)|\))', oklab, texto)
-    texto = re.sub(r'#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})(?![0-9a-fA-F])', hexa, texto)
+    texto = re.sub(r'#([0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})(?![0-9a-fA-F])', hexa, texto)
     texto = re.sub(r'(rgba?\(\s*)(\d+)(\s*,\s*|\s+)(\d+)(\s*,\s*|\s+)(\d+)', lambda m: rgb(_ajusta(m)), texto)
     texto = re.sub(r'(oklch\([\d.%]+ [\d.]+ )([\d.]+)', oklch, texto)
     return texto
