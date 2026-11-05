@@ -97,7 +97,9 @@ Modelo padrão: **Nemotron 3 Ultra** (`nvidia/nemotron-3-ultra-550b-a55b`), rese
 
 Montado a partir do site da GWT Solution (15 páginas), da qual a OficialCert é **afiliada**, e servido por
 *rewrites* em `next.config.ts` — a URL fica limpa (`/`, `/quem-somos`, `/blog/<artigo>`…). Marca OficialCert
-(Selo Oficial) em `public/site/marca/`.
+(Selo Oficial) em `public/site/marca/`. Paleta (04/11/2026): **azul-marinho + dourado + creme** — o verde herdado
+foi convertido por `scripts/marca/verde-para-marinho.py` (mesma luminância percebida ×0,8, saturação ≤ 55%;
+idempotente, entende hex, rgb, oklab e oklch do CSS compilado). Base `#1A2D5A`, fundo `#0B1225`, acento `#213870`.
 
 Textos (04/11/2026, `scripts/clonar-site/trocar-textos.py`): saíram os números e afirmações que são da GWT
 (R$ 1 bi+, 200+ empresas, 100%, 8 unidades, prazos de 48 h, "risco zero"/"glosa zero") e a afiliação aparece

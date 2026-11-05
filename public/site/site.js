@@ -221,7 +221,7 @@
   // 7) Cabeçalho: ganha fundo escuro quando a página rola mais de 60px (como no original) OU quando
   //    o que está logo atrás dele é claro (Diagnóstico, Privacidade, Termos começam em creme) —
   //    sem isso a logo e o menu, que são claros, somem.
-  var CLS_ROLADO = ['bg-[#031A15]/95', 'backdrop-blur-xl', 'border-b', 'border-white/5', 'shadow-sm']
+  var CLS_ROLADO = ['bg-[#0B1225]/95', 'backdrop-blur-xl', 'border-b', 'border-white/5', 'shadow-sm']
   function luminancia(css) {
     var m = css && css.match(/rgba?\(([^)]+)\)/)
     if (!m) return null
@@ -316,8 +316,8 @@
     var status = raiz.querySelector('[data-radar-status]')
     var fixo = +raiz.getAttribute('data-radar-limite') || 0
     var BASE = filtros ? filtros.getAttribute('data-classe-botao') : ''
-    var ATIVO = ' bg-[#0B3C34] text-white border border-[#0B3C34] shadow-md shadow-[#0B3C34]/10'
-    var INATIVO = ' bg-white/40 text-[#0B3C34]/70 border border-[#0B4B3F]/10 hover:border-[#0B4B3F]/30 hover:text-[#0B3C34]'
+    var ATIVO = ' bg-[#1A2D5A] text-white border border-[#1A2D5A] shadow-md shadow-[#1A2D5A]/10'
+    var INATIVO = ' bg-white/40 text-[#1A2D5A]/70 border border-[#213870]/10 hover:border-[#213870]/30 hover:text-[#1A2D5A]'
     var PASSO = fixo || (window.innerWidth < 768 ? 4 : 9)
     var dados = null, tema = 'Todas', mostrando = PASSO
     var seta = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg>'
