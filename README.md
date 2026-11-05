@@ -35,6 +35,9 @@ SUPABASE_SECRET_KEY=sb_secret_... npm run criar-usuario -- pessoa@empresa.com 's
 | `/dashboard/contadores` | E-mails presentes em 5+ empresas (escritórios contábeis e grupos) |
 | `/dashboard/agente` | Agente de IA |
 | `/api/exportar`, `/api/empresas`, `/api/agente` | CSV, paginação do agente e o agente (exigem login; sem login: 401) |
+| `/dashboard/disparos` (+ `/campanhas`, `/numeros`, `/[id]`) | **Disparos de WhatsApp** — só administradores (ver seção abaixo) |
+| `/consulta-gratuita/[token]` | Formulário público que o contato abre pelo link do WhatsApp |
+| `/api/sistema/disparos/ciclo`, `/api/sistema/whatsapp` | Ciclo de envio (pg_cron) e webhook do WAHA — públicas para o proxy, protegidas por segredo/HMAC |
 
 Rotas centralizadas em `src/lib/rotas.ts`; o `src/proxy.ts` protege `/dashboard` e `/api` e deixa o resto público
 (sem nem consultar o Supabase), então páginas novas da landing não precisam mexer no proxy.
@@ -45,6 +48,8 @@ A URL guarda todos os filtros: dá para salvar, compartilhar e voltar no navegad
 
 ```
 supabase/migrations/001_consulta_empresas.sql  acesso (RLS), funções de busca e resumo — rodar após a carga
+supabase/migrations/005_disparos_whatsapp.sql  disparos de WhatsApp (livro, campanhas, números) — 006 liga o relógio
+src/lib/disparos/                              motor, webhook, mensagens e cliente WAHA dos disparos
 scripts/criar-usuario.mjs                      cria/autoriza usuário
 src/proxy.ts                                   renova a sessão e manda para /login quem não está logado
 src/lib/empresas/filtros.ts                    schema único dos filtros (zod) + leitura/escrita da URL
@@ -63,6 +68,44 @@ src/app/(app)/                                 páginas logadas
 
 Tempos medidos: filtros comuns ~25 ms; resumo 0,4–2 s (fica 15 min em cache no servidor); busca por texto ~1,4 s
 (varredura completa — um índice de trigramas resolveria, mas custa ~60 MB do limite de 500 MB do plano grátis).
+
+## Disparos de WhatsApp (`/dashboard/disparos`)
+
+Prospecção ativa pelo WhatsApp, só para usuários `admin` em `app_usuarios` (o menu ganha a seção **Administrativo**).
+
+**Fluxo:** campanha (filtros da Consulta + textos) → a cada minuto o **pg_cron** do Supabase chama o ciclo → cada
+número pronto manda a 1ª mensagem para a melhor empresa ainda não contatada (+ uma **enquete** "Sim / Não") → quem
+toca "Sim" (ou responde SIM) recebe o link `/consulta-gratuita/<token>` → o formulário (nome, empresa, e-mail
+corporativo, WhatsApp) grava no mesmo registro → agradecimento automático pelo WhatsApp.
+
+**Regra de ouro — ninguém recebe duas vezes:** a tabela `disparos` é um livro com índice ÚNICO em `telefone` e em
+`cnpj`. A reserva (`disparo_reservar`) acontece no banco antes do envio; corrida entre ciclos é decidida pelo índice.
+Falhas e números sem WhatsApp ficam registrados e não voltam. Quem responde SAIR vai para `disparo_bloqueios`.
+O único DELETE é de uma reserva que comprovadamente não chegou ao WhatsApp (WAHA fora do ar antes do envio).
+
+Peças:
+- `supabase/migrations/005_disparos_whatsapp.sql` — tabelas, RLS (só admin), `disparo_reservar` (rodízio entre
+  campanhas ativas, pula celular compartilhado por 2+ empresas), `disparo_contar_elegiveis`, `disparo_resumo`.
+  `006_disparos_agendamento.sql` — pg_cron + pg_net, só chama a Vercel quando há o que fazer.
+- `src/lib/disparos/motor.ts` — o ciclo: trava por número, limite diário, sessão WORKING, check-exists (acha o chatId
+  com/sem o 9), "digitando…", texto, enquete, intervalo aleatório.
+- `src/lib/disparos/webhook.ts` — entrega/leitura (`message.ack`), voto (`poll.vote`; `poll.vote.failed` com LID → pede
+  SIM por escrito), mensagens escritas (SIM/NÃO/SAIR/cortesia; o resto vai para "Precisam de atenção").
+- `src/lib/disparos/mensagens.ts` — modelos padrão, variáveis `{empresa}` `{saudacao}` `{link}` `{primeiro_nome}`,
+  variações `{Olá|Oi}` sorteadas por envio, leitura da intenção das respostas.
+- `src/lib/disparos/waha.ts` — cliente do WAHA por número (URL + sessão + API key; no CORE, uma instância por número).
+
+Variáveis do servidor (Vercel, **nunca** `NEXT_PUBLIC_`):
+
+| Variável | Para quê |
+|---|---|
+| `SUPABASE_SECRET_KEY` | ciclo, webhook e formulário rodam sem usuário logado |
+| `DISPAROS_SEGREDO` | Bearer do pg_cron e chave HMAC do webhook. O MESMO valor vai no Vault do Supabase (`disparos_segredo`) |
+| `APP_URL` | opcional; padrão `https://www.oficialcert.com` (links do formulário e do webhook) |
+
+Ligar um número: instância WAHA (NOWEB, HTTPS público) → parear por código de 8 dígitos → **Números e regras →
+Adicionar número** (URL + API key) → **Conectar webhook** (configura HMAC + eventos + store do NOWEB; reinicia a sessão
+~20 s). Número novo: 20–30 envios/dia e subir aos poucos.
 
 ## Agente de IA (`/agente`)
 

@@ -10,7 +10,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className='flex min-h-screen'>
-      <MenuLateral email={usuario.email} />
+      <MenuLateral email={usuario.email} admin={usuario.admin} />
       <main className='min-w-0 flex-1'>
         {usuario.autorizado ? (
           children

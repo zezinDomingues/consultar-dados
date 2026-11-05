@@ -1,0 +1,334 @@
+'use server'
+
+import { revalidatePath } from 'next/cache'
+import { redirect } from 'next/navigation'
+import { z } from 'zod'
+import { pendenciasServidor, segredoDisparos, urlWebhook } from '@/lib/disparos/config'
+import { exigirAdmin } from '@/lib/disparos/dados'
+import { montar, nomeEmpresa, normalizarFone, RESPOSTAS, saudacao } from '@/lib/disparos/mensagens'
+import { canalDe, carregarNumero, responder } from '@/lib/disparos/motor'
+import type { Disparo } from '@/lib/disparos/tipos'
+import { configurarWebhook, enviarEnquete, enviarTexto, lerSessao, verificarNumero } from '@/lib/disparos/waha'
+import { buscarEmpresas } from '@/lib/empresas/consulta'
+import { FiltrosSchema, ORDENS } from '@/lib/empresas/filtros'
+import { ROTAS } from '@/lib/rotas'
+import { supabaseAdmin } from '@/lib/supabase/admin'
+import { createClient } from '@/lib/supabase/server'
+
+export type Retorno = { ok?: boolean; erro?: string; mensagem?: string; campos?: Record<string, string> }
+
+const erroDe = (e: unknown) => (e instanceof Error ? e.message : String(e))
+const atualizarTelas = () => revalidatePath(ROTAS.disparos, 'layout')
+
+// ---------------------------------------------------------------------------------------------------------------
+// Campanhas
+// ---------------------------------------------------------------------------------------------------------------
+
+const texto = (max: number, nome: string) => z.string().trim().min(1, `${nome}: obrigatório.`).max(max, `${nome}: até ${max} caracteres.`)
+
+const CampanhaSchema = z
+  .object({
+    id: z.coerce.number().int().positive().optional(),
+    nome: texto(120, 'Nome'),
+    filtros: z.string().transform((s, ctx) => {
+      try {
+        const r = FiltrosSchema.safeParse(JSON.parse(s || '{}'))
+        if (r.success) return r.data
+      } catch {}
+      ctx.addIssue({ code: 'custom', message: 'Filtros inválidos.' })
+      return z.NEVER
+    }),
+    ordem: z.enum(Object.keys(ORDENS) as [keyof typeof ORDENS, ...(keyof typeof ORDENS)[]]).default('score'),
+    excluir_compartilhados: z.coerce.boolean(),
+    usar_enquete: z.coerce.boolean(),
+    mensagem: texto(3000, 'Mensagem inicial'),
+    enquete_pergunta: texto(250, 'Pergunta da enquete'),
+    opcao_sim: texto(100, 'Opção "sim"'),
+    opcao_nao: texto(100, 'Opção "não"'),
+    mensagem_sim: texto(3000, 'Mensagem do "sim"').refine(v => v.includes('{link}'), 'A mensagem do "sim" precisa ter {link} — é por ela que o formulário chega.'),
+    mensagem_nao: texto(3000, 'Mensagem do "não"'),
+    mensagem_obrigado: texto(3000, 'Agradecimento'),
+    limite_total: z
+      .string()
+      .trim()
+      .transform(v => (v ? Number(v) : null))
+      .pipe(z.number().int().positive('Limite deve ser maior que zero.').nullable()),
+    ativar: z.coerce.boolean()
+  })
+  .refine(c => c.opcao_sim.trim() !== c.opcao_nao.trim(), { message: 'As duas opções da enquete precisam ser diferentes.' })
+
+function lerCampanha(fd: FormData) {
+  const obj: Record<string, unknown> = {}
+  for (const k of ['id', 'nome', 'filtros', 'ordem', 'mensagem', 'enquete_pergunta', 'opcao_sim', 'opcao_nao', 'mensagem_sim', 'mensagem_nao', 'mensagem_obrigado', 'limite_total']) {
+    const v = fd.get(k)
+    if (v !== null && !(k === 'id' && v === '')) obj[k] = String(v)
+  }
+  for (const k of ['excluir_compartilhados', 'usar_enquete', 'ativar']) obj[k] = fd.get(k) === 'on' || fd.get(k) === 'true' ? true : ''
+  return CampanhaSchema.safeParse(obj)
+}
+
+export async function salvarCampanha(_: Retorno, fd: FormData): Promise<Retorno> {
+  await exigirAdmin()
+  const p = lerCampanha(fd)
+  if (!p.success) return { erro: p.error.issues[0]?.message ?? 'Dados inválidos.' }
+  const { id, ativar, ...c } = p.data
+  const supabase = await createClient()
+  const linha = { ...c, atualizada_em: new Date().toISOString() }
+  let novoId = id
+  if (id) {
+    const { error } = await supabase.from('disparo_campanhas').update(linha).eq('id', id)
+    if (error) return { erro: error.message }
+  } else {
+    const { data, error } = await supabase
+      .from('disparo_campanhas')
+      .insert({ ...linha, status: ativar ? 'ativa' : 'pausada' })
+      .select('id')
+      .single()
+    if (error) return { erro: error.message }
+    novoId = data.id
+  }
+  atualizarTelas()
+  redirect(`${ROTAS.campanhas}?salva=${novoId}`)
+}
+
+export async function mudarStatusCampanha(id: number, status: 'ativa' | 'pausada' | 'concluida'): Promise<Retorno> {
+  await exigirAdmin()
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from('disparo_campanhas')
+    .update({
+      status,
+      motivo_status: status === 'concluida' ? 'encerrada manualmente' : null,
+      atualizada_em: new Date().toISOString()
+    })
+    .eq('id', id)
+  if (error) return { erro: error.message }
+  atualizarTelas()
+  return { ok: true, mensagem: status === 'ativa' ? 'Campanha ativada.' : status === 'pausada' ? 'Campanha pausada.' : 'Campanha encerrada.' }
+}
+
+/** Manda a 1ª mensagem (e a enquete) para um WhatsApp de teste, SEM entrar no livro. */
+export async function enviarTeste(_: Retorno, fd: FormData): Promise<Retorno> {
+  await exigirAdmin()
+  const p = lerCampanha(fd)
+  if (!p.success) return { erro: p.error.issues[0]?.message ?? 'Dados inválidos.' }
+  const telefone = normalizarFone(String(fd.get('teste_telefone') ?? ''))
+  if (!telefone) return { erro: 'Informe o WhatsApp de teste com DDD.' }
+  const numeroId = Number(fd.get('teste_numero'))
+  if (!numeroId) return { erro: 'Cadastre e escolha um número de envio.' }
+  if (pendenciasServidor().includes('SUPABASE_SECRET_KEY')) return { erro: 'Falta a SUPABASE_SECRET_KEY no servidor.' }
+  try {
+    const n = await carregarNumero(numeroId)
+    if (!n) return { erro: 'Número não encontrado.' }
+    const canal = canalDe(n)
+    const v = await verificarNumero(canal, telefone)
+    if (!v.existe || !v.chatId) return { erro: 'Esse número não tem WhatsApp.' }
+    const [exemplo] = await buscarEmpresas(p.data.filtros, p.data.ordem, 1, 1, 'razao_social,nome_fantasia,municipio')
+    const vars = { empresa: nomeEmpresa(exemplo ?? { razao_social: 'Empresa Exemplo' }), saudacao: saudacao(), municipio: exemplo?.municipio ?? '' }
+    let texto = montar(p.data.mensagem, vars)
+    if (!p.data.usar_enquete && !/\bSIM\b/.test(texto)) texto += `\n\n${RESPOSTAS.sem_enquete}`
+    await enviarTexto(canal, v.chatId, texto)
+    if (p.data.usar_enquete) await enviarEnquete(canal, v.chatId, p.data.enquete_pergunta, [p.data.opcao_sim, p.data.opcao_nao])
+    return { ok: true, mensagem: `Teste enviado para ${telefone} (exemplo: ${vars.empresa}). Respostas ao teste não entram no livro.` }
+  } catch (e) {
+    return { erro: `Falha no envio de teste: ${erroDe(e)}` }
+  }
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Números (sessões do WAHA)
+// ---------------------------------------------------------------------------------------------------------------
+
+const NumeroSchema = z
+  .object({
+    id: z.coerce.number().int().positive().optional(),
+    rotulo: texto(60, 'Nome'),
+    waha_url: z.string().trim().url('URL do WAHA inválida (ex.: https://waha3.mindloop.com.br).').transform(u => u.replace(/\/+$/, '')),
+    waha_sessao: z.string().trim().min(1).max(60).default('default'),
+    waha_api_key: z.string().trim().max(200).optional(),
+    limite_diario: z.coerce.number().int().min(1).max(2000),
+    intervalo_min_s: z.coerce.number().int().min(20, 'Intervalo mínimo: 20 s.'),
+    intervalo_max_s: z.coerce.number().int().min(20),
+    ativo: z.coerce.boolean()
+  })
+  .refine(n => n.intervalo_max_s >= n.intervalo_min_s, { message: 'O intervalo máximo precisa ser ≥ o mínimo.' })
+
+export async function salvarNumero(_: Retorno, fd: FormData): Promise<Retorno> {
+  await exigirAdmin()
+  const obj = Object.fromEntries(['id', 'rotulo', 'waha_url', 'waha_sessao', 'waha_api_key', 'limite_diario', 'intervalo_min_s', 'intervalo_max_s'].map(k => [k, fd.get(k) ?? undefined]).filter(([, v]) => v !== '' && v !== undefined))
+  const p = NumeroSchema.safeParse({ ...obj, ativo: fd.get('ativo') === 'on' ? true : '' })
+  if (!p.success) return { erro: p.error.issues[0]?.message ?? 'Dados inválidos.' }
+  const { id, waha_api_key, ...n } = p.data
+  const supabase = await createClient()
+  const linha = { ...n, ...(waha_api_key ? { waha_api_key } : {}) }
+  let numeroId = id
+  if (id) {
+    const { error } = await supabase.from('disparo_numeros').update(linha).eq('id', id)
+    if (error) return { erro: error.message }
+  } else {
+    const { data, error } = await supabase.from('disparo_numeros').insert(linha).select('id').single()
+    if (error) return { erro: error.message }
+    numeroId = data.id
+  }
+  const teste = await testarNumero(numeroId!)
+  atualizarTelas()
+  return { ok: true, mensagem: `Número salvo. ${teste.mensagem ?? teste.erro ?? ''}` }
+}
+
+export async function testarNumero(id: number): Promise<Retorno> {
+  await exigirAdmin()
+  if (pendenciasServidor().includes('SUPABASE_SECRET_KEY')) return { erro: 'Falta a SUPABASE_SECRET_KEY no servidor para falar com o WAHA.' }
+  const n = await carregarNumero(id)
+  if (!n) return { erro: 'Número não encontrado.' }
+  const db = supabaseAdmin()
+  const agora = new Date().toISOString()
+  try {
+    const s = await lerSessao(canalDe(n))
+    const telefone = s?.me?.id ? normalizarFone(s.me.id) : null
+    await db
+      .from('disparo_numeros')
+      .update({
+        status: s?.status ?? 'DESCONHECIDO',
+        status_detalhe: s?.status === 'WORKING' ? null : 'conecte o número no painel do WAHA (código de 8 dígitos)',
+        status_em: agora,
+        ...(telefone ? { telefone } : {}),
+        ...(s?.me?.pushName ? { nome_perfil: s.me.pushName } : {})
+      })
+      .eq('id', id)
+    atualizarTelas()
+    return s?.status === 'WORKING'
+      ? { ok: true, mensagem: `Conectado: sessão WORKING${telefone ? ` no número ${telefone}` : ''}.` }
+      : { erro: `O WAHA respondeu, mas a sessão está ${s?.status ?? 'sem status'}. Conecte o número no painel do WAHA.` }
+  } catch (e) {
+    await db.from('disparo_numeros').update({ status: 'ERRO', status_detalhe: erroDe(e).slice(0, 300), status_em: agora }).eq('id', id)
+    atualizarTelas()
+    return { erro: `Não consegui falar com o WAHA: ${erroDe(e)}` }
+  }
+}
+
+export async function conectarWebhook(id: number): Promise<Retorno> {
+  await exigirAdmin()
+  const faltam = pendenciasServidor()
+  if (faltam.length) return { erro: `Configure no servidor: ${faltam.join(', ')}.` }
+  const n = await carregarNumero(id)
+  if (!n) return { erro: 'Número não encontrado.' }
+  try {
+    await configurarWebhook(canalDe(n), urlWebhook(id), segredoDisparos()!)
+    await supabaseAdmin().from('disparo_numeros').update({ webhook_em: new Date().toISOString() }).eq('id', id)
+    atualizarTelas()
+    return { ok: true, mensagem: 'Webhook configurado. O WAHA reinicia a sessão (volta a WORKING em ~20 s, sem parear de novo).' }
+  } catch (e) {
+    return { erro: `Falha ao configurar o webhook: ${erroDe(e)}` }
+  }
+}
+
+export async function alternarNumero(id: number, ativo: boolean): Promise<Retorno> {
+  await exigirAdmin()
+  const supabase = await createClient()
+  const { error } = await supabase.from('disparo_numeros').update({ ativo }).eq('id', id)
+  if (error) return { erro: error.message }
+  atualizarTelas()
+  return { ok: true, mensagem: ativo ? 'Número ativado.' : 'Número pausado.' }
+}
+
+export async function excluirNumero(id: number): Promise<Retorno> {
+  await exigirAdmin()
+  const supabase = await createClient()
+  const { count } = await supabase.from('disparos').select('id', { count: 'exact', head: true }).eq('numero_id', id)
+  if (count) return { erro: 'Este número já enviou mensagens: pause em vez de excluir (o histórico depende dele).' }
+  const { error } = await supabase.from('disparo_numeros').delete().eq('id', id)
+  if (error) return { erro: error.message }
+  atualizarTelas()
+  return { ok: true, mensagem: 'Número excluído.' }
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Regras gerais
+// ---------------------------------------------------------------------------------------------------------------
+
+export async function salvarRegras(_: Retorno, fd: FormData): Promise<Retorno> {
+  await exigirAdmin()
+  const p = z
+    .object({
+      hora_inicio: z.coerce.number().int().min(0).max(23),
+      hora_fim: z.coerce.number().int().min(1).max(24),
+      dias_semana: z.array(z.coerce.number().int().min(1).max(7)).min(1, 'Escolha pelo menos um dia.')
+    })
+    .refine(r => r.hora_fim > r.hora_inicio, { message: 'O fim precisa ser depois do início.' })
+    .safeParse({ hora_inicio: fd.get('hora_inicio'), hora_fim: fd.get('hora_fim'), dias_semana: fd.getAll('dias_semana') })
+  if (!p.success) return { erro: p.error.issues[0]?.message ?? 'Dados inválidos.' }
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from('disparo_config')
+    .update({ ...p.data, atualizado_em: new Date().toISOString() })
+    .eq('id', 1)
+  if (error) return { erro: error.message }
+  atualizarTelas()
+  return { ok: true, mensagem: 'Regras salvas.' }
+}
+
+export async function pausarTudo(pausado: boolean): Promise<Retorno> {
+  await exigirAdmin()
+  const supabase = await createClient()
+  const { error } = await supabase.from('disparo_config').update({ pausado, atualizado_em: new Date().toISOString() }).eq('id', 1)
+  if (error) return { erro: error.message }
+  atualizarTelas()
+  return { ok: true, mensagem: pausado ? 'Todos os disparos pausados.' : 'Disparos liberados.' }
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Contatos
+// ---------------------------------------------------------------------------------------------------------------
+
+export async function marcarComoVisto(id: number): Promise<Retorno> {
+  await exigirAdmin()
+  const supabase = await createClient()
+  const { error } = await supabase.from('disparos').update({ atencao: false }).eq('id', id)
+  if (error) return { erro: error.message }
+  atualizarTelas()
+  return { ok: true }
+}
+
+export async function enviarMensagemManual(id: number, mensagem: string): Promise<Retorno> {
+  const u = await exigirAdmin()
+  const corpo = mensagem.trim()
+  if (!corpo) return { erro: 'Escreva a mensagem.' }
+  if (corpo.length > 3000) return { erro: 'Mensagem longa demais (até 3.000 caracteres).' }
+  const supabase = await createClient()
+  const { data } = await supabase.from('disparos').select('*').eq('id', id).maybeSingle()
+  const d = data as Disparo | null
+  if (!d) return { erro: 'Contato não encontrado.' }
+  if (d.status === 'descadastrado') return { erro: 'Esta pessoa pediu para não receber mais mensagens.' }
+  if (!d.chat_id || !d.numero_id) return { erro: 'Ainda não há conversa com este contato.' }
+  try {
+    const n = await carregarNumero(d.numero_id)
+    if (!n) return { erro: 'O número que fez o contato foi excluído.' }
+    await responder(d, n, corpo, { autor: u.email })
+    await supabase.from('disparos').update({ atencao: false }).eq('id', id)
+    atualizarTelas()
+    return { ok: true, mensagem: 'Mensagem enviada.' }
+  } catch (e) {
+    return { erro: `Não foi possível enviar: ${erroDe(e)}` }
+  }
+}
+
+export async function bloquearTelefone(_: Retorno, fd: FormData): Promise<Retorno> {
+  await exigirAdmin()
+  const telefone = normalizarFone(String(fd.get('telefone') ?? ''))
+  if (!telefone) return { erro: 'Telefone inválido (DDD + número).' }
+  const observacao = String(fd.get('observacao') ?? '').trim().slice(0, 200) || null
+  const supabase = await createClient()
+  const { error } = await supabase.from('disparo_bloqueios').upsert({ telefone, motivo: 'manual', observacao }, { onConflict: 'telefone', ignoreDuplicates: true })
+  if (error) return { erro: error.message }
+  atualizarTelas()
+  return { ok: true, mensagem: `${telefone} nunca será contatado.` }
+}
+
+export async function desbloquearTelefone(telefone: string): Promise<Retorno> {
+  await exigirAdmin()
+  const supabase = await createClient()
+  const { error } = await supabase.from('disparo_bloqueios').delete().eq('telefone', telefone).eq('motivo', 'manual')
+  if (error) return { erro: error.message }
+  atualizarTelas()
+  return { ok: true, mensagem: 'Bloqueio removido.' }
+}

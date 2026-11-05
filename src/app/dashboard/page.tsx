@@ -6,7 +6,7 @@ import { FiltrosAtivos } from '@/components/consulta/filtros-ativos'
 import { PainelFiltros } from '@/components/consulta/painel-filtros'
 import { Resultados, ResultadosCarregando } from '@/components/consulta/resultados'
 import { Resumo, ResumoCarregando } from '@/components/consulta/resumo'
-import { opcoesFiltros } from '@/lib/empresas/consulta'
+import { opcoesFiltros, usuarioAtual } from '@/lib/empresas/consulta'
 import { contarFiltros, hrefConsulta, lerDeSearchParams, type Filtros } from '@/lib/empresas/filtros'
 import { fmtInt } from '@/lib/formatar'
 
@@ -31,7 +31,7 @@ export default async function ConsultarPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
   const consulta = lerDeSearchParams(await searchParams)
-  const opcoes = await opcoesFiltros()
+  const [opcoes, usuario] = await Promise.all([opcoesFiltros(), usuarioAtual()])
   const chave = JSON.stringify(consulta.filtros)
   const semFiltro = contarFiltros(consulta.filtros) === 0
 
@@ -48,7 +48,7 @@ export default async function ConsultarPage({
                 {fmtInt(opcoes.total_base)} empresas de SP com Lucro Real ou Presumido · uma por CNPJ raiz
               </p>
             </div>
-            <BarraAcoes consulta={consulta} />
+            <BarraAcoes consulta={consulta} admin={!!usuario?.admin} />
           </header>
 
           {semFiltro ? (

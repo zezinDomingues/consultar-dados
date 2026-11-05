@@ -1,10 +1,12 @@
 'use client'
 
-import { Download } from 'lucide-react'
+import Link from 'next/link'
+import { Download, Send } from 'lucide-react'
 import { useConsulta } from './contexto'
 import { hrefConsulta, LIMITE_EXPORTACAO, ORDENS, paraQuery, POR_PAGINA, type Consulta, type Ordem } from '@/lib/empresas/filtros'
+import { ROTAS } from '@/lib/rotas'
 
-export function BarraAcoes({ consulta }: { consulta: Consulta }) {
+export function BarraAcoes({ consulta, admin = false }: { consulta: Consulta; admin?: boolean }) {
   const { navegar } = useConsulta()
   const select =
     'h-9 rounded-lg border border-slate-200 bg-white px-2.5 text-sm text-slate-700 outline-none focus:border-marca-400'
@@ -37,6 +39,15 @@ export function BarraAcoes({ consulta }: { consulta: Consulta }) {
           </option>
         ))}
       </select>
+      {admin && (
+        <Link
+          href={`${ROTAS.novaCampanha}?${paraQuery({ filtros: consulta.filtros, ordem: consulta.ordem })}`}
+          title='Disparar WhatsApp para as empresas destes filtros (só quem tem celular e nunca foi contatado)'
+          className='inline-flex h-10 items-center gap-2 rounded-full border border-marca-800 bg-white px-5 text-sm font-bold tracking-wide text-marca-800 transition hover:bg-marca-50'
+        >
+          <Send className='size-4' /> Criar campanha
+        </Link>
+      )}
       <a
         href={`/api/exportar?${paraQuery({ filtros: consulta.filtros, ordem: consulta.ordem })}`}
         title={`Baixa até ${LIMITE_EXPORTACAO.toLocaleString('pt-BR')} empresas, na ordem atual`}

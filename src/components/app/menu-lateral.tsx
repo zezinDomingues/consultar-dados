@@ -3,18 +3,44 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Building2, LogOut, MessagesSquare, Search } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
+import { Building2, LogOut, MessagesSquare, Search, Send } from 'lucide-react'
 import { sair } from '@/app/login/actions'
 import { cn } from '@/lib/utils'
 import { ROTAS } from '@/lib/rotas'
 
-const ITENS = [
+type Item = { href: string; rotulo: string; icone: LucideIcon; ativo: (p: string) => boolean }
+
+const ITENS: Item[] = [
   { href: ROTAS.dashboard, rotulo: 'Consultar empresas', icone: Search, ativo: (p: string) => p === ROTAS.dashboard || p.startsWith(`${ROTAS.dashboard}/empresa`) },
   { href: ROTAS.contadores, rotulo: 'Contadores e grupos', icone: Building2, ativo: (p: string) => p.startsWith(ROTAS.contadores) },
   { href: ROTAS.agente, rotulo: 'Agente de IA', icone: MessagesSquare, ativo: (p: string) => p.startsWith(ROTAS.agente) }
 ]
 
-export function MenuLateral({ email }: { email: string }) {
+// Só para administradores (app_usuarios.papel = 'admin')
+const ITENS_ADMIN: Item[] = [
+  { href: ROTAS.disparos, rotulo: 'Disparos', icone: Send, ativo: (p: string) => p.startsWith(ROTAS.disparos) }
+]
+
+function ItemMenu({ item, pathname }: { item: Item; pathname: string }) {
+  const ativo = item.ativo(pathname)
+  const Icone = item.icone
+  return (
+    <Link
+      href={item.href}
+      className={cn(
+        'relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13.5px] transition',
+        ativo ? 'bg-white/[0.08] font-semibold text-white' : 'text-areia/75 hover:bg-white/[0.04] hover:text-white'
+      )}
+    >
+      {ativo && <span className='absolute inset-y-2 left-0 w-[3px] rounded-full bg-ouro' />}
+      <Icone className={cn('size-4', ativo ? 'text-ouro' : 'text-areia/60')} />
+      <span className='flex-1 whitespace-nowrap'>{item.rotulo}</span>
+    </Link>
+  )
+}
+
+export function MenuLateral({ email, admin = false }: { email: string; admin?: boolean }) {
   const pathname = usePathname()
 
   return (
@@ -38,24 +64,19 @@ export function MenuLateral({ email }: { email: string }) {
       </Link>
 
       <nav className='relative flex-1 space-y-1 px-3 py-2'>
-        {ITENS.map(item => {
-          const ativo = item.ativo(pathname)
-          const Icone = item.icone
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                'relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13.5px] transition',
-                ativo ? 'bg-white/[0.08] font-semibold text-white' : 'text-areia/75 hover:bg-white/[0.04] hover:text-white'
-              )}
-            >
-              {ativo && <span className='absolute inset-y-2 left-0 w-[3px] rounded-full bg-ouro' />}
-              <Icone className={cn('size-4', ativo ? 'text-ouro' : 'text-areia/60')} />
-              <span className='flex-1 whitespace-nowrap'>{item.rotulo}</span>
-            </Link>
-          )
-        })}
+        {ITENS.map(item => (
+          <ItemMenu key={item.href} item={item} pathname={pathname} />
+        ))}
+        {admin && (
+          <>
+            <span className='flex items-center gap-2 px-3 pb-2 pt-6 text-[10px] font-bold uppercase tracking-[0.22em] text-ouro'>
+              <span className='h-px w-5 bg-ouro/50' /> Administrativo
+            </span>
+            {ITENS_ADMIN.map(item => (
+              <ItemMenu key={item.href} item={item} pathname={pathname} />
+            ))}
+          </>
+        )}
       </nav>
 
       <div className='relative border-t border-white/10 px-6 py-5'>

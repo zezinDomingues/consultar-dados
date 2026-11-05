@@ -35,8 +35,9 @@ export const usuarioAtual = cache(async () => {
   const supabase = await createClient()
   const user = await lerUsuario(supabase)
   if (!user) return null
-  const { data: autorizado } = await supabase.rpc('is_app_user')
-  return { id: user.id, email: user.email ?? '', autorizado: autorizado === true }
+  // is_app_admin vem da migração 005; se ela ainda não rodou, o erro vira "não é admin".
+  const [{ data: autorizado }, { data: admin }] = await Promise.all([supabase.rpc('is_app_user'), supabase.rpc('is_app_admin')])
+  return { id: user.id, email: user.email ?? '', autorizado: autorizado === true, admin: autorizado === true && admin === true }
 })
 
 async function exigirAcesso() {
