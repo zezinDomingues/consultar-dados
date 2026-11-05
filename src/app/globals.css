@@ -92,6 +92,11 @@ summary {
 }
 .selo-3d { transform-style: preserve-3d; animation: selo-flutua 7s ease-in-out infinite; }
 .selo-3d-topo { transform: translateZ(28px); }
+/* selo plano que flutua devagar (tela inicial do agente) */
+@keyframes selo-sobe { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+.selo-flutua { animation: selo-sobe 6s ease-in-out infinite; filter: drop-shadow(0 10px 16px rgba(11, 18, 37, 0.22)); }
+@media (prefers-reduced-motion: reduce) { .selo-flutua { animation: none; } }
+
 /* qual selo aparece: no canto (notebooks, 1024–1799 px) ou grande ao lado do texto (≥ 1800 px) */
 .selo-canto, .selo-grande { display: none; }
 @media (min-width: 1024px) and (max-width: 1799.98px) { .selo-canto { display: block; } }
