@@ -218,18 +218,59 @@
   }
   if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) requestAnimationFrame(quadro)
 
-  // 7) Cabeçalho: igual ao original, ganha fundo escuro quando a página rola mais de 60px
-  //    (sem isso, nas seções de fundo claro a logo e o menu somem).
+  // 7) Cabeçalho: ganha fundo escuro quando a página rola mais de 60px (como no original) OU quando
+  //    o que está logo atrás dele é claro (Diagnóstico, Privacidade, Termos começam em creme) —
+  //    sem isso a logo e o menu, que são claros, somem.
   var CLS_ROLADO = ['bg-[#031A15]/95', 'backdrop-blur-xl', 'border-b', 'border-white/5', 'shadow-sm']
+  function luminancia(css) {
+    var m = css && css.match(/rgba?\(([^)]+)\)/)
+    if (!m) return null
+    var p = m[1].split(/[\s,\/]+/).filter(Boolean).map(parseFloat)
+    if (p.length > 3 && p[3] < 0.5) return null // quase transparente: vale o que está atrás
+    return (0.2126 * p[0] + 0.7152 * p[1] + 0.0722 * p[2]) / 255
+  }
+  function fundoAtras(h, x, y) {
+    var pilha = document.elementsFromPoint(x, y)
+    for (var i = 0; i < pilha.length; i++) {
+      if (h.contains(pilha[i])) continue
+      for (var e = pilha[i]; e && e.nodeType === 1; e = e.parentElement) {
+        var cs = getComputedStyle(e)
+        var l = cs.backgroundImage !== 'none' ? luminancia(cs.backgroundImage) : null
+        if (l === null) l = luminancia(cs.backgroundColor)
+        if (l !== null) return l
+      }
+      return 1 // nada pintado até a raiz: fundo branco do navegador
+    }
+    return 1
+  }
+  function fundoClaro(h) {
+    var y = Math.max(1, Math.min(h.getBoundingClientRect().bottom - 4, window.innerHeight - 1))
+    var w = window.innerWidth
+    // confere três pontos (esquerda, meio, direita): basta um claro para o texto do menu sumir
+    return [w * 0.15, w * 0.5, w * 0.85].some(function (x) { return fundoAtras(h, x, y) > 0.5 })
+  }
+  var agendado = false
   function cabecalho() {
+    agendado = false
     var h = document.querySelector('header.fixed')
     if (!h) return
-    var rolado = window.scrollY > 60
-    CLS_ROLADO.forEach(function (c) { h.classList.toggle(c, rolado) })
-    h.classList.toggle('bg-transparent', !rolado)
+    // só o cabeçalho que nasce transparente muda; o das páginas legais já é escuro por desenho
+    if (!h.hasAttribute('data-cabecalho-dinamico')) {
+      if (!h.classList.contains('bg-transparent')) return
+      h.setAttribute('data-cabecalho-dinamico', '')
+    }
+    var solido = window.scrollY > 60 || fundoClaro(h)
+    CLS_ROLADO.forEach(function (c) { h.classList.toggle(c, solido) })
+    h.classList.toggle('bg-transparent', !solido)
   }
-  window.addEventListener('scroll', cabecalho, { passive: true })
-  cabecalho()
+  function agendarCabecalho() {
+    if (!agendado) { agendado = true; requestAnimationFrame(cabecalho) }
+  }
+  window.addEventListener('scroll', agendarCabecalho, { passive: true })
+  window.addEventListener('resize', agendarCabecalho)
+  window.addEventListener('load', agendarCabecalho)
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', cabecalho)
+  else cabecalho()
 
   // Delegação de eventos (funciona também nos trechos trocados pelas abas)
   document.addEventListener('click', function (ev) {
