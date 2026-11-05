@@ -1,4 +1,4 @@
--- 009 · Base multiestado (05/11/2026)
+-- 010 · Base multiestado (05/11/2026)
 --
 -- A plataforma deixa de ser só de SP: os estados chegam aos poucos e cada um é carregado em separado por
 -- banco-clientes-sp/carga_estado.py (apaga e regrava só as linhas do próprio estado).
