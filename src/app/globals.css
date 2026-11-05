@@ -74,6 +74,8 @@ summary {
 .selo-canto, .selo-grande { display: none; }
 @media (min-width: 1024px) and (max-width: 1799.98px) { .selo-canto { display: block; } }
 @media (min-width: 1800px) { .selo-grande { display: block; } }
+/* telas baixas (notebook 1280×720): menos respiro vertical para o painel caber sem rolagem */
+@media (min-width: 1024px) and (max-height: 740px) { .login-coluna { padding-top: 1.75rem; padding-bottom: 1.75rem; } }
 @media (prefers-reduced-motion: reduce) { .selo-3d { animation: none; transform: rotateX(10deg) rotateY(-16deg); } }
 
 /* o preenchimento automático do Chrome pinta o campo de azul-claro; mantém o branco do formulário */
