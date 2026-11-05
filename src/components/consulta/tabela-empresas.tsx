@@ -12,14 +12,14 @@ export function TabelaEmpresas({ empresas }: { empresas: EmpresaLista[] }) {
   return (
     <div className='overflow-x-auto'>
         <table className='w-full min-w-[900px] text-left'>
-          <thead className='bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500'>
+          <thead className='bg-slate-50 text-[10px] uppercase tracking-[0.14em] text-marca-800/60'>
             <tr>
-              <th className='py-2.5 pl-4 pr-2 font-medium'>Prior.</th>
-              <th className='px-3 py-2.5 font-medium'>Empresa</th>
-              <th className='px-3 py-2.5 font-medium'>Atividade</th>
-              <th className='px-3 py-2.5 font-medium'>Local</th>
-              <th className='px-3 py-2.5 font-medium'>Porte e regime</th>
-              <th className='px-3 py-2.5 pr-4 font-medium'>Contato</th>
+              <th className='py-2.5 pl-4 pr-2 font-bold'>Prior.</th>
+              <th className='px-3 py-2.5 font-bold'>Empresa</th>
+              <th className='px-3 py-2.5 font-bold'>Atividade</th>
+              <th className='px-3 py-2.5 font-bold'>Local</th>
+              <th className='px-3 py-2.5 font-bold'>Porte e regime</th>
+              <th className='px-3 py-2.5 pr-4 font-bold'>Contato</th>
             </tr>
           </thead>
           <tbody>
@@ -40,7 +40,7 @@ export function LinhaEmpresa({ e }: { e: EmpresaLista }) {
         <SeloPrioridade prioridade={e.prioridade} score={e.score} />
       </td>
       <td className='max-w-[260px] px-3 py-3'>
-        <Link href={ROTAS.empresa(e.cnpj)} className='line-clamp-2 font-medium text-slate-900 hover:text-marca-700'>
+        <Link href={ROTAS.empresa(e.cnpj)} className='line-clamp-2 font-semibold text-marca-800 hover:text-marca-600 hover:underline hover:decoration-ouro/60 hover:underline-offset-4'>
           {e.razao_social}
         </Link>
         {e.nome_fantasia && <p className='truncate text-xs text-slate-500'>{e.nome_fantasia}</p>}

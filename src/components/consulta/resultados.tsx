@@ -32,7 +32,7 @@ export async function Resultados({ consulta }: { consulta: Consulta }) {
   const paginas = Math.ceil(total / consulta.por)
 
   return (
-    <div className='overflow-hidden rounded-xl border border-slate-200 bg-white'>
+    <div className='overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm shadow-marca-900/[0.03]'>
       <TabelaEmpresas empresas={empresas} />
 
       <div className='flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-4 py-3 text-sm'>
@@ -91,7 +91,7 @@ function Paginacao({ consulta, paginas }: { consulta: Consulta; paginas: number 
 
 export function ResultadosCarregando() {
   return (
-    <div className='overflow-hidden rounded-xl border border-slate-200 bg-white'>
+    <div className='overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm shadow-marca-900/[0.03]'>
       <div className='h-9 bg-slate-50' />
       {Array.from({ length: 8 }).map((_, i) => (
         <div key={i} className='flex gap-4 border-t border-slate-100 px-4 py-4'>

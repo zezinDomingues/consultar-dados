@@ -40,7 +40,7 @@ export function BarraAcoes({ consulta }: { consulta: Consulta }) {
       <a
         href={`/api/exportar?${paraQuery({ filtros: consulta.filtros, ordem: consulta.ordem })}`}
         title={`Baixa até ${LIMITE_EXPORTACAO.toLocaleString('pt-BR')} empresas, na ordem atual`}
-        className='inline-flex h-9 items-center gap-2 rounded-lg bg-marca-800 px-3.5 text-sm font-medium text-white transition hover:bg-marca-900'
+        className='inline-flex h-10 items-center gap-2 rounded-full bg-marca-800 px-5 text-sm font-bold tracking-wide text-creme shadow-md shadow-marca-900/15 transition hover:bg-marca-950'
       >
         <Download className='size-4' /> Exportar CSV
       </a>

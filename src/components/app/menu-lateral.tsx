@@ -1,8 +1,9 @@
 'use client'
+/* eslint-disable @next/next/no-img-element -- SVGs estáticos da marca (public/site/marca) */
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Building2, Database, LogOut, Search, Sparkles } from 'lucide-react'
+import { Building2, LogOut, Search, Sparkles } from 'lucide-react'
 import { sair } from '@/app/login/actions'
 import { cn } from '@/lib/utils'
 import { ROTAS } from '@/lib/rotas'
@@ -17,18 +18,26 @@ export function MenuLateral({ email }: { email: string }) {
   const pathname = usePathname()
 
   return (
-    <aside className='sticky top-0 flex h-screen w-56 shrink-0 flex-col bg-marca-950 text-marca-100'>
-      <div className='flex items-center gap-2.5 px-5 py-5'>
-        <div className='grid size-9 place-items-center rounded-lg bg-white/10 text-white'>
-          <Database className='size-4.5' />
-        </div>
-        <div className='leading-tight'>
-          <p className='text-sm font-semibold text-white'>Consultar Dados</p>
-          <p className='text-[11px] text-marca-300'>Empresas de SP</p>
-        </div>
-      </div>
+    <aside className='fundo-marinho sticky top-0 flex h-screen w-60 shrink-0 flex-col overflow-hidden text-areia'>
+      {/* brilho e marca d'água do selo, como no destaque do site */}
+      <div
+        className='pointer-events-none absolute -left-24 -top-24 size-80 rounded-full opacity-25 blur-3xl'
+        style={{ background: 'radial-gradient(circle, #365db9 0%, #213870 50%, transparent 70%)' }}
+      />
+      <img
+        src='/site/marca/simbolo-escuro.svg'
+        alt=''
+        className='pointer-events-none absolute -bottom-16 -right-20 size-64 opacity-[0.05]'
+      />
 
-      <nav className='flex-1 space-y-1 px-3 py-2'>
+      <Link href={ROTAS.dashboard} className='relative block px-6 pb-6 pt-7'>
+        <img src='/site/marca/horizontal-escuro.svg' alt='OficialCert' className='h-9 w-auto' />
+        <span className='mt-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.22em] text-ouro'>
+          <span className='h-px w-5 bg-ouro/50' /> Plataforma
+        </span>
+      </Link>
+
+      <nav className='relative flex-1 space-y-1 px-3 py-2'>
         {ITENS.map(item => {
           const ativo = item.ativo(pathname)
           const Icone = item.icone
@@ -37,14 +46,15 @@ export function MenuLateral({ email }: { email: string }) {
               key={item.href}
               href={item.href}
               className={cn(
-                'flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition',
-                ativo ? 'bg-white/12 font-medium text-white' : 'text-marca-200 hover:bg-white/6 hover:text-white'
+                'relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13.5px] transition',
+                ativo ? 'bg-white/[0.08] font-semibold text-white' : 'text-areia/75 hover:bg-white/[0.04] hover:text-white'
               )}
             >
-              <Icone className='size-4' />
+              {ativo && <span className='absolute inset-y-2 left-0 w-[3px] rounded-full bg-ouro' />}
+              <Icone className={cn('size-4', ativo ? 'text-ouro' : 'text-areia/60')} />
               <span className='flex-1 whitespace-nowrap'>{item.rotulo}</span>
               {item.selo && (
-                <span className='whitespace-nowrap rounded-full bg-white/10 px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-marca-200'>
+                <span className='whitespace-nowrap rounded-full border border-ouro/40 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-ouro'>
                   {item.selo}
                 </span>
               )}
@@ -53,14 +63,15 @@ export function MenuLateral({ email }: { email: string }) {
         })}
       </nav>
 
-      <div className='border-t border-white/10 p-4'>
-        <p className='truncate text-xs text-marca-300' title={email}>
+      <div className='relative border-t border-white/10 px-6 py-5'>
+        <p className='text-[10px] font-bold uppercase tracking-[0.18em] text-ouro/80'>Conectado</p>
+        <p className='mt-1 truncate text-xs text-areia/80' title={email}>
           {email}
         </p>
         <form action={sair}>
           <button
             type='submit'
-            className='mt-2 flex items-center gap-2 text-xs text-marca-200 transition hover:text-white'
+            className='mt-3 flex items-center gap-2 text-xs font-semibold text-areia/70 transition hover:text-white'
           >
             <LogOut className='size-3.5' /> Sair
           </button>

@@ -159,11 +159,11 @@ export function Chat() {
     <div className='flex h-screen flex-col'>
       <header className='flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4'>
         <div className='flex items-center gap-3'>
-          <div className='grid size-9 place-items-center rounded-lg bg-marca-900 text-white'>
+          <div className='fundo-marinho grid size-9 place-items-center rounded-full text-ouro'>
             <Sparkles className='size-4.5' />
           </div>
           <div>
-            <h1 className='font-semibold leading-tight'>Agente de IA</h1>
+            <h1 className='font-serif text-lg font-bold leading-tight text-marca-800'>Agente de IA</h1>
             <p className='text-xs text-slate-500'>Encontra empresas na base e tira dúvidas de tributação e prospecção</p>
           </div>
         </div>
@@ -183,10 +183,10 @@ export function Chat() {
           {turnos.length === 0 && (
             <div className='py-8'>
               <div className='text-center'>
-                <div className='mx-auto grid size-14 place-items-center rounded-2xl bg-marca-900 text-white shadow-lg shadow-marca-900/20'>
+                <div className='fundo-marinho mx-auto grid size-16 place-items-center rounded-full text-ouro shadow-lg shadow-marca-900/25 ring-4 ring-ouro/25'>
                   <Sparkles className='size-7' />
                 </div>
-                <h2 className='mt-4 text-2xl font-semibold'>O que você quer encontrar?</h2>
+                <h2 className='mt-5 font-serif text-[2rem] font-bold tracking-[-0.02em] text-marca-800'>O que você quer encontrar?</h2>
                 <p className='mx-auto mt-1 max-w-xl text-sm text-slate-500'>
                   Peça em português. O agente monta os filtros, consulta as 628 mil empresas e mostra o resultado igual à
                   Consulta — com indicadores, tabela e contatos. Dúvidas de tributação ele responde direto.
@@ -216,7 +216,7 @@ export function Chat() {
           {turnos.map((t, i) =>
             t.papel === 'usuario' ? (
               <div key={i} className='flex justify-end'>
-                <div className='max-w-[75%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-marca-800 px-4 py-2.5 text-sm text-white'>
+                <div className='max-w-[75%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-marca-800 px-4 py-2.5 text-sm text-creme shadow-sm shadow-marca-900/10'>
                   {t.texto}
                 </div>
               </div>

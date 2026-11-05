@@ -34,12 +34,12 @@ export default async function EmpresaPage({ params }: Props) {
         <ArrowLeft className='size-4' /> Voltar à consulta
       </Link>
 
-      <header className='flex flex-wrap items-start gap-4 rounded-xl border border-slate-200 bg-white p-5'>
+      <header className='flex flex-wrap items-start gap-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm shadow-marca-900/[0.03]'>
         <div className='grid size-12 place-items-center rounded-xl bg-marca-50 text-marca-700'>
           <Building2 className='size-6' />
         </div>
         <div className='min-w-0 flex-1 space-y-1'>
-          <h1 className='text-xl font-semibold leading-tight'>{e.razao_social}</h1>
+          <h1 className='font-serif text-[1.7rem] font-bold leading-tight tracking-[-0.01em] text-marca-800'>{e.razao_social}</h1>
           {e.nome_fantasia && <p className='text-slate-500'>{e.nome_fantasia}</p>}
           <div className='flex flex-wrap items-center gap-2 pt-1 text-sm'>
             <span className='flex items-center font-mono text-slate-600'>
@@ -202,8 +202,8 @@ export default async function EmpresaPage({ params }: Props) {
 
 function Cartao({ titulo, children }: { titulo: string; children: React.ReactNode }) {
   return (
-    <section className='rounded-xl border border-slate-200 bg-white p-5'>
-      <h2 className='mb-3 text-sm font-semibold text-slate-700'>{titulo}</h2>
+    <section className='rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-marca-900/[0.03]'>
+      <h2 className='mb-3 font-serif text-[1.05rem] font-bold text-marca-800'>{titulo}</h2>
       {children}
     </section>
   )

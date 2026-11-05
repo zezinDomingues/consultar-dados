@@ -93,7 +93,7 @@ export function PainelFiltros({ consulta, opcoes }: { consulta: Consulta; opcoes
     <aside className='sticky top-0 flex h-screen w-[296px] shrink-0 flex-col border-r border-slate-200 bg-white'>
       <div className='flex items-center justify-between border-b border-slate-100 px-5 py-4'>
         <div className='flex items-center gap-2'>
-          <h2 className='text-sm font-semibold'>Filtros</h2>
+          <h2 className='font-serif text-lg font-bold text-marca-800'>Filtros</h2>
           {total > 0 && (
             <span className='rounded-full bg-marca-100 px-2 py-0.5 text-xs font-medium text-marca-800'>{total}</span>
           )}
@@ -266,7 +266,7 @@ function Secao({ titulo, ativos, children }: { titulo: string; ativos: unknown[]
   const n = ativos.filter(v => (Array.isArray(v) ? v.length > 0 : v !== undefined && v !== false)).length
   return (
     <details open className='group border-b border-slate-100 py-3 last:border-0'>
-      <summary className='flex cursor-pointer select-none items-center justify-between text-xs font-semibold uppercase tracking-wide text-slate-500'>
+      <summary className='flex cursor-pointer select-none items-center justify-between text-[11px] font-bold uppercase tracking-[0.16em] text-marca-800/70'>
         <span className='flex items-center gap-2'>
           {titulo}
           {n > 0 && <span className='size-1.5 rounded-full bg-marca-500' />}

@@ -1,8 +1,8 @@
 import { cn } from '@/lib/utils'
 
 const COR_PRIORIDADE = {
-  A: 'bg-marca-800 text-white',
-  B: 'bg-marca-500 text-white',
+  A: 'bg-ouro-escuro text-white',
+  B: 'bg-marca-800 text-white',
   C: 'bg-marca-100 text-marca-900',
   D: 'bg-slate-100 text-slate-500'
 } as const
@@ -12,7 +12,7 @@ export function SeloPrioridade({ prioridade, score, grande = false }: { priorida
     <span className='inline-flex items-center gap-1.5' title={score != null ? `Prioridade ${prioridade} · score ${score}/100` : undefined}>
       <span
         className={cn(
-          'grid place-items-center rounded-md font-semibold',
+          'grid place-items-center rounded-full font-serif font-bold',
           grande ? 'size-9 text-base' : 'size-6 text-xs',
           COR_PRIORIDADE[prioridade]
         )}

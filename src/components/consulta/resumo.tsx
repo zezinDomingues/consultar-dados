@@ -47,12 +47,12 @@ export function ResumoCarregando() {
     <div className='space-y-4'>
       <div className='grid grid-cols-2 gap-3 md:grid-cols-3 2xl:grid-cols-6'>
         {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className='h-[106px] animate-pulse rounded-xl border border-slate-200 bg-white' />
+          <div key={i} className='h-[106px] animate-pulse rounded-2xl border border-slate-200 bg-white' />
         ))}
       </div>
       <div className='grid gap-3 md:grid-cols-2 2xl:grid-cols-4'>
         {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className='h-56 animate-pulse rounded-xl border border-slate-200 bg-white' />
+          <div key={i} className='h-56 animate-pulse rounded-2xl border border-slate-200 bg-white' />
         ))}
       </div>
     </div>

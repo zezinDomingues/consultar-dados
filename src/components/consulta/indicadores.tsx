@@ -18,7 +18,7 @@ export function CartoesIndicadores({
   compacto?: boolean
 }) {
   const cards = [
-    { rotulo: 'Empresas encontradas', valor: t.n, nota: `${fmtPct(t.n, base)} da base`, icone: Building, destaque: true },
+    { rotulo: 'Encontradas', valor: t.n, nota: `${fmtPct(t.n, base)} da base`, icone: Building, destaque: true },
     { rotulo: 'Lucro Real', valor: t.lucro_real, nota: `${fmtPct(t.lucro_real, t.n)} do resultado`, icone: Landmark },
     { rotulo: 'Regime recente', valor: t.regime_recente, nota: 'ECF 2024, fora do Simples', icone: TrendingUp },
     { rotulo: 'Com WhatsApp', valor: t.com_whatsapp, nota: `${fmtPct(t.com_whatsapp, t.n)} com celular`, icone: MessageCircle },
@@ -31,19 +31,30 @@ export function CartoesIndicadores({
         <div
           key={c.rotulo}
           className={cn(
-            'rounded-xl border',
+            'relative overflow-hidden rounded-2xl border',
             compacto ? 'p-3' : 'p-4',
-            c.destaque ? 'border-marca-800 bg-marca-900 text-white' : 'border-slate-200 bg-white'
+            c.destaque ? 'fundo-marinho border-marca-800 text-white shadow-lg shadow-marca-900/15' : 'border-slate-200 bg-white shadow-sm shadow-marca-900/[0.03]'
           )}
         >
-          <div className={cn('flex items-center gap-1.5 text-xs', c.destaque ? 'text-marca-100' : 'text-slate-500')}>
-            <c.icone className='size-3.5 shrink-0' />
+          <div
+            className={cn(
+              'flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.12em]',
+              c.destaque ? 'text-ouro' : 'text-slate-500'
+            )}
+          >
+            <c.icone className={cn('size-3.5 shrink-0', c.destaque ? 'text-ouro' : 'text-ouro-escuro')} />
             <span className='truncate'>{c.rotulo}</span>
           </div>
-          <p className={cn('font-semibold tabular-nums', compacto ? 'mt-1.5 text-xl' : 'mt-2 text-2xl', c.destaque ? 'text-white' : 'text-slate-900')}>
+          <p
+            className={cn(
+              'font-serif font-bold leading-none tracking-[-0.01em] lining-nums tabular-nums',
+              compacto ? 'mt-2 text-[1.35rem]' : 'mt-3 text-[1.75rem]',
+              c.destaque ? 'text-white' : 'text-marca-800'
+            )}
+          >
             {fmtInt(c.valor)}
           </p>
-          <p className={cn('mt-0.5 truncate text-xs', c.destaque ? 'text-marca-200' : 'text-slate-400')}>{c.nota}</p>
+          <p className={cn('mt-1.5 truncate text-xs', c.destaque ? 'text-areia/80' : 'text-slate-400')}>{c.nota}</p>
         </div>
       ))}
     </div>
@@ -72,9 +83,9 @@ export function BarrasDistribuicao({
   const resto = itens.length - visiveis.length
 
   return (
-    <div className='rounded-xl border border-slate-200 bg-white p-4'>
+    <div className='rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-marca-900/[0.03]'>
       <div className='mb-3 flex items-baseline justify-between gap-2'>
-        <h3 className='text-sm font-semibold text-slate-700'>{titulo}</h3>
+        <h3 className='font-serif text-[1.05rem] font-bold text-marca-800'>{titulo}</h3>
         <span className='truncate text-[11px] text-slate-400'>{nota}</span>
       </div>
       <ul className='space-y-1'>

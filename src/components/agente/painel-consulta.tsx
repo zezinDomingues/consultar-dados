@@ -101,7 +101,7 @@ export function PainelConsulta({ anexo }: { anexo: AnexoConsulta }) {
               {barras('Porte', ordenarPorte(dims.porte), 'portes', 3)}
             </div>
 
-            <div className='overflow-hidden rounded-xl border border-slate-200 bg-white'>
+            <div className='overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm shadow-marca-900/[0.03]'>
               <TabelaEmpresas empresas={empresas} />
               <div className='flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-4 py-3 text-sm'>
                 <p className='text-slate-500'>

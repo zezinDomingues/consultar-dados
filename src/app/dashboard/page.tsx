@@ -42,8 +42,9 @@ export default async function ConsultarPage({
         <AreaResultados>
           <header className='flex flex-wrap items-end justify-between gap-4'>
             <div>
-              <h1 className='text-xl font-semibold'>Consultar empresas</h1>
-              <p className='text-sm text-slate-500'>
+              <span className='rotulo-secao'>Base de empresas</span>
+              <h1 className='mt-2 font-serif text-[2rem] font-bold leading-tight tracking-[-0.02em] text-marca-800'>Consultar empresas</h1>
+              <p className='mt-1 text-sm text-slate-500'>
                 {fmtInt(opcoes.total_base)} empresas de SP com Lucro Real ou Presumido · uma por CNPJ raiz
               </p>
             </div>
@@ -53,13 +54,13 @@ export default async function ConsultarPage({
           {semFiltro ? (
             <div className='flex flex-wrap items-center gap-2'>
               <span className='flex items-center gap-1.5 text-xs font-medium text-slate-500'>
-                <Sparkles className='size-3.5 text-marca-500' /> Atalhos
+                <Sparkles className='size-3.5 text-ouro-escuro' /> Atalhos
               </span>
               {ATALHOS.map(a => (
                 <LinkNav
                   key={a.rotulo}
                   href={hrefConsulta({ filtros: a.filtros })}
-                  className='rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-600 transition hover:border-marca-300 hover:text-marca-800'
+                  className='rounded-full border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-medium text-slate-600 shadow-sm shadow-marca-900/[0.03] transition hover:border-marca-800 hover:text-marca-800'
                 >
                   {a.rotulo}
                 </LinkNav>

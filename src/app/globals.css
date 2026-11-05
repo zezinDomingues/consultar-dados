@@ -3,18 +3,32 @@
 @theme {
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
 
-  /* Paleta da marca (a mesma da planilha "Banco de Possíveis Clientes") */
-  --color-marca-50: #eef4fd;
-  --color-marca-100: #cde2fb;
-  --color-marca-200: #9ec5f4;
-  --color-marca-300: #6da7ec;
-  --color-marca-400: #3987e5;
-  --color-marca-500: #2a78d6;
-  --color-marca-600: #256abf;
-  --color-marca-700: #1c5cab;
-  --color-marca-800: #184f95;
-  --color-marca-900: #0d366b;
-  --color-marca-950: #0a2547;
+  /* Paleta da marca = azul-marinho da OficialCert (mesma do site institucional).
+     Todo o painel usa marca-*; mudar aqui muda o app inteiro. */
+  --color-marca-50: #eef1f8;
+  --color-marca-100: #dde3f1;
+  --color-marca-200: #bcc7e2;
+  --color-marca-300: #93a3cd;
+  --color-marca-400: #6a80b8;
+  --color-marca-500: #4a63a3;
+  --color-marca-600: #34508f;
+  --color-marca-700: #263f78;
+  --color-marca-800: #1a2d5a;
+  --color-marca-900: #142347;
+  --color-marca-950: #0b1225;
+
+  /* Neutros da landing: creme nos fundos e bordas, tinta marinho nos textos (substitui o slate frio) */
+  --color-slate-50: #faf8f3;
+  --color-slate-100: #f3efe6;
+  --color-slate-200: #e7e1d4;
+  --color-slate-300: #d5cdbb;
+  --color-slate-400: #9a968c;
+  --color-slate-500: #6b6e7d;
+  --color-slate-600: #50566a;
+  --color-slate-700: #3a4157;
+  --color-slate-800: #262d44;
+  --color-slate-900: #171d31;
+  --color-slate-950: #0d1222;
 
   /* Identidade OficialCert (a mesma do site institucional em public/site) */
   --font-serif: var(--font-playfair), ui-serif, Georgia, serif;
@@ -31,8 +45,16 @@
 }
 
 body {
-  @apply bg-slate-50 text-slate-900 antialiased;
+  @apply bg-creme text-slate-900 antialiased;
 }
+
+/* Peças de identidade do painel (iguais às do site) */
+.fundo-marinho { background: linear-gradient(175deg, #080e1b 0%, #182a53 45%, #0e1931 100%); }
+.rotulo-secao {
+  display: inline-flex; align-items: center; gap: 0.75rem;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: rgb(26 45 90 / 0.7);
+}
+.rotulo-secao::before { content: ''; width: 2rem; height: 1px; background: rgb(26 45 90 / 0.25); }
 
 /* <details> sem o triângulo padrão: usamos um ícone próprio */
 summary::-webkit-details-marker {

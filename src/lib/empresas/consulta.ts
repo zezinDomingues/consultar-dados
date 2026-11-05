@@ -18,11 +18,22 @@ export class SemAcessoError extends Error {
   }
 }
 
+// Sem sessão (ou token inválido) → null, e o layout manda para o login. Falha de REDE ao consultar o
+// Auth não pode virar "deslogado": tenta de novo e, se persistir, lança (o error.tsx oferece tentar de novo).
+async function lerUsuario(supabase: Awaited<ReturnType<typeof createClient>>) {
+  for (let tentativa = 0; tentativa < 2; tentativa++) {
+    const { data, error } = await supabase.auth.getUser()
+    if (data.user) return data.user
+    const naoLogado = !error || error.name === 'AuthSessionMissingError' || (error.status !== undefined && error.status >= 400 && error.status < 500)
+    if (naoLogado) return null
+    await new Promise(r => setTimeout(r, 400))
+  }
+  throw new Error('Não foi possível verificar sua sessão agora. Tente novamente em instantes.')
+}
+
 export const usuarioAtual = cache(async () => {
   const supabase = await createClient()
-  const {
-    data: { user }
-  } = await supabase.auth.getUser()
+  const user = await lerUsuario(supabase)
   if (!user) return null
   const { data: autorizado } = await supabase.rpc('is_app_user')
   return { id: user.id, email: user.email ?? '', autorizado: autorizado === true }

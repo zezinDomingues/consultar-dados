@@ -23,7 +23,8 @@ export default async function ContadoresPage({ searchParams }: { searchParams: P
     <div className='space-y-5 p-6'>
       <header className='flex flex-wrap items-end justify-between gap-4'>
         <div className='max-w-2xl'>
-          <h1 className='text-xl font-semibold'>Contadores e grupos</h1>
+          <span className='rotulo-secao'>Relacionamento</span>
+          <h1 className='mt-2 font-serif text-[2rem] font-bold leading-tight tracking-[-0.02em] text-marca-800'>Contadores e grupos</h1>
           <p className='text-sm text-slate-500'>
             E-mails que aparecem no cadastro de 5 ou mais empresas: escritórios contábeis (um contato fala por dezenas de
             clientes) e grupos econômicos com várias empresas.
@@ -40,7 +41,7 @@ export default async function ContadoresPage({ searchParams }: { searchParams: P
         </form>
       </header>
 
-      <div className='overflow-hidden rounded-xl border border-slate-200 bg-white'>
+      <div className='overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm shadow-marca-900/[0.03]'>
         <div className='overflow-x-auto'>
           <table className='w-full min-w-[980px] text-left text-sm'>
             <thead className='bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500'>
