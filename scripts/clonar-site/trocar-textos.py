@@ -48,7 +48,7 @@ ELEMENTOS = [
      'A <strong class="text-white font-semibold">OficialCert</strong>, afiliada da '
      '<strong class="text-white font-semibold">GWT Solution</strong>, integra inteligência fiscal aos seus '
      '<strong class="text-white font-medium">sistemas</strong> e viabiliza a '
-     '<strong class="text-white font-medium">antecipação</strong> de créditos, com a tecnologia e a metodologia GWT.'),
+     '<strong class="text-white font-medium">antecipação</strong> de créditos tributários, com a tecnologia e a metodologia GWT.'),
     (['p'], 'Isso não é marketing. É mais de',
      'Como afiliada da <strong class="font-semibold text-[#0B3C34]">GWT Solution</strong>, a OficialCert opera com a '
      'mesma tecnologia e a mesma esteira de validação. Cada real identificado passa por validação jurídica, normativa '
@@ -301,7 +301,10 @@ def processar(soup, nome):
         if heroi is not None and 'R$ 1 bilh' in texto(heroi):
             h1 = heroi.find('h1')
             grande, pequena = h1.find_all('span', recursive=False)[:2]
-            grande.clear(); grande.append('Seus créditos')
+            # 05/11/2026: "Seus créditos tributários" não cabe numa linha: sai o nowrap, entra a quebra equilibrada
+            grande.clear(); grande.append('Seus créditos tributários')
+            grande['class'] = [c for c in grande.get('class', []) if c != 'whitespace-nowrap']
+            grande['style'] = 'text-wrap:balance'
             pequena.clear(); pequena.append('identificados. Validados. Blindados.')
             trocar_nos(heroi, {'R$ 1 bi+': 'Afiliada', 'Homologados': 'GWT Solution', '200+': '360Corp',
                                'Empresas': 'Plataforma', '100%': 'LGPD', 'Segurança': 'Sigilo'})
