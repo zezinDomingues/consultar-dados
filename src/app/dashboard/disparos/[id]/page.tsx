@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { ArrowLeft, BellRing, Building2, ClipboardCheck, ExternalLink, MessageCircle } from 'lucide-react'
+import { ArrowLeft, BellRing, Building2, CalendarPlus, ClipboardCheck, ExternalLink, MessageCircle } from 'lucide-react'
 import { BotaoAcao } from '@/components/disparos/botao-acao'
 import { Responder } from '@/components/disparos/responder'
 import { SeloStatus } from '@/components/disparos/selos'
@@ -96,6 +96,12 @@ export default async function DisparoPage({ params }: { params: Promise<{ id: st
                 className='inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-700 hover:border-marca-300 hover:text-marca-800'
               >
                 <Building2 className='size-3.5' /> Ficha da empresa
+              </Link>
+              <Link
+                href={`${ROTAS.calendario}?nova=1&disparo=${d.id}`}
+                className='inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-700 hover:border-marca-300 hover:text-marca-800'
+              >
+                <CalendarPlus className='size-3.5' /> Agendar reunião
               </Link>
               {d.atencao && (
                 <BotaoAcao acao={marcarComoVisto.bind(null, d.id)} variante='primario'>

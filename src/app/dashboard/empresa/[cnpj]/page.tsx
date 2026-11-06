@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation'
 import { ArrowLeft, Building2, ExternalLink, Mail, MapPin, MessageCircle, Phone, TriangleAlert } from 'lucide-react'
 import { PORTE_CURTO, SeloPrioridade, SeloSituacao } from '@/components/consulta/selos'
 import { Copiar } from '@/components/ui/copiar'
-import { obterEmpresa } from '@/lib/empresas/consulta'
+import { obterEmpresa, paginaInterna } from '@/lib/empresas/consulta'
 import { fmtData, fmtInt, fmtMoeda } from '@/lib/formatar'
 import { ROTAS } from '@/lib/rotas'
 import { hrefConsulta } from '@/lib/empresas/filtros'
@@ -17,6 +17,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function EmpresaPage({ params }: Props) {
+  await paginaInterna()
   const { cnpj } = await params
   if (!/^\d{14}$/.test(cnpj)) notFound()
   const dados = await obterEmpresa(cnpj)

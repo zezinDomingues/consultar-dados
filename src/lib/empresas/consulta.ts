@@ -3,6 +3,8 @@
 // logado: o RLS do Supabase só libera quem está em app_usuarios.
 import 'server-only'
 import { cache } from 'react'
+import { redirect } from 'next/navigation'
+import { ROTAS } from '@/lib/rotas'
 import { createClient } from '@/lib/supabase/server'
 import type { Filtros, Ordem } from './filtros'
 import type { ContadorGrupo, Empresa, EmpresaLista, Opcoes, Resumo } from './tipos'
@@ -11,6 +13,8 @@ export const COLUNAS_LISTA =
   'cnpj,cnpj_formatado,prioridade,score,razao_social,nome_fantasia,tipo_negocio,setor,ramo,cnae_fmt,' +
   'atividade_principal,municipio,uf,regiao_intermediaria,porte,capital_social,regime,situacao_regime,idade_anos,' +
   'estabelecimentos_uf,telefone1,whatsapp,whatsapp_link,email,email_tipo,empresas_mesmo_email'
+
+export type Papel = 'admin' | 'equipe' | 'consulta' | 'cliente'
 
 export class SemAcessoError extends Error {
   constructor() {
@@ -35,10 +39,19 @@ export const usuarioAtual = cache(async () => {
   const supabase = await createClient()
   const user = await lerUsuario(supabase)
   if (!user) return null
-  // is_app_admin vem da migração 005; se ela ainda não rodou, o erro vira "não é admin".
-  const [{ data: autorizado }, { data: admin }] = await Promise.all([supabase.rpc('is_app_user'), supabase.rpc('is_app_admin')])
-  return { id: user.id, email: user.email ?? '', autorizado: autorizado === true, admin: autorizado === true && admin === true }
+  // papel (migração 012): admin | equipe | consulta | cliente. `autorizado` = equipe interna (lê a base inteira);
+  // o cliente NÃO é autorizado — ele só usa "Minhas empresas", pelas funções cliente_* do banco.
+  const [{ data: autorizado }, { data: papel }] = await Promise.all([supabase.rpc('is_app_user'), supabase.rpc('meu_papel')])
+  const p = (typeof papel === 'string' ? papel : null) as Papel | null
+  return { id: user.id, email: user.email ?? '', autorizado: autorizado === true, admin: autorizado === true && p === 'admin', papel: p }
 })
+
+/** Páginas da equipe interna: o cliente vai para "Minhas empresas"; quem não entrou, para o login. */
+export async function paginaInterna() {
+  const u = await usuarioAtual()
+  if (u?.papel === 'cliente') redirect(ROTAS.minhasEmpresas)
+  return u
+}
 
 async function exigirAcesso() {
   const u = await usuarioAtual()

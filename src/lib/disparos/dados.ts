@@ -30,6 +30,13 @@ export async function exigirAdmin() {
 }
 
 /** A migração 005 já rodou neste banco? (a tela explica o que fazer se não) */
+/** Painel e conversas: admin vê tudo; a equipe só os ramos dela (o RLS do banco garante, aqui é a porta da tela). */
+export async function exigirAtendimento() {
+  const u = await usuarioAtual()
+  if (!u || (u.papel !== 'admin' && u.papel !== 'equipe')) throw new SemAdminError()
+  return u
+}
+
 export const migracaoAplicada = cache(async () => {
   const supabase = await createClient()
   const { error } = await supabase.from('disparo_config').select('id').limit(1)
@@ -40,18 +47,18 @@ const COLUNAS_NUMERO =
   'id,rotulo,provedor,waha_url,waha_sessao,telefone,nome_perfil,ativo,limite_diario,intervalo_min_s,intervalo_max_s,status,' +
   'status_detalhe,status_em,webhook_em,ultimo_evento_em,proximo_envio_em,ultimo_envio_em,criado_em'
 
-export async function resumoDisparos(campanha?: number) {
-  await exigirAdmin()
+export async function resumoDisparos(campanha?: number, ramo?: string) {
+  await exigirAtendimento()
   const supabase = await createClient()
-  const { data, error } = await supabase.rpc('disparo_resumo', { p_campanha: campanha ?? null })
+  const { data, error } = await supabase.rpc('disparo_resumo', { p_campanha: campanha ?? null, p_ramo: ramo ?? null })
   if (error) throw new Error(`resumo: ${error.message}`)
   return data as ResumoDisparos
 }
 
-export type ConsultaDisparos = { grupo: Grupo; campanha?: number; q?: string; pagina: number; por: number }
+export type ConsultaDisparos = { grupo: Grupo; campanha?: number; ramo?: string; q?: string; pagina: number; por: number }
 
 export async function listarDisparos(c: ConsultaDisparos) {
-  await exigirAdmin()
+  await exigirAtendimento()
   const supabase = await createClient()
   let consulta = supabase.from('disparos').select('*', { count: 'exact' })
   const g = GRUPOS[c.grupo]
@@ -59,6 +66,7 @@ export async function listarDisparos(c: ConsultaDisparos) {
   else if (c.grupo === 'leads') consulta = consulta.not('preenchido_em', 'is', null)
   else if (g.status) consulta = consulta.in('status', [...g.status])
   if (c.campanha) consulta = consulta.eq('campanha_id', c.campanha)
+  if (c.ramo) consulta = consulta.eq('ramo', c.ramo)
   const termo = c.q?.replace(/[,()%*\\]/g, ' ').trim()
   if (termo) {
     const dig = termo.replace(/\D/g, '')
@@ -75,7 +83,7 @@ export async function listarDisparos(c: ConsultaDisparos) {
 }
 
 export async function obterDisparo(id: number) {
-  await exigirAdmin()
+  await exigirAtendimento()
   const supabase = await createClient()
   const [{ data: d, error }, { data: eventos }] = await Promise.all([
     supabase.from('disparos').select('*').eq('id', id).maybeSingle(),
@@ -120,14 +128,14 @@ export async function obterCampanha(id: number) {
 
 /** Nomes das campanhas (para filtros e rótulos). */
 export async function nomesCampanhas() {
-  await exigirAdmin()
+  await exigirAtendimento()
   const supabase = await createClient()
   const { data } = await supabase.from('disparo_campanhas').select('id,nome,status').order('criada_em', { ascending: false })
   return (data ?? []) as Pick<Campanha, 'id' | 'nome' | 'status'>[]
 }
 
 export async function listarNumeros() {
-  await exigirAdmin()
+  await exigirAtendimento()
   const supabase = await createClient()
   const [{ data, error }, { data: hoje }] = await Promise.all([
     supabase.from('disparo_numeros').select(COLUNAS_NUMERO).order('id'),
@@ -142,7 +150,7 @@ export async function listarNumeros() {
 }
 
 export async function lerConfig() {
-  await exigirAdmin()
+  await exigirAtendimento()
   const supabase = await createClient()
   const { data, error } = await supabase.from('disparo_config').select('*').eq('id', 1).single()
   if (error) throw new Error(`regras: ${error.message}`)
@@ -162,4 +170,46 @@ export async function listarBloqueios() {
   const supabase = await createClient()
   const { data } = await supabase.from('disparo_bloqueios').select('*').order('criado_em', { ascending: false }).limit(200)
   return (data ?? []) as { telefone: string; motivo: string; observacao: string | null; criado_em: string }[]
+}
+
+export type LinhaRamo = {
+  ramo: string
+  ramo_nome: string
+  total: number
+  enviados: number
+  aguardando: number
+  responderam: number
+  interessados: number
+  preencheram: number
+  atencao: number
+}
+
+/** Uma linha por ramo (a equipe só recebe os ramos dela) + quem responde cada ramo. */
+export async function disparosPorRamo(campanha?: number) {
+  await exigirAtendimento()
+  const supabase = await createClient()
+  const [{ data, error }, { data: atribuicoes }, { data: pessoas }] = await Promise.all([
+    supabase.rpc('disparo_por_ramo', { p_campanha: campanha ?? null }),
+    supabase.from('equipe_ramos').select('user_id, ramo'),
+    supabase.rpc('pessoas_equipe')
+  ])
+  if (error) throw new Error(`por ramo: ${error.message}`)
+  const nome = new Map(((pessoas ?? []) as { user_id: string; nome: string }[]).map(p => [p.user_id, p.nome]))
+  const responsaveis = new Map<string, string[]>()
+  for (const a of (atribuicoes ?? []) as { user_id: string; ramo: string }[]) {
+    const lista = responsaveis.get(a.ramo) ?? []
+    lista.push(nome.get(a.user_id) ?? '—')
+    responsaveis.set(a.ramo, lista)
+  }
+  return ((data ?? []) as LinhaRamo[]).map(r => ({
+    ...r,
+    total: Number(r.total),
+    enviados: Number(r.enviados),
+    aguardando: Number(r.aguardando),
+    responderam: Number(r.responderam),
+    interessados: Number(r.interessados),
+    preencheram: Number(r.preencheram),
+    atencao: Number(r.atencao),
+    responsaveis: responsaveis.get(r.ramo) ?? []
+  }))
 }

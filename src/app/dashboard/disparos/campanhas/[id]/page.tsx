@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
+import { usuarioAtual } from '@/lib/empresas/consulta'
 import Link from 'next/link'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import { FormCampanha } from '@/components/disparos/form-campanha'
 import { SeloCampanha } from '@/components/disparos/selos'
@@ -15,6 +16,7 @@ export const metadata: Metadata = { title: 'Campanha' }
 
 // Edição: textos, nome, ordem e limites. Os filtros ficam fixos (público diferente = campanha nova).
 export default async function CampanhaPage({ params }: { params: Promise<{ id: string }> }) {
+  if (!(await usuarioAtual())?.admin) redirect(ROTAS.disparos)
   const id = Number((await params).id)
   if (!Number.isInteger(id) || id <= 0) notFound()
   const c = await obterCampanha(id)

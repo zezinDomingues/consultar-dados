@@ -1,4 +1,7 @@
 import type { Metadata } from 'next'
+import { redirect } from 'next/navigation'
+import { usuarioAtual } from '@/lib/empresas/consulta'
+import { ROTAS } from '@/lib/rotas'
 import { FormCampanha } from '@/components/disparos/form-campanha'
 import { urlApp } from '@/lib/disparos/config'
 import { contarElegiveis, listarNumeros } from '@/lib/disparos/dados'
@@ -12,6 +15,7 @@ export const metadata: Metadata = { title: 'Nova campanha' }
 
 // Os filtros chegam pela URL, iguais aos da Consulta ("Criar campanha" lá leva a consulta inteira para cá).
 export default async function NovaCampanhaPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  if (!(await usuarioAtual())?.admin) redirect(ROTAS.disparos)
   const { filtros, ordem } = lerDeSearchParams(await searchParams)
   const [opcoes, com, sem, [exemplo], numeros] = await Promise.all([
     opcoesFiltros(),

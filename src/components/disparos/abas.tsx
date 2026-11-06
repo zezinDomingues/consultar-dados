@@ -12,11 +12,12 @@ const ABAS = [
   { href: ROTAS.numeros, rotulo: 'Números e regras', icone: Smartphone, ativa: (p: string) => p.startsWith(ROTAS.numeros) }
 ]
 
-export function AbasDisparos() {
+export function AbasDisparos({ admin }: { admin: boolean }) {
   const pathname = usePathname()
+  const abas = admin ? ABAS : ABAS.slice(0, 1)
   return (
     <nav className='flex gap-1 overflow-x-auto border-b border-slate-200'>
-      {ABAS.map(a => {
+      {abas.map(a => {
         const ativa = a.ativa(pathname)
         return (
           <Link

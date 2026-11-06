@@ -11,14 +11,14 @@ export const metadata: Metadata = { title: { default: 'Disparos', template: '%s 
 
 export default async function DisparosLayout({ children }: { children: React.ReactNode }) {
   const u = await usuarioAtual()
-  if (!u?.admin) {
+  if (u?.papel !== 'admin' && u?.papel !== 'equipe') {
     return (
       <div className='grid min-h-[70vh] place-items-center p-6'>
         <div className='max-w-md space-y-3 text-center'>
           <ShieldAlert className='mx-auto size-10 text-amber-500' />
           <h1 className='text-lg font-semibold'>Área restrita a administradores</h1>
           <p className='text-sm text-slate-500'>
-            Os disparos de WhatsApp só aparecem para usuários com papel <strong>admin</strong>.
+            Os disparos de WhatsApp aparecem para a <strong>equipe</strong> (os ramos de cada um) e para o <strong>admin</strong>.
           </p>
         </div>
       </div>
@@ -51,19 +51,21 @@ export default async function DisparosLayout({ children }: { children: React.Rea
             Disparos de WhatsApp
           </h1>
           <p className='text-sm text-slate-500'>
-            Quem já recebeu, quem respondeu e quem pediu a consulta gratuita. Cada telefone recebe a primeira mensagem uma
-            única vez — o registro é permanente.
+            Quem já recebeu, quem respondeu e quem pediu a consulta gratuita, separados por ramo — cada pessoa da equipe
+            responde os ramos que recebeu. Cada telefone recebe a primeira mensagem uma única vez.
           </p>
         </div>
+        {u.admin && (
         <Link
           href={ROTAS.novaCampanha}
           className='inline-flex h-10 items-center gap-2 rounded-full bg-marca-800 px-5 text-sm font-bold tracking-wide text-creme shadow-md shadow-marca-900/15 transition hover:bg-marca-950'
         >
           <Plus className='size-4' /> Nova campanha
         </Link>
+        )}
       </header>
 
-      {faltam.length > 0 && (
+      {u.admin && faltam.length > 0 && (
         <div className='flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900'>
           <TriangleAlert className='mt-0.5 size-4 shrink-0' />
           <p>
@@ -73,7 +75,7 @@ export default async function DisparosLayout({ children }: { children: React.Rea
         </div>
       )}
 
-      <AbasDisparos />
+      <AbasDisparos admin={u.admin} />
       {children}
     </div>
   )

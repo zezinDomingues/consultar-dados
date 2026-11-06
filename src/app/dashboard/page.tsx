@@ -6,7 +6,7 @@ import { FiltrosAtivos } from '@/components/consulta/filtros-ativos'
 import { PainelFiltros } from '@/components/consulta/painel-filtros'
 import { Resultados, ResultadosCarregando } from '@/components/consulta/resultados'
 import { Resumo, ResumoCarregando } from '@/components/consulta/resumo'
-import { opcoesFiltros, usuarioAtual } from '@/lib/empresas/consulta'
+import { opcoesFiltros, usuarioAtual, paginaInterna } from '@/lib/empresas/consulta'
 import { contarFiltros, hrefConsulta, lerDeSearchParams, type Filtros } from '@/lib/empresas/filtros'
 import { fmtInt } from '@/lib/formatar'
 
@@ -30,6 +30,7 @@ export default async function ConsultarPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
+  await paginaInterna()
   const consulta = lerDeSearchParams(await searchParams)
   const [opcoes, usuario] = await Promise.all([opcoesFiltros(), usuarioAtual()])
   const chave = JSON.stringify(consulta.filtros)

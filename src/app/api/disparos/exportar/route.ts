@@ -20,17 +20,17 @@ export async function GET(request: NextRequest) {
       [
         'CNPJ', 'Razão social', 'Nome fantasia', 'Município', 'WhatsApp', 'Situação', 'Enviado em', 'Entregue em', 'Lido em',
         'Respondeu em', 'Última resposta', 'Quis a consulta em', 'Enviou os dados em', 'Nome completo', 'CNPJ informado', 'Lead - empresa',
-        'Lead - e-mail', 'Lead - WhatsApp', 'Teste', 'Erro'
+        'Lead - e-mail', 'Lead - WhatsApp', 'Teste', 'Ramo', 'UF', 'Erro'
       ].join(';')
     ]
     for (let pagina = 1; pagina <= 40; pagina++) {
-      const { itens } = await listarDisparos({ grupo, campanha: Number(sp.get('campanha')) || undefined, q: sp.get('q') ?? undefined, pagina, por: 500 })
+      const { itens } = await listarDisparos({ grupo, campanha: Number(sp.get('campanha')) || undefined, ramo: sp.get('ramo') || undefined, q: sp.get('q') ?? undefined, pagina, por: 500 })
       for (const d of itens) {
         linhas.push(
           [
             d.cnpj, d.razao_social, d.nome_fantasia, d.municipio, fmtFone(d.telefone), ROTULO_STATUS[d.status], data(d.enviado_em),
             data(d.entregue_em), data(d.lido_em), data(d.respondido_em), d.ultima_resposta, data(d.interessado_em), data(d.preenchido_em),
-            d.lead_nome, d.lead_cnpj ? fmtCnpj(d.lead_cnpj) : '', d.lead_empresa, d.lead_email, d.lead_whatsapp ? fmtFone(d.lead_whatsapp) : '', d.teste ? 'sim' : '', d.erro
+            d.lead_nome, d.lead_cnpj ? fmtCnpj(d.lead_cnpj) : '', d.lead_empresa, d.lead_email, d.lead_whatsapp ? fmtFone(d.lead_whatsapp) : '', d.teste ? 'sim' : '', d.ramo_nome, d.uf, d.erro
           ].map(campo).join(';')
         )
       }

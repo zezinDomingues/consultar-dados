@@ -4,7 +4,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import type { LucideIcon } from 'lucide-react'
-import { Building2, LogOut, MessagesSquare, Search, Send } from 'lucide-react'
+import { Building2, CalendarDays, LogOut, MessagesSquare, Search, Send, UsersRound } from 'lucide-react'
 import { sair } from '@/app/login/actions'
 import { cn } from '@/lib/utils'
 import { ROTAS } from '@/lib/rotas'
@@ -17,9 +17,18 @@ const ITENS: Item[] = [
   { href: ROTAS.agente, rotulo: 'Agente de IA', icone: MessagesSquare, ativo: (p: string) => p.startsWith(ROTAS.agente) }
 ]
 
-// Só para administradores (app_usuarios.papel = 'admin')
-const ITENS_ADMIN: Item[] = [
-  { href: ROTAS.disparos, rotulo: 'Disparos', icone: Send, ativo: (p: string) => p.startsWith(ROTAS.disparos) }
+type Papel = 'admin' | 'equipe' | 'consulta' | 'cliente' | null
+
+// Seção "Administrativo": cada item diz quem o vê
+const ITENS_ADMIN: (Item & { papeis: Papel[] })[] = [
+  { href: ROTAS.disparos, rotulo: 'Disparos', icone: Send, ativo: (p: string) => p.startsWith(ROTAS.disparos), papeis: ['admin', 'equipe'] },
+  { href: ROTAS.calendario, rotulo: 'Calendário', icone: CalendarDays, ativo: (p: string) => p.startsWith(ROTAS.calendario), papeis: ['admin', 'equipe', 'consulta'] },
+  { href: ROTAS.usuarios, rotulo: 'Usuários', icone: UsersRound, ativo: (p: string) => p.startsWith(ROTAS.usuarios), papeis: ['admin'] }
+]
+
+// O cliente (produto "Consulta de dados") só tem a área dele
+const ITENS_CLIENTE: Item[] = [
+  { href: ROTAS.minhasEmpresas, rotulo: 'Minhas empresas', icone: Search, ativo: (p: string) => p.startsWith(ROTAS.minhasEmpresas) }
 ]
 
 function ItemMenu({ item, pathname }: { item: Item; pathname: string }) {
@@ -40,7 +49,9 @@ function ItemMenu({ item, pathname }: { item: Item; pathname: string }) {
   )
 }
 
-export function MenuLateral({ email, admin = false }: { email: string; admin?: boolean }) {
+export function MenuLateral({ email, papel }: { email: string; papel: Papel }) {
+  const cliente = papel === 'cliente'
+  const administrativos = ITENS_ADMIN.filter(i => i.papeis.includes(papel))
   const pathname = usePathname()
 
   return (
@@ -64,15 +75,15 @@ export function MenuLateral({ email, admin = false }: { email: string; admin?: b
       </Link>
 
       <nav className='relative flex-1 space-y-1 px-3 py-2'>
-        {ITENS.map(item => (
+        {(cliente ? ITENS_CLIENTE : ITENS).map(item => (
           <ItemMenu key={item.href} item={item} pathname={pathname} />
         ))}
-        {admin && (
+        {!cliente && administrativos.length > 0 && (
           <>
             <span className='flex items-center gap-2 px-3 pb-2 pt-6 text-[10px] font-bold uppercase tracking-[0.22em] text-ouro'>
               <span className='h-px w-5 bg-ouro/50' /> Administrativo
             </span>
-            {ITENS_ADMIN.map(item => (
+            {administrativos.map(item => (
               <ItemMenu key={item.href} item={item} pathname={pathname} />
             ))}
           </>

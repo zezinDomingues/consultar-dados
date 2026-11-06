@@ -94,6 +94,10 @@ export type Disparo = {
   tentativas: number
   /** conversa de teste do administrador (fora do funil) */
   teste: boolean
+  /** ramo (divisão CNAE) e estado da empresa no momento do envio */
+  ramo: string | null
+  ramo_nome: string | null
+  uf: string | null
   atualizado_em: string
 }
 

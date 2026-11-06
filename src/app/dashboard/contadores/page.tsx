@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { ChevronLeft, ChevronRight, Search } from 'lucide-react'
-import { listarContadores } from '@/lib/empresas/consulta'
+import { listarContadores, paginaInterna } from '@/lib/empresas/consulta'
 import { fmtInt } from '@/lib/formatar'
 import { cn } from '@/lib/utils'
 import { ROTAS } from '@/lib/rotas'
@@ -12,6 +12,7 @@ export const metadata: Metadata = { title: 'Contadores e grupos' }
 const POR_PAGINA = 50
 
 export default async function ContadoresPage({ searchParams }: { searchParams: Promise<{ q?: string; pagina?: string }> }) {
+  await paginaInterna()
   const sp = await searchParams
   const q = sp.q?.trim() || undefined
   const pagina = Math.max(1, parseInt(sp.pagina ?? '1', 10) || 1)

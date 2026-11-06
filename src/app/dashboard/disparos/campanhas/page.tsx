@@ -1,4 +1,6 @@
 import type { Metadata } from 'next'
+import { redirect } from 'next/navigation'
+import { usuarioAtual } from '@/lib/empresas/consulta'
 import Link from 'next/link'
 import { CircleCheck, Megaphone, Pause, Pencil, Play, Square } from 'lucide-react'
 import { BotaoAcao } from '@/components/disparos/botao-acao'
@@ -13,6 +15,7 @@ import { ROTAS } from '@/lib/rotas'
 export const metadata: Metadata = { title: 'Campanhas' }
 
 export default async function CampanhasPage({ searchParams }: { searchParams: Promise<{ salva?: string }> }) {
+  if (!(await usuarioAtual())?.admin) redirect(ROTAS.disparos)
   const { salva } = await searchParams
   const [campanhas, opcoes] = await Promise.all([listarCampanhas(), opcoesFiltros()])
 

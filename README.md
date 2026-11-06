@@ -113,6 +113,26 @@ Ligar um número: instância WAHA (NOWEB, HTTPS público) → parear por código
 Adicionar número** (URL + API key) → **Conectar webhook** (configura HMAC + eventos + store do NOWEB; reinicia a sessão
 ~20 s). Número novo: 20–30 envios/dia e subir aos poucos.
 
+## Papéis, calendário e o produto "Consulta de dados" (06/11/2026 · migrações 012 e 013)
+
+| Papel | O que vê |
+|---|---|
+| `admin` | tudo, inclusive **Usuários** (`/dashboard/usuarios`) |
+| `equipe` | base inteira + **Disparos só dos ramos dela** (`equipe_ramos`, garantido pelo RLS) + Calendário |
+| `consulta` | base inteira, agente e Calendário |
+| `cliente` | **só** `/dashboard/minhas-empresas` |
+
+- `is_app_user()` = equipe interna (admin/equipe/consulta): é o que libera as tabelas da base no RLS. **O cliente não
+  lê nenhuma tabela da base**; tudo passa por `cliente_buscar`/`cliente_contar`/`cliente_liberar`/`cliente_saldo`/
+  `cliente_opcoes` (security definer), que aplicam o plano (`clientes_acesso`: ramos, estados, validade), escondem
+  telefone/WhatsApp/e-mail/endereço até a empresa ser liberada (`clientes_liberacoes`) e cobram a cota — **mensal**
+  (`cota_mensal`, renova dia 1º em Brasília) ou **por pacote** (`clientes_pacotes`, cada "leva de compra" soma).
+- **Disparos por ramo:** cada contato guarda `ramo`/`ramo_nome`/`uf` da empresa; o painel tem a faixa "Por ramo"
+  (com os responsáveis) e o filtro `?ramo=`. Campanhas e números continuam só do admin.
+- **Calendário** (`/dashboard/calendario`, tabela `reunioes`): toda a equipe interna vê; cada um edita as suas (admin
+  edita todas). "Agendar reunião" na conversa de um contato já preenche empresa e WhatsApp.
+- Desativar alguém = desmarcar "Acesso ativo" em Usuários (`app_usuarios.ativo`).
+
 ## Agente de IA (`/agente`)
 
 Conversa em português com dois modos:

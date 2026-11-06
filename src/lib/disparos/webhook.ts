@@ -77,7 +77,9 @@ export async function processarEvento(ev: EventoWaha, numeroId: number | null, d
 
   switch (ev.event) {
     case 'session.status': {
-      if (numero) {
+      // STARTING é passageiro: o WhatsApp derruba a conexão de vez em quando (stream 503) e o WAHA reconecta em
+      // segundos. Gravar esse estado deixava o painel acusando "não conectado" com a sessão já de volta.
+      if (numero && texto(p.status) !== 'STARTING') {
         const status = texto(p.status) || 'DESCONHECIDO'
         await db
           .from('disparo_numeros')

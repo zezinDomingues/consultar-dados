@@ -10,9 +10,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className='flex min-h-screen'>
-      <MenuLateral email={usuario.email} admin={usuario.admin} />
+      <MenuLateral email={usuario.email} papel={usuario.papel} />
       <main className='min-w-0 flex-1'>
-        {usuario.autorizado ? (
+        {usuario.autorizado || usuario.papel === 'cliente' ? (
           children
         ) : (
           <div className='grid min-h-screen place-items-center p-6'>

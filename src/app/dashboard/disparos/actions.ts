@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
 import { pendenciasServidor, segredoDisparos, urlWebhook } from '@/lib/disparos/config'
-import { exigirAdmin } from '@/lib/disparos/dados'
+import { exigirAdmin, exigirAtendimento } from '@/lib/disparos/dados'
 import { fmtFone, MODELOS, nomeEmpresa, normalizarFone } from '@/lib/disparos/mensagens'
 import { canalDe, carregarNumero, enviarPrimeiraDeTeste, responder } from '@/lib/disparos/motor'
 import type { Disparo } from '@/lib/disparos/tipos'
@@ -165,7 +165,9 @@ export async function enviarTeste(_: Retorno, fd: FormData): Promise<Retorno> {
       await db.from('disparo_bloqueios').delete().eq('telefone', telefone).eq('observacao', `disparo #${existente.id}`)
       await db.from('disparos').delete().eq('id', existente.id)
     }
-    const [exemplo] = await buscarEmpresas({ ...c.filtros, com_whatsapp: true }, c.ordem, 1, 1, 'razao_social,nome_fantasia,municipio')
+    const [exemplo] = (await buscarEmpresas({ ...c.filtros, com_whatsapp: true }, c.ordem, 1, 1, 'razao_social,nome_fantasia,municipio,divisao,ramo,uf')) as unknown as {
+      razao_social: string; nome_fantasia: string | null; municipio: string; divisao: string; ramo: string; uf: string
+    }[]
     const { data: d, error } = await db
       .from('disparos')
       .insert({
@@ -176,7 +178,10 @@ export async function enviarTeste(_: Retorno, fd: FormData): Promise<Retorno> {
         teste: true,
         razao_social: exemplo?.razao_social ?? 'EMPRESA EXEMPLO LTDA',
         nome_fantasia: exemplo?.nome_fantasia ?? null,
-        municipio: exemplo?.municipio ?? 'São Paulo'
+        municipio: exemplo?.municipio ?? 'São Paulo',
+        ramo: exemplo?.divisao ?? null,
+        ramo_nome: exemplo?.ramo ?? null,
+        uf: exemplo?.uf ?? null
       })
       .select('*')
       .single()
@@ -347,7 +352,7 @@ export async function pausarTudo(pausado: boolean): Promise<Retorno> {
 // ---------------------------------------------------------------------------------------------------------------
 
 export async function marcarComoVisto(id: number): Promise<Retorno> {
-  await exigirAdmin()
+  await exigirAtendimento()
   const supabase = await createClient()
   const { error } = await supabase.from('disparos').update({ atencao: false }).eq('id', id)
   if (error) return { erro: error.message }
@@ -356,7 +361,8 @@ export async function marcarComoVisto(id: number): Promise<Retorno> {
 }
 
 export async function enviarMensagemManual(id: number, mensagem: string): Promise<Retorno> {
-  const u = await exigirAdmin()
+  // a equipe responde pelos ramos dela: o select abaixo passa pelo RLS e não acha contato de outro ramo
+  const u = await exigirAtendimento()
   const corpo = mensagem.trim()
   if (!corpo) return { erro: 'Escreva a mensagem.' }
   if (corpo.length > 3000) return { erro: 'Mensagem longa demais (até 3.000 caracteres).' }

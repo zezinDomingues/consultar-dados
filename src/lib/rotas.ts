@@ -13,6 +13,11 @@ export const ROTAS = {
   novaCampanha: '/dashboard/disparos/campanhas/nova',
   campanha: (id: number) => `/dashboard/disparos/campanhas/${id}`,
   numeros: '/dashboard/disparos/numeros',
+  calendario: '/dashboard/calendario',
+  usuarios: '/dashboard/usuarios',
+  usuario: (id: string) => `/dashboard/usuarios/${id}`,
+  /** Produto "Consulta de dados": a única área do cliente */
+  minhasEmpresas: '/dashboard/minhas-empresas',
   /** Formulário público que o contato abre pelo link do WhatsApp */
   consultaGratuita: (token: string) => `/consulta-gratuita/${token}`
 } as const

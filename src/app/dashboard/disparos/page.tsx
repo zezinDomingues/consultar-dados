@@ -18,7 +18,8 @@ import {
 } from 'lucide-react'
 import { SeloStatus } from '@/components/disparos/selos'
 import { dentroDaJanela } from '@/lib/disparos/config'
-import { lerConfig, listarDisparos, listarNumeros, nomesCampanhas, resumoDisparos, type ConsultaDisparos } from '@/lib/disparos/dados'
+import { disparosPorRamo, lerConfig, listarDisparos, listarNumeros, nomesCampanhas, resumoDisparos, type ConsultaDisparos } from '@/lib/disparos/dados'
+import { usuarioAtual } from '@/lib/empresas/consulta'
 import { fmtCnpj, fmtFone } from '@/lib/disparos/mensagens'
 import { GRUPOS, type Grupo, type ResumoDisparos } from '@/lib/disparos/tipos'
 import { fmtDataHora, fmtInt, fmtPct, fmtRelativo } from '@/lib/formatar'
@@ -34,6 +35,7 @@ function lerConsulta(sp: Record<string, string | undefined>): ConsultaDisparos {
   return {
     grupo,
     campanha: Number(sp.campanha) || undefined,
+    ramo: sp.ramo && /^(\d{2}|\?\?)$/.test(sp.ramo) ? sp.ramo : undefined,
     q: sp.q?.trim() || undefined,
     pagina: Math.max(1, parseInt(sp.pagina ?? '1', 10) || 1),
     por: POR_PAGINA
@@ -44,6 +46,7 @@ function href(c: Partial<ConsultaDisparos>) {
   const p = new URLSearchParams()
   if (c.grupo && c.grupo !== 'todos') p.set('grupo', c.grupo)
   if (c.campanha) p.set('campanha', String(c.campanha))
+  if (c.ramo) p.set('ramo', c.ramo)
   if (c.q) p.set('q', c.q)
   if (c.pagina && c.pagina > 1) p.set('pagina', String(c.pagina))
   const q = p.toString()
@@ -52,18 +55,22 @@ function href(c: Partial<ConsultaDisparos>) {
 
 export default async function PainelDisparos({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const c = lerConsulta(await searchParams)
-  const [resumo, lista, campanhas, numeros, cfg] = await Promise.all([
-    resumoDisparos(c.campanha),
+  const [resumo, lista, campanhas, numeros, cfg, ramos, u] = await Promise.all([
+    resumoDisparos(c.campanha, c.ramo),
     listarDisparos(c),
     nomesCampanhas(),
     listarNumeros(),
-    lerConfig()
+    lerConfig(),
+    disparosPorRamo(c.campanha),
+    usuarioAtual()
   ])
+  const admin = !!u?.admin
   const nomeCampanha = new Map(campanhas.map(x => [x.id, x.nome]))
   const paginas = Math.max(1, Math.ceil(lista.total / POR_PAGINA))
 
   // ---- avisos: o que impede (ou vai impedir) os envios agora ----
   const avisos: { texto: React.ReactNode; grave?: boolean }[] = []
+  if (!admin && !ramos.length) avisos.push({ texto: 'Você ainda não tem ramos para responder. Peça ao administrador para atribuir (Usuários).' })
   const ativos = numeros.filter(n => n.ativo)
   if (!numeros.length) avisos.push({ texto: <>Nenhum número cadastrado. <Link className='underline' href={ROTAS.numeros}>Cadastre o primeiro</Link>.</>, grave: true })
   else if (!ativos.length) avisos.push({ texto: 'Todos os números estão pausados.', grave: true })
@@ -78,6 +85,8 @@ export default async function PainelDisparos({ searchParams }: { searchParams: P
   if (cfg.pausado) avisos.push({ texto: 'Os disparos estão pausados nas regras gerais.', grave: true })
   else if (!janela.ok) avisos.push({ texto: `Agora está ${janela.motivo} (${cfg.hora_inicio}h–${cfg.hora_fim}h). Os envios retomam sozinhos.` })
   const capacidade = ativos.reduce((s, n) => s + n.limite_diario, 0)
+  // a equipe só precisa do aviso de ramos (o 1º, quando existe); números, regras e campanhas são do admin
+  if (!admin) avisos.splice(ramos.length ? 0 : 1)
 
   return (
     <div className='space-y-5'>
@@ -97,6 +106,8 @@ export default async function PainelDisparos({ searchParams }: { searchParams: P
           ))}
         </ul>
       )}
+
+      <PorRamo ramos={ramos} atual={c.ramo} hrefDe={r => href({ ...c, ramo: r, pagina: 1 })} />
 
       <Funil r={resumo} capacidade={capacidade} />
 
@@ -121,6 +132,7 @@ export default async function PainelDisparos({ searchParams }: { searchParams: P
           </div>
           <form action={ROTAS.disparos} className='flex flex-wrap items-center gap-2'>
             {c.grupo !== 'todos' && <input type='hidden' name='grupo' value={c.grupo} />}
+            {c.ramo && <input type='hidden' name='ramo' value={c.ramo} />}
             <select
               name='campanha'
               defaultValue={c.campanha ?? ''}
@@ -144,7 +156,7 @@ export default async function PainelDisparos({ searchParams }: { searchParams: P
             </span>
             <button className='h-9 rounded-lg bg-slate-100 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-200'>Filtrar</button>
             <a
-              href={`/api/disparos/exportar?${new URLSearchParams({ grupo: c.grupo, ...(c.campanha ? { campanha: String(c.campanha) } : {}), ...(c.q ? { q: c.q } : {}) })}`}
+              href={`/api/disparos/exportar?${new URLSearchParams({ grupo: c.grupo, ...(c.campanha ? { campanha: String(c.campanha) } : {}), ...(c.ramo ? { ramo: c.ramo } : {}), ...(c.q ? { q: c.q } : {}) })}`}
               className='inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-700 hover:border-marca-300'
             >
               <Download className='size-3.5' /> CSV
@@ -175,7 +187,8 @@ export default async function PainelDisparos({ searchParams }: { searchParams: P
                         <span className='truncate font-medium text-slate-800 hover:text-marca-700'>{d.nome_fantasia || d.razao_social}</span>
                       </span>
                       <span className='block truncate text-xs text-slate-400'>
-                        {d.municipio} · {nomeCampanha.get(d.campanha_id) ?? `campanha ${d.campanha_id}`}
+                        {d.municipio}
+                        {d.uf ? `/${d.uf}` : ''} · {d.ramo_nome ?? 'ramo ?'} · {nomeCampanha.get(d.campanha_id) ?? `campanha ${d.campanha_id}`}
                       </span>
                     </Link>
                   </td>
@@ -286,5 +299,57 @@ function Funil({ r, capacidade }: { r: ResumoDisparos; capacidade: number }) {
         </div>
       ))}
     </div>
+  )
+}
+
+function PorRamo({
+  ramos,
+  atual,
+  hrefDe
+}: {
+  ramos: Awaited<ReturnType<typeof disparosPorRamo>>
+  atual?: string
+  hrefDe: (ramo?: string) => string
+}) {
+  if (!ramos.length) return null
+  return (
+    <section className='space-y-2'>
+      <div className='flex items-center justify-between'>
+        <p className='text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500'>Por ramo</p>
+        {atual && (
+          <Link href={hrefDe(undefined)} className='text-xs font-semibold text-marca-700 hover:underline'>
+            ver todos os ramos
+          </Link>
+        )}
+      </div>
+      <div className='flex gap-2 overflow-x-auto pb-1'>
+        {ramos.map(r => (
+          <Link
+            key={r.ramo}
+            href={hrefDe(r.ramo === atual ? undefined : r.ramo)}
+            className={cn(
+              'min-w-[200px] max-w-[240px] shrink-0 rounded-2xl border p-3 transition',
+              r.ramo === atual ? 'border-marca-700 bg-marca-50 ring-2 ring-marca-100' : 'border-slate-200 bg-white hover:border-marca-300'
+            )}
+          >
+            <p className='line-clamp-2 min-h-[2.5em] text-[13px] font-semibold leading-tight text-slate-800' title={r.ramo_nome}>
+              {r.ramo_nome}
+            </p>
+            <p className='mt-1 truncate text-[11px] text-slate-400'>
+              {r.responsaveis.length ? `👤 ${r.responsaveis.join(', ')}` : 'sem responsável'}
+            </p>
+            <div className='mt-2 flex items-end justify-between gap-2 text-xs'>
+              <span className='text-slate-500'>
+                <strong className='font-serif text-lg text-marca-800'>{fmtInt(r.enviados)}</strong> env. · {fmtInt(r.responderam)} resp.
+              </span>
+              <span className='flex gap-1'>
+                {r.atencao > 0 && <span className='rounded-full bg-amber-400 px-1.5 text-[10px] font-bold text-marca-950'>{r.atencao}</span>}
+                {r.preencheram > 0 && <span className='rounded-full bg-emerald-100 px-1.5 text-[10px] font-bold text-emerald-800'>{r.preencheram} leads</span>}
+              </span>
+            </div>
+          </Link>
+        ))}
+      </div>
+    </section>
   )
 }

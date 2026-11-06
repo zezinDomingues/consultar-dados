@@ -1,4 +1,7 @@
 import type { Metadata } from 'next'
+import { redirect } from 'next/navigation'
+import { usuarioAtual } from '@/lib/empresas/consulta'
+import { ROTAS } from '@/lib/rotas'
 import { Ban, Clock, PauseCircle, PlayCircle, Plug, RefreshCw, Smartphone, Trash2, Webhook } from 'lucide-react'
 import { BotaoAcao } from '@/components/disparos/botao-acao'
 import { FormBloqueio } from '@/components/disparos/form-bloqueio'
@@ -15,6 +18,7 @@ import { cn } from '@/lib/utils'
 export const metadata: Metadata = { title: 'Números e regras' }
 
 export default async function NumerosPage() {
+  if (!(await usuarioAtual())?.admin) redirect(ROTAS.disparos)
   const [numeros, cfg, bloqueios] = await Promise.all([listarNumeros(), lerConfig(), listarBloqueios()])
 
   return (
