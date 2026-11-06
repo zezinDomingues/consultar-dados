@@ -28,6 +28,7 @@ const ITENS_ADMIN: (Item & { papeis: Papel[] })[] = [
 
 // O cliente só tem as áreas dos produtos que contratou
 const CLIENTE_CONSULTA: Item = { href: ROTAS.minhasEmpresas, rotulo: 'Minhas empresas', icone: Search, ativo: (p: string) => p.startsWith(ROTAS.minhasEmpresas) }
+const CLIENTE_CALENDARIO: Item = { href: ROTAS.calendario, rotulo: 'Calendário', icone: CalendarDays, ativo: (p: string) => p.startsWith(ROTAS.calendario) }
 const CLIENTE_DISPAROS: Item = { href: ROTAS.disparos, rotulo: 'Meus disparos', icone: Send, ativo: (p: string) => p.startsWith(ROTAS.disparos) }
 
 function ItemMenu({ item, pathname }: { item: Item; pathname: string }) {
@@ -60,7 +61,7 @@ export function MenuLateral({
   const cliente = papel === 'cliente'
   const ITENS_CLIENTE = [
     ...(produtos?.consulta || !produtos?.disparos ? [CLIENTE_CONSULTA] : []),
-    ...(produtos?.disparos ? [CLIENTE_DISPAROS] : [])
+    ...(produtos?.disparos ? [CLIENTE_DISPAROS, CLIENTE_CALENDARIO] : [])
   ]
   const administrativos = ITENS_ADMIN.filter(i => i.papeis.includes(papel))
   const pathname = usePathname()

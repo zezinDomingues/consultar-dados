@@ -11,6 +11,7 @@ export type Reuniao = {
   local: string | null
   cnpj: string | null
   disparo_id: number | null
+  grupo_id: number
   criado_por: string
   criado_em: string
 }
@@ -29,11 +30,11 @@ export const CORES = [
   'bg-teal-700 text-white'
 ]
 
-export async function reunioesEntre(inicioIso: string, fimIso: string) {
+export async function reunioesEntre(inicioIso: string, fimIso: string, grupo?: number) {
   const supabase = await createClient()
-  const { data, error } = await supabase
-    .from('reunioes')
-    .select('*')
+  let q = supabase.from('reunioes').select('*')
+  if (grupo) q = q.eq('grupo_id', grupo)
+  const { data, error } = await q
     .lt('inicio', fimIso)
     .gt('fim', inicioIso)
     .order('inicio')
@@ -42,14 +43,26 @@ export async function reunioesEntre(inicioIso: string, fimIso: string) {
   return (data ?? []) as Reuniao[]
 }
 
-export async function proximasReunioes(limite = 12) {
+export async function proximasReunioes(limite = 12, grupo?: number) {
   const supabase = await createClient()
-  const { data } = await supabase.from('reunioes').select('*').gte('fim', new Date().toISOString()).order('inicio').limit(limite)
+  let q = supabase.from('reunioes').select('*').gte('fim', new Date().toISOString())
+  if (grupo) q = q.eq('grupo_id', grupo)
+  const { data } = await q.order('inicio').limit(limite)
   return (data ?? []) as Reuniao[]
 }
 
 export async function pessoasEquipe() {
   const supabase = await createClient()
-  const { data } = await supabase.rpc('pessoas_equipe')
+  const { data } = await supabase.rpc('pessoas_dos_meus_grupos')
   return (data ?? []) as Pessoa[]
+}
+
+/** Grupos cujo calendário a pessoa vê: o admin vê todos; os demais, só os grupos de que fazem parte. */
+export async function meusGruposCalendario(admin: boolean, userId: string) {
+  const supabase = await createClient()
+  const { data: grupos } = await supabase.from('disparo_grupos').select('id, nome').order('id')
+  if (admin) return (grupos ?? []) as { id: number; nome: string }[]
+  const { data: membro } = await supabase.from('grupo_membros').select('grupo_id').eq('user_id', userId)
+  const meus = new Set(((membro ?? []) as { grupo_id: number }[]).map(m => m.grupo_id))
+  return ((grupos ?? []) as { id: number; nome: string }[]).filter(g => meus.has(g.id))
 }

@@ -71,7 +71,7 @@ async function gravarExtras(userId: string, papel: (typeof PAPEIS)[number], dado
     }
   }
   await db.from('grupo_membros').delete().eq('user_id', userId)
-  if (papel === 'cliente' && dados.grupos.length) {
+  if (papel !== 'admin' && dados.grupos.length) {
     const { error } = await db.from('grupo_membros').insert(dados.grupos.map(grupo_id => ({ user_id: userId, grupo_id })))
     if (error) return error.message
   }

@@ -59,7 +59,7 @@ export function FormUsuario({ usuario, ramos, ufs, grupos }: { usuario?: Usuario
       {papel === 'cliente' && (selUfs ?? []).map(u => <input key={u} type='hidden' name='ufs' value={u} />)}
       {papel === 'cliente' && <input type='hidden' name='modalidade' value={modalidade} />}
       {papel === 'cliente' && temConsulta && <input type='hidden' name='tem_consulta' value='on' />}
-      {papel === 'cliente' && (selGrupos ?? []).map(g => <input key={g} type='hidden' name='grupos' value={g} />)}
+      {papel !== 'admin' && (selGrupos ?? []).map(g => <input key={g} type='hidden' name='grupos' value={g} />)}
 
       <div className='grid gap-3 sm:grid-cols-2'>
         <label className='block space-y-1'>
@@ -102,10 +102,13 @@ export function FormUsuario({ usuario, ramos, ufs, grupos }: { usuario?: Usuario
         </div>
       )}
 
-      {papel === 'cliente' && (
+      {papel !== 'admin' && (
         <div className='space-y-1.5 rounded-xl bg-slate-50 p-3'>
-          <MultiSelect rotulo='Disparos: grupos que este cliente acompanha' opcoes={grupos} selecionados={selGrupos} aoMudar={setSelGrupos} placeholder='Nenhum' />
-          <p className='text-[11px] text-slate-400'>Ele entra em “Meus disparos” e vê só o painel, as conversas e os leads desses grupos.</p>
+          <MultiSelect rotulo='Grupos de que faz parte' opcoes={grupos} selecionados={selGrupos} aoMudar={setSelGrupos} placeholder='Nenhum' />
+          <p className='text-[11px] text-slate-400'>
+            Vê o calendário desses grupos (as reuniões de todos do grupo).
+            {papel === 'cliente' ? ' Como cliente, também entra em “Meus disparos” e vê o painel, as conversas e os leads deles.' : ''}
+          </p>
         </div>
       )}
 

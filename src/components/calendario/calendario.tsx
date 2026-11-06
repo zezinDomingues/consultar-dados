@@ -17,12 +17,14 @@ export type ReuniaoTela = {
   local: string | null
   cnpj: string | null
   disparo_id: number | null
+  grupo_id: number
+  grupo: string
   autor: string
   cor: string
   podeEditar: boolean
 }
 
-export type Rascunho = Partial<Pick<ReuniaoTela, 'id' | 'titulo' | 'dia' | 'hi' | 'hf' | 'descricao' | 'local' | 'cnpj' | 'disparo_id'>>
+export type Rascunho = Partial<Pick<ReuniaoTela, 'id' | 'titulo' | 'dia' | 'hi' | 'hf' | 'descricao' | 'local' | 'cnpj' | 'disparo_id' | 'grupo_id'>>
 
 const SEMANA = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro']
@@ -36,7 +38,9 @@ export function Calendario({
   reunioes,
   legenda,
   inicial,
-  base
+  base,
+  grupos,
+  grupoAtual
 }: {
   mes: string // AAAA-MM
   hoje: string // AAAA-MM-DD
@@ -44,8 +48,11 @@ export function Calendario({
   legenda: { nome: string; cor: string }[]
   inicial: Rascunho | null
   base: string
+  grupos: { id: number; nome: string }[]
+  grupoAtual?: number
 }) {
-  const hrefMes = (mm: string) => `${base}?mes=${mm}`
+  const hrefMes = (mm: string) => `${base}?mes=${mm}${grupoAtual ? `&g=${grupoAtual}` : ''}`
+  const hrefGrupo = (g?: number) => `${base}?mes=${mes}${g ? `&g=${g}` : ''}`
   const [editando, setEditando] = useState<Rascunho | null>(inicial)
   const [vendo, setVendo] = useState<ReuniaoTela | null>(null)
 
@@ -81,6 +88,18 @@ export function Calendario({
           <Link href={hrefMes(hoje.slice(0, 7))} className='text-xs font-semibold text-marca-700 hover:underline'>
             hoje
           </Link>
+        )}
+        {grupos.length > 1 && (
+          <span className='flex flex-wrap gap-1'>
+            <Link href={hrefGrupo()} className={cn('rounded-full px-3 py-1.5 text-xs font-semibold', !grupoAtual ? 'bg-marca-800 text-creme' : 'border border-slate-200 bg-white text-slate-600')}>
+              Todos os meus grupos
+            </Link>
+            {grupos.map(g => (
+              <Link key={g.id} href={hrefGrupo(g.id)} className={cn('rounded-full px-3 py-1.5 text-xs font-semibold', grupoAtual === g.id ? 'bg-marca-800 text-creme' : 'border border-slate-200 bg-white text-slate-600')}>
+                {g.nome}
+              </Link>
+            ))}
+          </span>
         )}
         <button
           type='button'
@@ -167,7 +186,7 @@ export function Calendario({
           }}
         />
       )}
-      {editando && <Formulario rascunho={editando} fechar={() => setEditando(null)} />}
+      {editando && <Formulario rascunho={editando} fechar={() => setEditando(null)} grupos={grupos} grupoPadrao={grupoAtual ?? grupos[0]?.id} />}
     </div>
   )
 }
@@ -210,7 +229,9 @@ function Detalhe({ r, fechar, editar }: { r: ReuniaoTela; fechar: () => void; ed
           </p>
         )}
         {r.descricao && <p className='whitespace-pre-wrap rounded-xl bg-slate-50 px-3 py-2 text-[13px]'>{r.descricao}</p>}
-        <p className='text-xs text-slate-400'>Marcada por {r.autor}</p>
+        <p className='text-xs text-slate-400'>
+          Marcada por {r.autor} · grupo {r.grupo}
+        </p>
         <div className='flex flex-wrap gap-2 pt-1'>
           {r.cnpj && (
             <Link href={`/dashboard/empresa/${r.cnpj}`} className='inline-flex items-center gap-1 text-xs font-semibold text-marca-700 hover:underline'>
@@ -253,7 +274,17 @@ function Detalhe({ r, fechar, editar }: { r: ReuniaoTela; fechar: () => void; ed
   )
 }
 
-function Formulario({ rascunho, fechar }: { rascunho: Rascunho; fechar: () => void }) {
+function Formulario({
+  rascunho,
+  fechar,
+  grupos,
+  grupoPadrao
+}: {
+  rascunho: Rascunho
+  fechar: () => void
+  grupos: { id: number; nome: string }[]
+  grupoPadrao?: number
+}) {
   const [estado, acao, salvando] = useActionState<Retorno, FormData>(salvarReuniao, {})
   useEffect(() => {
     if (estado.ok) {
@@ -266,6 +297,20 @@ function Formulario({ rascunho, fechar }: { rascunho: Rascunho; fechar: () => vo
       <form action={acao} className='space-y-3'>
         {rascunho.id && <input type='hidden' name='id' value={rascunho.id} />}
         {rascunho.disparo_id && <input type='hidden' name='disparo_id' value={rascunho.disparo_id} />}
+        {grupos.length > 1 ? (
+          <label className='block space-y-1'>
+            <span className='text-xs font-semibold text-slate-600'>Grupo (quem vê esta reunião)</span>
+            <select name='grupo_id' defaultValue={rascunho.grupo_id ?? grupoPadrao} className={ENTRADA}>
+              {grupos.map(g => (
+                <option key={g.id} value={g.id}>
+                  {g.nome}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : (
+          <input type='hidden' name='grupo_id' value={rascunho.grupo_id ?? grupoPadrao ?? ''} />
+        )}
         <label className='block space-y-1'>
           <span className='text-xs font-semibold text-slate-600'>Título</span>
           <input name='titulo' defaultValue={rascunho.titulo} required maxLength={160} autoFocus className={ENTRADA} placeholder='Ex.: Apresentação para a Acme' />

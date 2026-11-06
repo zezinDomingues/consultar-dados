@@ -142,8 +142,9 @@ ele) e opção de **medir cliques** (o link passa por `/r/<token>`, que ignora r
   (`cota_mensal`, renova dia 1º em Brasília) ou **por pacote** (`clientes_pacotes`, cada "leva de compra" soma).
 - **Disparos por ramo:** cada contato guarda `ramo`/`ramo_nome`/`uf` da empresa; o painel tem a faixa "Por ramo"
   (com os responsáveis) e o filtro `?ramo=`. Campanhas e números continuam só do admin.
-- **Calendário** (`/dashboard/calendario`, tabela `reunioes`): toda a equipe interna vê; cada um edita as suas (admin
-  edita todas). "Agendar reunião" na conversa de um contato já preenche empresa e WhatsApp.
+- **Calendário** (`/dashboard/calendario`, tabela `reunioes`, migração 015): **por grupo** — cada pessoa vê só o
+  calendário dos grupos de que faz parte (`grupo_membros`, qualquer papel) e, dentro do grupo, as reuniões de todos;
+  edita só as suas (admin vê e edita tudo). "Agendar reunião" na conversa de um contato já preenche empresa e WhatsApp.
 - Desativar alguém = desmarcar "Acesso ativo" em Usuários (`app_usuarios.ativo`).
 
 ## Agente de IA (`/agente`)

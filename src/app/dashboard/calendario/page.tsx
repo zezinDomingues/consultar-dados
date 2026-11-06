@@ -1,7 +1,8 @@
 import type { Metadata } from 'next'
 import { Calendario, type Rascunho, type ReuniaoTela } from '@/components/calendario/calendario'
-import { CORES, pessoasEquipe, proximasReunioes, reunioesEntre } from '@/lib/calendario/dados'
-import { paginaInterna } from '@/lib/empresas/consulta'
+import { CORES, meusGruposCalendario, pessoasEquipe, proximasReunioes, reunioesEntre } from '@/lib/calendario/dados'
+import { redirect } from 'next/navigation'
+import { usuarioAtual } from '@/lib/empresas/consulta'
 import { fmtDataHora } from '@/lib/formatar'
 import { ROTAS } from '@/lib/rotas'
 import { createClient } from '@/lib/supabase/server'
@@ -19,15 +20,20 @@ const fuso = (iso: string) => {
 }
 
 export default async function CalendarioPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
-  const u = await paginaInterna()
+  const u = await usuarioAtual()
+  // equipe interna ou cliente que faz parte de um grupo
+  if (!u?.autorizado && !(u?.papel === 'cliente' && u.produtos?.disparos)) redirect(ROTAS.dashboard)
   const sp = await searchParams
+  const grupos = await meusGruposCalendario(!!u.admin, u.id)
+  const grupoAtual = grupos.find(g => String(g.id) === sp.g)?.id
   const hoje = fuso(new Date().toISOString()).dia
   const mes = sp.mes && /^\d{4}-\d{2}$/.test(sp.mes) ? sp.mes : hoje.slice(0, 7)
   const [ano, m] = mes.split('-').map(Number)
   const inicio = new Date(`${mes}-01T00:00:00-03:00`).toISOString()
   const fim = new Date(`${m === 12 ? ano + 1 : ano}-${String(m === 12 ? 1 : m + 1).padStart(2, '0')}-01T00:00:00-03:00`).toISOString()
 
-  const [reunioes, pessoas, proximas] = await Promise.all([reunioesEntre(inicio, fim), pessoasEquipe(), proximasReunioes()])
+  const [reunioes, pessoas, proximas] = await Promise.all([reunioesEntre(inicio, fim, grupoAtual), pessoasEquipe(), proximasReunioes(12, grupoAtual)])
+  const nomeGrupo = new Map(grupos.map(g => [g.id, g.nome]))
   const indice = new Map(pessoas.map((p, i) => [p.user_id, i]))
   const cor = (uid: string) => CORES[(indice.get(uid) ?? pessoas.length) % CORES.length]
   const nome = (uid: string) => pessoas.find(p => p.user_id === uid)?.nome ?? 'alguém que saiu da equipe'
@@ -44,6 +50,8 @@ export default async function CalendarioPage({ searchParams }: { searchParams: P
       local: r.local,
       cnpj: r.cnpj,
       disparo_id: r.disparo_id,
+      grupo_id: r.grupo_id,
+      grupo: nomeGrupo.get(r.grupo_id) ?? '—',
       autor: nome(r.criado_por),
       cor: cor(r.criado_por),
       podeEditar: !!u?.admin || r.criado_por === u?.id
@@ -59,7 +67,7 @@ export default async function CalendarioPage({ searchParams }: { searchParams: P
       const supabase = await createClient()
       const { data: d } = await supabase
         .from('disparos')
-        .select('id, cnpj, razao_social, nome_fantasia, lead_nome, lead_whatsapp, telefone')
+        .select('id, cnpj, razao_social, nome_fantasia, lead_nome, lead_whatsapp, telefone, grupo_id')
         .eq('id', disparoId)
         .maybeSingle()
       if (d) {
@@ -68,6 +76,7 @@ export default async function CalendarioPage({ searchParams }: { searchParams: P
           titulo: `Reunião — ${d.nome_fantasia || d.razao_social}`.slice(0, 160),
           cnpj: /^\d{14}$/.test(d.cnpj) ? d.cnpj : null,
           disparo_id: d.id,
+          grupo_id: d.grupo_id,
           descricao: [d.lead_nome && `Contato: ${d.lead_nome}`, `WhatsApp: ${d.lead_whatsapp ?? d.telefone}`].filter(Boolean).join('\n')
         }
       }
@@ -81,10 +90,19 @@ export default async function CalendarioPage({ searchParams }: { searchParams: P
       <header className='max-w-2xl'>
         <span className='rotulo-secao'>Administrativo</span>
         <h1 className='mt-2 font-serif text-[2rem] font-bold leading-tight tracking-[-0.02em] text-marca-800'>Calendário</h1>
-        <p className='text-sm text-slate-500'>As reuniões de toda a equipe num lugar só. Cada um marca e edita as suas; clique num dia para marcar.</p>
+        <p className='text-sm text-slate-500'>
+          As reuniões de cada grupo: você vê as de todos do(s) seu(s) grupo(s) e edita as suas. Clique num dia para marcar.
+        </p>
       </header>
       <div className='grid gap-5 2xl:grid-cols-[1fr_320px]'>
-        <Calendario mes={mes} hoje={hoje} reunioes={reunioes.map(tela)} legenda={legenda} inicial={inicial} base={ROTAS.calendario} />
+        {grupos.length ? (
+          <Calendario mes={mes} hoje={hoje} reunioes={reunioes.map(tela)} legenda={legenda} inicial={inicial} base={ROTAS.calendario} grupos={grupos} grupoAtual={grupoAtual} />
+        ) : (
+          <p className='rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900'>
+            Você ainda não faz parte de nenhum grupo, então não há calendário para mostrar. Peça ao administrador para incluir você
+            em um grupo (Usuários).
+          </p>
+        )}
         <aside className='rounded-2xl border border-slate-200 bg-white p-4 2xl:self-start'>
           <p className='text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500'>Próximas reuniões</p>
           {proximas.length === 0 && <p className='mt-3 text-sm text-slate-400'>Nada marcado.</p>}

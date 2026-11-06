@@ -22,7 +22,8 @@ const Reuniao = z
       .trim()
       .optional()
       .transform(v => (v ? v.replace(/\D/g, '') || null : null)),
-    disparo_id: z.coerce.number().int().positive().optional()
+    disparo_id: z.coerce.number().int().positive().optional(),
+    grupo_id: z.coerce.number().int().positive('Escolha o grupo da reunião.')
   })
   .refine(r => r.hora_fim > r.hora_inicio, { message: 'O fim precisa ser depois do início.' })
 
@@ -31,7 +32,8 @@ const instante = (data: string, hora: string) => new Date(`${data}T${hora}:00-03
 
 async function exigirEquipe() {
   const u = await usuarioAtual()
-  if (!u?.autorizado) throw new Error('Calendário só para a equipe.')
+  // equipe interna ou cliente que faz parte de um grupo; o banco ainda confere se a reunião é de um grupo dele
+  if (!u?.autorizado && !(u?.papel === 'cliente' && u.produtos?.disparos)) throw new Error('Calendário só para quem faz parte de um grupo.')
   return u
 }
 
@@ -48,14 +50,16 @@ export async function salvarReuniao(_: Retorno, fd: FormData): Promise<Retorno> 
     local: r.local,
     descricao: r.descricao,
     cnpj: r.cnpj,
-    disparo_id: r.disparo_id ?? null
+    disparo_id: r.disparo_id ?? null,
+    grupo_id: r.grupo_id
   }
   const supabase = await createClient()
   const { error, count } = r.id
     ? await supabase.from('reunioes').update(linha, { count: 'exact' }).eq('id', r.id)
     : await supabase.from('reunioes').insert(linha, { count: 'exact' })
-  if (error) return { erro: error.message }
+  if (error) return { erro: /row-level security/i.test(error.message) ? 'Você só pode marcar reuniões nos seus grupos.' : error.message }
   if (r.id && !count) return { erro: 'Só quem criou a reunião (ou um admin) pode alterá-la.' }
+  if (!r.id && !count) return { erro: 'Você só pode marcar reuniões nos seus grupos.' }
   revalidatePath(ROTAS.calendario)
   return { ok: true, mensagem: r.id ? 'Reunião atualizada.' : 'Reunião marcada.' }
 }

@@ -67,9 +67,9 @@ export default async function UsuariosPage() {
                   <span className='min-w-[260px] flex-[2] text-xs text-slate-500'>
                     {u.papel === 'equipe' &&
                       (u.ramos.length ? `Ramos: ${u.ramos.map(r => nomeRamo.get(r) ?? r).join(', ')}` : 'Sem ramos — não vê disparos')}
-                    {u.papel === 'cliente' && u.grupos.length > 0 && (
+                    {u.grupos.length > 0 && (
                       <span className='mr-1 font-semibold text-violet-700'>
-                        Disparos: {u.grupos.map(g => gruposDisparo.find(x => x.id === g)?.nome ?? g).join(', ')} ·{' '}
+                        Grupos: {u.grupos.map(g => gruposDisparo.find(x => x.id === g)?.nome ?? g).join(', ')} ·{' '}
                       </span>
                     )}
                     {u.papel === 'cliente' &&
