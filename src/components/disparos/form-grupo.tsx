@@ -180,7 +180,7 @@ export function FormGrupo({ grupo }: { grupo?: GrupoDisparo }) {
             )}
           </div>
         </div>
-        <p className='mt-2 text-[11px] text-slate-400'>Com número da Z-API os botões aparecem; com WAHA vira texto com o link escrito.</p>
+        <p className='mt-2 text-[11px] text-slate-400'>Pela Z-API os botões aparecem no celular. Se a campanha estiver em “Responder por texto”, o link vai escrito escrito.</p>
       </aside>
     </form>
   )

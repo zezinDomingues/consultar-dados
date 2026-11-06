@@ -9,10 +9,11 @@ import { cn } from '@/lib/utils'
 
 const ENTRADA = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-marca-400 focus:ring-4 focus:ring-marca-50'
 
-/** Cadastro/edição de um número (sessão do WAHA). A API key nunca volta para a tela: em branco = mantém. */
+/** Cadastro/edição de um número (instância da Z-API). Tokens nunca voltam para a tela: em branco = mantém. */
 export function FormNumero({ numero, rotuloBotao, grupos }: { numero?: Numero; rotuloBotao?: string; grupos: { id: number; nome: string }[] }) {
   const [aberto, setAberto] = useState(false)
-  const [provedor, setProvedor] = useState<'waha' | 'zapi'>(numero?.provedor ?? 'zapi')
+  // desde 06/11/2026 a OficialCert usa só a Z-API (o WAHA saiu do servidor do escritório)
+  const provedor: 'waha' | 'zapi' = numero?.provedor ?? 'zapi'
   const z = provedor === 'zapi'
   const [estado, acao, salvando] = useActionState<Retorno, FormData>(salvarNumero, {})
 
@@ -43,27 +44,6 @@ export function FormNumero({ numero, rotuloBotao, grupos }: { numero?: Numero; r
     <form action={acao} className={cn('w-full space-y-3 rounded-2xl border border-marca-200 bg-marca-50/40 p-4', numero && 'mt-3')}>
       {numero && <input type='hidden' name='id' value={numero.id} />}
       <input type='hidden' name='provedor' value={provedor} />
-      <div className='grid grid-cols-2 gap-2'>
-        {(
-          [
-            ['zapi', 'Z-API', 'Mostra botões no celular'],
-            ['waha', 'WAHA', 'Só texto e imagem (botões não aparecem)']
-          ] as const
-        ).map(([v, t, nota]) => (
-          <button
-            key={v}
-            type='button'
-            onClick={() => setProvedor(v)}
-            className={cn(
-              'rounded-xl border px-3 py-2 text-left',
-              provedor === v ? 'border-marca-700 bg-white ring-2 ring-marca-100' : 'border-slate-200 bg-white/60 hover:border-marca-300'
-            )}
-          >
-            <span className='block text-sm font-semibold text-slate-800'>{t}</span>
-            <span className='block text-[11px] text-slate-500'>{nota}</span>
-          </button>
-        ))}
-      </div>
       <div className='grid gap-3 sm:grid-cols-2 lg:grid-cols-4'>
         <Campo rotulo='Nome' dica='ex.: OficialCert 01'>
           <input name='rotulo' defaultValue={numero?.rotulo} required maxLength={60} className={ENTRADA} />

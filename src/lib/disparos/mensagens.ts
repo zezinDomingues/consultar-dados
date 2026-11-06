@@ -79,8 +79,8 @@ export const campanhaPadrao = (nome: string, base: string): CampanhaEditavel => 
   nome,
   ordem: 'score',
   excluir_compartilhados: true,
-  // botões do WAHA não aparecem no celular (achado de 05/11): o padrão é texto
-  formato: 'texto',
+  // desde 06/11/2026 só Z-API, onde os botões aparecem: campanha nova já nasce com botões
+  formato: 'botao',
   imagem_url: imagemPadrao(base),
   limite_total: null,
   site_url: base.replace(/\/+$/, ''),

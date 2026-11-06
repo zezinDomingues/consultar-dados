@@ -29,7 +29,7 @@ export default async function NumerosPage() {
         <div className='flex flex-wrap items-center justify-between gap-3'>
           <div>
             <h2 className='font-serif text-xl font-bold text-marca-800'>Números de WhatsApp</h2>
-            <p className='text-xs text-slate-500'>Cada número é uma sessão do WAHA (no plano CORE, uma instância por número).</p>
+            <p className='text-xs text-slate-500'>Cada número é uma instância da Z-API (conectada por QR code), ligada a um grupo.</p>
           </div>
           <FormNumero grupos={opcoesGrupo} />
         </div>
@@ -37,7 +37,7 @@ export default async function NumerosPage() {
         {numeros.length === 0 && (
           <div className='rounded-2xl border border-dashed border-slate-300 bg-white/60 px-6 py-10 text-center text-sm text-slate-500'>
             <Smartphone className='mx-auto mb-2 size-8 text-ouro-escuro' strokeWidth={1.5} />
-            Nenhum número ainda. Veja ao lado como preparar o WAHA e depois clique em <strong>Adicionar número</strong>.
+            Nenhum número ainda. Veja ao lado como criar a instância na Z-API e depois clique em <strong>Adicionar número</strong>.
           </div>
         )}
 
@@ -124,17 +124,15 @@ export default async function NumerosPage() {
           </p>
           <ol className='mt-3 list-decimal space-y-2 pl-4 text-[13px] leading-relaxed text-slate-600'>
             <li>
-              Suba uma instância do WAHA para o número (no CORE, <strong>uma por número</strong>, como a waha2) com motor <strong>NOWEB</strong>
-              e um endereço HTTPS público (túnel do Cloudflare).
+              Na <strong>Z-API</strong>, crie uma instância para o número e conecte pelo <strong>QR code</strong> (WhatsApp → Dispositivos
+              conectados). Aceite os <strong>termos de uso dos botões</strong> na instância.
             </li>
             <li>
-              Pareie pelo <strong>código de 8 dígitos</strong> (<span className='font-mono text-xs'>POST /api/default/auth/request-code</span>) — é mais estável que o QR.
+              Aqui: <strong>Adicionar número</strong> com o grupo, o ID e o token da instância e o Client-Token (Segurança). O teste mostra
+              “Conectado”.
             </li>
             <li>
-              Aqui: <strong>Adicionar número</strong> com a URL e a API key. O teste mostra “Conectado” e o telefone.
-            </li>
-            <li>
-              Clique em <strong>Conectar webhook</strong>: a plataforma aponta o WAHA para cá (com assinatura) e liga o store do NOWEB.
+              Clique em <strong>Conectar webhook</strong>: a plataforma aponta os avisos da Z-API (mensagens, leitura, conexão) para cá.
             </li>
             <li>
               Número novo: comece com <strong>20–30 por dia</strong> e suba aos poucos. Denúncias derrubam o número — mensagem honesta e “SAIR” respeitado

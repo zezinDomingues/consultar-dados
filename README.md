@@ -113,6 +113,12 @@ Ligar um número: instância WAHA (NOWEB, HTTPS público) → parear por código
 Adicionar número** (URL + API key) → **Conectar webhook** (configura HMAC + eventos + store do NOWEB; reinicia a sessão
 ~20 s). Número novo: 20–30 envios/dia e subir aos poucos.
 
+## Provedor de WhatsApp: só Z-API (06/11/2026)
+
+Decisão do usuário: a OficialCert usa só a **Z-API** (botões aparecem no celular). O WAHA da OficialCert foi removido do
+servidor vlm do escritório (o do SmartRanch continua lá). O código do WAHA segue em `src/lib/disparos/waha.ts` (o motor
+despacha por `disparo_numeros.provedor`), mas a tela só cadastra números da Z-API.
+
 ## Grupos de disparo (06/11/2026 · migração 014)
 
 Cada **grupo** é um cliente que contrata a divulgação pelo WhatsApp (a OficialCert é o grupo 1): nome (`{marca}` nas

@@ -199,8 +199,8 @@ export function FormCampanha({
           <div className='grid grid-cols-2 gap-2'>
             {(
               [
-                ['texto', 'Responder por texto', 'Logo + texto; a pessoa responde SIM, 1 ou 2. Funciona no WAHA'],
-                ['botao', 'Com botões', 'Só com provedor que mostre botões (Z-API). No WAHA a mensagem chega invisível']
+                ['texto', 'Responder por texto', 'Logo + texto; a pessoa responde SIM, 1 ou 2 (sem botões)'],
+                ['botao', 'Com botões', 'Logo + texto + botões tocáveis (Z-API)']
               ] as const
             ).map(([f, titulo, nota]) => (
               <button
