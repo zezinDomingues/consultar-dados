@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils'
 const ENTRADA = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-marca-400 focus:ring-4 focus:ring-marca-50'
 
 /** Cadastro/edição de um número (sessão do WAHA). A API key nunca volta para a tela: em branco = mantém. */
-export function FormNumero({ numero, rotuloBotao }: { numero?: Numero; rotuloBotao?: string }) {
+export function FormNumero({ numero, rotuloBotao, grupos }: { numero?: Numero; rotuloBotao?: string; grupos: { id: number; nome: string }[] }) {
   const [aberto, setAberto] = useState(false)
   const [provedor, setProvedor] = useState<'waha' | 'zapi'>(numero?.provedor ?? 'zapi')
   const z = provedor === 'zapi'
@@ -67,6 +67,15 @@ export function FormNumero({ numero, rotuloBotao }: { numero?: Numero; rotuloBot
       <div className='grid gap-3 sm:grid-cols-2 lg:grid-cols-4'>
         <Campo rotulo='Nome' dica='ex.: OficialCert 01'>
           <input name='rotulo' defaultValue={numero?.rotulo} required maxLength={60} className={ENTRADA} />
+        </Campo>
+        <Campo rotulo='Grupo' dica='só envia campanhas deste grupo'>
+          <select name='grupo_id' defaultValue={numero?.grupo_id ?? grupos[0]?.id} required className={ENTRADA}>
+            {grupos.map(g => (
+              <option key={g.id} value={g.id}>
+                {g.nome}
+              </option>
+            ))}
+          </select>
         </Campo>
         {z ? (
           <>

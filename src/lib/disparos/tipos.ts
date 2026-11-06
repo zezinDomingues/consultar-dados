@@ -57,6 +57,7 @@ export type Grupo = keyof typeof GRUPOS
 
 export type Disparo = {
   id: number
+  grupo_id: number
   campanha_id: number
   numero_id: number | null
   cnpj: string
@@ -103,11 +104,49 @@ export type Disparo = {
 
 export type StatusCampanha = 'ativa' | 'pausada' | 'concluida'
 
+/** Fluxo do grupo: coleta (SIM → nome → contato → final, o da OficialCert) ou só divulgação (logo + texto + link). */
+export type FluxoGrupo = 'coleta' | 'divulgacao'
+
+/** Textos que uma campanha nova do grupo já traz. */
+export type ModeloGrupo = Partial<
+  Pick<
+    Campanha,
+    | 'mensagem'
+    | 'rodape'
+    | 'botao_texto'
+    | 'pergunta_nome'
+    | 'pergunta_contato'
+    | 'botao_mesmo_numero'
+    | 'botao_outro_numero'
+    | 'pergunta_telefone'
+    | 'mensagem_obrigado'
+    | 'botao_site_texto'
+    | 'mensagem_nao'
+  >
+>
+
+/** Grupo de disparo = cliente que contrata a divulgação (a OficialCert é o grupo 1). */
+export type GrupoDisparo = {
+  id: number
+  nome: string
+  logo_url: string | null
+  site_url: string | null
+  fluxo: FluxoGrupo
+  medir_cliques: boolean
+  modelo: ModeloGrupo
+  ativo: boolean
+  observacao: string | null
+  criado_em: string
+}
+
 /** Como a 1ª mensagem chega: logo + texto + botão, ou logo + texto pedindo "SIM" (enquete = formato antigo). */
 export type FormatoCampanha = 'botao' | 'texto' | 'enquete'
 
 export type Campanha = {
   id: number
+  grupo_id: number
+  /** carregado junto pelo motor (com `{marca}` já trocado nos textos) */
+  grupo?: GrupoDisparo
   nome: string
   filtros: Filtros
   ordem: Ordem
@@ -159,6 +198,7 @@ export type Numero = {
   rotulo: string
   /** 'waha' (só texto/imagem) ou 'zapi' (botões aparecem) */
   provedor: 'waha' | 'zapi'
+  grupo_id: number
   waha_url: string
   waha_sessao: string
   telefone: string | null

@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { ChevronRight, UserPlus } from 'lucide-react'
 import { FormUsuario } from '@/components/usuarios/form-usuario'
 import { PAPEIS } from '@/lib/usuarios/papeis'
+import { listarGrupos } from '@/lib/disparos/dados'
 import { opcoesFiltros, usuarioAtual } from '@/lib/empresas/consulta'
 import { fmtDataHora, fmtInt, fmtRelativo } from '@/lib/formatar'
 import { ROTAS } from '@/lib/rotas'
@@ -21,7 +22,8 @@ const COR_PAPEL: Record<string, string> = {
 
 export default async function UsuariosPage() {
   if (!(await usuarioAtual())?.admin) redirect(ROTAS.dashboard)
-  const [usuarios, opcoes] = await Promise.all([listarUsuarios(), opcoesFiltros()])
+  const [usuarios, opcoes, gruposDisparo] = await Promise.all([listarUsuarios(), opcoesFiltros(), listarGrupos()])
+  const opcoesGrupos = gruposDisparo.map(g => ({ chave: String(g.id), nome: g.nome, n: g.enviados }))
   const nomeRamo = new Map(opcoes.ramos.map(r => [r.chave, r.nome]))
   const grupos = PAPEIS.map(p => ({ ...p, lista: usuarios.filter(u => u.papel === p.valor) })).filter(g => g.lista.length)
 
@@ -42,7 +44,7 @@ export default async function UsuariosPage() {
           <ChevronRight className='ml-auto size-4 text-slate-400 transition group-open:rotate-90' />
         </summary>
         <div className='mt-4'>
-          <FormUsuario ramos={opcoes.ramos} ufs={opcoes.ufs} />
+          <FormUsuario ramos={opcoes.ramos} ufs={opcoes.ufs} grupos={opcoesGrupos} />
         </div>
       </details>
 
@@ -65,6 +67,11 @@ export default async function UsuariosPage() {
                   <span className='min-w-[260px] flex-[2] text-xs text-slate-500'>
                     {u.papel === 'equipe' &&
                       (u.ramos.length ? `Ramos: ${u.ramos.map(r => nomeRamo.get(r) ?? r).join(', ')}` : 'Sem ramos — não vê disparos')}
+                    {u.papel === 'cliente' && u.grupos.length > 0 && (
+                      <span className='mr-1 font-semibold text-violet-700'>
+                        Disparos: {u.grupos.map(g => gruposDisparo.find(x => x.id === g)?.nome ?? g).join(', ')} ·{' '}
+                      </span>
+                    )}
                     {u.papel === 'cliente' &&
                       (u.plano ? (
                         <>
@@ -76,7 +83,7 @@ export default async function UsuariosPage() {
                           {u.plano.vencido && <strong className='text-red-600'> · vencido</strong>}
                         </>
                       ) : (
-                        <strong className='text-red-600'>sem plano</strong>
+                        !u.grupos.length && <strong className='text-red-600'>sem produto</strong>
                       ))}
                   </span>
                   <span className='text-xs text-slate-400' title={u.ultimo_acesso ? fmtDataHora(u.ultimo_acesso) : ''}>

@@ -3,7 +3,7 @@
 // (intervalo_min_s … intervalo_max_s) e respeita o limite diário. Tudo pela chave secreta (sem usuário logado).
 import 'server-only'
 import { supabaseAdmin } from '@/lib/supabase/admin'
-import { dentroDaJanela, inicioDoDiaBrasilia } from './config'
+import { dentroDaJanela, inicioDoDiaBrasilia, urlApp } from './config'
 import { fmtCnpj, fmtFone, montar, nomeEmpresa, primeiroNome, RESPOSTAS, saudacao } from './mensagens'
 import type { Campanha, Disparo, EventoDisparo, NumeroComChave } from './tipos'
 import {
@@ -45,10 +45,25 @@ export async function carregarNumero(id: number) {
   return data as NumeroComChave | null
 }
 
+const TEXTOS_CAMPANHA = [
+  'mensagem', 'rodape', 'botao_texto', 'pergunta_nome', 'pergunta_contato', 'pergunta_telefone', 'mensagem_obrigado',
+  'mensagem_nao', 'mensagem_sim', 'enquete_pergunta', 'botao_site_texto'
+] as const
+
+/** Campanha + grupo, com `{marca}` já trocado pelo nome do grupo em todos os textos. */
 export async function carregarCampanha(id: number) {
-  const { data, error } = await supabaseAdmin().from('disparo_campanhas').select('*').eq('id', id).single()
+  const { data, error } = await supabaseAdmin().from('disparo_campanhas').select('*, grupo:disparo_grupos(*)').eq('id', id).single()
   if (error) throw new Error(`campanha ${id}: ${error.message}`)
-  return data as Campanha
+  const c = data as Campanha
+  const marca = c.grupo?.nome ?? 'OficialCert'
+  const r = c as unknown as Record<string, unknown>
+  for (const k of TEXTOS_CAMPANHA) if (typeof r[k] === 'string') r[k] = (r[k] as string).replaceAll('{marca}', marca)
+  return c
+}
+
+/** Link da divulgação: passa por /r/<token> (conta o clique) ou vai direto ao site. */
+export function linkDivulgacao(c: Campanha, d: Pick<Disparo, 'token'>) {
+  return c.grupo?.medir_cliques ? `${urlApp()}/r/${d.token}` : c.site_url
 }
 
 type NovoEvento = Omit<EventoDisparo, 'id' | 'criado_em' | 'texto' | 'wa_id' | 'dados' | 'autor' | 'direcao' | 'numero_id'> &
@@ -113,8 +128,14 @@ export const descrever = (m: MensagemRica) =>
     .join('\n')
 
 /** 1ª mensagem da campanha, já montada para a empresa. */
-export function primeiraMensagem(c: Campanha, d: Pick<Disparo, 'razao_social' | 'nome_fantasia' | 'municipio'>): MensagemRica {
+export function primeiraMensagem(c: Campanha, d: Pick<Disparo, 'razao_social' | 'nome_fantasia' | 'municipio' | 'token'>): MensagemRica {
   const texto = montar(c.mensagem, { empresa: nomeEmpresa(d), saudacao: saudacao(), municipio: d.municipio ?? '' })
+  if (c.grupo?.fluxo === 'divulgacao') {
+    // só divulgação: logo + texto + link (botão de link na Z-API; link escrito no WAHA)
+    const link = linkDivulgacao(c, d)
+    if (c.formato === 'botao') return { imagem: c.imagem_url, texto, rodape: c.rodape, botoes: [{ tipo: 'link', texto: c.botao_site_texto, url: link }] }
+    return { imagem: c.imagem_url, texto: `${texto}\n\n👉 ${link}`, rodape: c.rodape }
+  }
   if (c.formato === 'botao') {
     return { imagem: c.imagem_url, texto, rodape: c.rodape, botoes: [{ tipo: 'resposta', texto: c.botao_texto }] }
   }

@@ -2,12 +2,13 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Megaphone, Smartphone } from 'lucide-react'
+import { Building, LayoutDashboard, Megaphone, Smartphone } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ROTAS } from '@/lib/rotas'
 
 const ABAS = [
   { href: ROTAS.disparos, rotulo: 'Painel', icone: LayoutDashboard, ativa: (p: string) => p === ROTAS.disparos || /^\/dashboard\/disparos\/\d+/.test(p) },
+  { href: ROTAS.grupos, rotulo: 'Grupos', icone: Building, ativa: (p: string) => p.startsWith(ROTAS.grupos) },
   { href: ROTAS.campanhas, rotulo: 'Campanhas', icone: Megaphone, ativa: (p: string) => p.startsWith(ROTAS.campanhas) },
   { href: ROTAS.numeros, rotulo: 'Números e regras', icone: Smartphone, ativa: (p: string) => p.startsWith(ROTAS.numeros) }
 ]

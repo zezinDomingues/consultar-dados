@@ -29,6 +29,7 @@ const url = (nome: string) => z.string().trim().url(`${nome}: endereço inválid
 
 const CampanhaSchema = z.object({
   id: z.coerce.number().int().positive().optional(),
+  grupo_id: z.coerce.number().int().positive('Escolha o grupo.'),
   nome: texto(120, 'Nome'),
   filtros: z.string().transform((s, ctx) => {
     try {
@@ -71,7 +72,7 @@ const CampanhaSchema = z.object({
 })
 
 const CAMPOS = [
-  'id', 'nome', 'filtros', 'ordem', 'formato', 'imagem_url', 'mensagem', 'rodape', 'botao_texto', 'pergunta_nome',
+  'id', 'grupo_id', 'nome', 'filtros', 'ordem', 'formato', 'imagem_url', 'mensagem', 'rodape', 'botao_texto', 'pergunta_nome',
   'pergunta_contato', 'botao_mesmo_numero', 'botao_outro_numero', 'pergunta_telefone', 'mensagem_obrigado', 'botao_site_texto', 'site_url', 'mensagem_nao', 'limite_total'
 ]
 
@@ -159,7 +160,7 @@ export async function enviarTeste(_: Retorno, fd: FormData): Promise<Retorno> {
   const db = supabaseAdmin()
   try {
     // um número que já está no livro de verdade não pode virar teste (a regra "nunca duas vezes" vale para ele)
-    const { data: existente } = await db.from('disparos').select('id, teste').eq('telefone', telefone).maybeSingle()
+    const { data: existente } = await db.from('disparos').select('id, teste').eq('grupo_id', c.grupo_id).eq('telefone', telefone).maybeSingle()
     if (existente && !existente.teste) return { erro: 'Esse telefone já recebeu um disparo de verdade; use outro para testar.' }
     if (existente) {
       await db.from('disparo_bloqueios').delete().eq('telefone', telefone).eq('observacao', `disparo #${existente.id}`)
@@ -171,6 +172,7 @@ export async function enviarTeste(_: Retorno, fd: FormData): Promise<Retorno> {
     const { data: d, error } = await db
       .from('disparos')
       .insert({
+        grupo_id: c.grupo_id,
         campanha_id: id,
         numero_id: numeroId,
         cnpj: `TESTE-${telefone}`,
@@ -188,6 +190,7 @@ export async function enviarTeste(_: Retorno, fd: FormData): Promise<Retorno> {
     if (error) return { erro: error.message }
     const n = await carregarNumero(numeroId)
     if (!n) return { erro: 'Número não encontrado.' }
+    if (n.grupo_id !== c.grupo_id) return { erro: 'Esse número é de outro grupo.' }
     const r = await enviarPrimeiraDeTeste(d as Disparo, n)
     atualizarTelas()
     if (r.resultado !== 'enviado') return { erro: `Teste não saiu: ${r.resultado}` }
@@ -208,6 +211,7 @@ const NumeroSchema = z
   .object({
     id: z.coerce.number().int().positive().optional(),
     rotulo: texto(60, 'Nome'),
+    grupo_id: z.coerce.number().int().positive('Escolha o grupo do número.'),
     provedor: z.enum(['waha', 'zapi']).default('waha'),
     waha_url: z.string().trim().url('URL do WAHA inválida (ex.: https://waha3.mindloop.com.br).').transform(u => u.replace(/\/+$/, '')),
     waha_sessao: z.string().trim().min(1, 'Informe a sessão (WAHA) ou o ID da instância (Z-API).').max(80).default('default'),
@@ -222,7 +226,7 @@ const NumeroSchema = z
 
 export async function salvarNumero(_: Retorno, fd: FormData): Promise<Retorno> {
   await exigirAdmin()
-  const campos = ['id', 'rotulo', 'provedor', 'waha_url', 'waha_sessao', 'waha_api_key', 'client_token', 'limite_diario', 'intervalo_min_s', 'intervalo_max_s']
+  const campos = ['id', 'rotulo', 'grupo_id', 'provedor', 'waha_url', 'waha_sessao', 'waha_api_key', 'client_token', 'limite_diario', 'intervalo_min_s', 'intervalo_max_s']
   const obj: Record<string, unknown> = Object.fromEntries(campos.map(k => [k, fd.get(k) ?? undefined]).filter(([, v]) => v !== '' && v !== undefined))
   if (obj.provedor === 'zapi') obj.waha_url = 'https://api.z-api.io' // na Z-API o endereço é fixo
   const p = NumeroSchema.safeParse({ ...obj, ativo: fd.get('ativo') === 'on' ? true : '' })
@@ -389,17 +393,18 @@ export async function bloquearTelefone(_: Retorno, fd: FormData): Promise<Retorn
   const telefone = normalizarFone(String(fd.get('telefone') ?? ''))
   if (!telefone) return { erro: 'Telefone inválido (DDD + número).' }
   const observacao = String(fd.get('observacao') ?? '').trim().slice(0, 200) || null
+  const grupo = Number(fd.get('grupo_id')) || null
   const supabase = await createClient()
-  const { error } = await supabase.from('disparo_bloqueios').upsert({ telefone, motivo: 'manual', observacao }, { onConflict: 'telefone', ignoreDuplicates: true })
-  if (error) return { erro: error.message }
+  const { error } = await supabase.from('disparo_bloqueios').insert({ telefone, grupo_id: grupo, motivo: 'manual', observacao })
+  if (error && error.code !== '23505') return { erro: error.message }
   atualizarTelas()
   return { ok: true, mensagem: `${telefone} nunca será contatado.` }
 }
 
-export async function desbloquearTelefone(telefone: string): Promise<Retorno> {
+export async function desbloquearTelefone(id: number): Promise<Retorno> {
   await exigirAdmin()
   const supabase = await createClient()
-  const { error } = await supabase.from('disparo_bloqueios').delete().eq('telefone', telefone).eq('motivo', 'manual')
+  const { error } = await supabase.from('disparo_bloqueios').delete().eq('id', id).eq('motivo', 'manual')
   if (error) return { erro: error.message }
   atualizarTelas()
   return { ok: true, mensagem: 'Bloqueio removido.' }

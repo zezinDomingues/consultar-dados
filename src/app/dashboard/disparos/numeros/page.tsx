@@ -10,7 +10,7 @@ import { FormRegras } from '@/components/disparos/form-regras'
 import { SeloSessao } from '@/components/disparos/selos'
 import { alternarNumero, conectarWebhook, desbloquearTelefone, excluirNumero, pausarTudo, testarNumero } from '@/app/dashboard/disparos/actions'
 import { urlWebhook } from '@/lib/disparos/config'
-import { lerConfig, listarBloqueios, listarNumeros } from '@/lib/disparos/dados'
+import { lerConfig, listarBloqueios, listarGrupos, listarNumeros } from '@/lib/disparos/dados'
 import { fmtFone } from '@/lib/disparos/mensagens'
 import { fmtDataHora, fmtInt, fmtRelativo } from '@/lib/formatar'
 import { cn } from '@/lib/utils'
@@ -19,7 +19,9 @@ export const metadata: Metadata = { title: 'Números e regras' }
 
 export default async function NumerosPage() {
   if (!(await usuarioAtual())?.admin) redirect(ROTAS.disparos)
-  const [numeros, cfg, bloqueios] = await Promise.all([listarNumeros(), lerConfig(), listarBloqueios()])
+  const [numeros, cfg, bloqueios, grupos] = await Promise.all([listarNumeros(), lerConfig(), listarBloqueios(), listarGrupos()])
+  const nomeGrupo = new Map(grupos.map(g => [g.id, g.nome]))
+  const opcoesGrupo = grupos.map(g => ({ id: g.id, nome: g.nome }))
 
   return (
     <div className='grid gap-5 xl:grid-cols-[1.6fr_1fr]'>
@@ -29,7 +31,7 @@ export default async function NumerosPage() {
             <h2 className='font-serif text-xl font-bold text-marca-800'>Números de WhatsApp</h2>
             <p className='text-xs text-slate-500'>Cada número é uma sessão do WAHA (no plano CORE, uma instância por número).</p>
           </div>
-          <FormNumero />
+          <FormNumero grupos={opcoesGrupo} />
         </div>
 
         {numeros.length === 0 && (
@@ -45,6 +47,7 @@ export default async function NumerosPage() {
               <div className='min-w-0'>
                 <div className='flex flex-wrap items-center gap-2'>
                   <h3 className='font-semibold text-slate-800'>{n.rotulo}</h3>
+                  <span className='rounded-full bg-marca-50 px-2 py-0.5 text-[11px] font-semibold text-marca-800'>{nomeGrupo.get(n.grupo_id) ?? 'grupo ?'}</span>
                   <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-semibold', n.provedor === 'zapi' ? 'bg-emerald-50 text-emerald-800' : 'bg-slate-100 text-slate-600')}>
                     {n.provedor === 'zapi' ? 'Z-API · botões' : 'WAHA · texto'}
                   </span>
@@ -71,7 +74,7 @@ export default async function NumerosPage() {
                 <BotaoAcao acao={alternarNumero.bind(null, n.id, !n.ativo)}>
                   {n.ativo ? <PauseCircle className='size-3.5' /> : <PlayCircle className='size-3.5' />} {n.ativo ? 'Pausar' : 'Ativar'}
                 </BotaoAcao>
-                <FormNumero numero={n} />
+                <FormNumero numero={n} grupos={opcoesGrupo} />
                 {!n.ultimo_envio_em && (
                   <BotaoAcao acao={excluirNumero.bind(null, n.id)} variante='texto' confirmar={`Excluir ${n.rotulo}?`} titulo='Excluir'>
                     <Trash2 className='size-3.5' />
@@ -146,18 +149,18 @@ export default async function NumerosPage() {
           </p>
           <p className='mt-1 text-xs text-slate-400'>Clientes, parceiros, números da equipe. Quem pede para sair entra aqui sozinho.</p>
           <div className='mt-3'>
-            <FormBloqueio />
+            <FormBloqueio grupos={opcoesGrupo} />
           </div>
           {bloqueios.length > 0 && (
             <ul className='mt-3 max-h-72 divide-y divide-slate-100 overflow-y-auto text-xs'>
               {bloqueios.map(b => (
-                <li key={b.telefone} className='flex items-center gap-2 py-2'>
+                <li key={b.id} className='flex items-center gap-2 py-2'>
                   <span className='font-medium tabular-nums text-slate-700'>{fmtFone(b.telefone)}</span>
                   <span className='min-w-0 flex-1 truncate text-slate-400'>
-                    {b.motivo === 'manual' ? b.observacao || 'manual' : b.motivo}
+                    {b.motivo === 'manual' ? b.observacao || 'manual' : b.motivo} · {b.grupo_id ? nomeGrupo.get(b.grupo_id) : 'todos os grupos'}
                   </span>
                   {b.motivo === 'manual' && (
-                    <BotaoAcao acao={desbloquearTelefone.bind(null, b.telefone)} variante='texto' titulo='Remover bloqueio'>
+                    <BotaoAcao acao={desbloquearTelefone.bind(null, b.id)} variante='texto' titulo='Remover bloqueio'>
                       <Trash2 className='size-3.5' />
                     </BotaoAcao>
                   )}

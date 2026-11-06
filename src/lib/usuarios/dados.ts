@@ -29,6 +29,7 @@ export type Usuario = {
   ramos: string[] // equipe
   plano: (SaldoCliente & { cota_mensal: number | null; observacao: string | null }) | null // cliente
   pacotes: { id: number; quantidade: number; observacao: string | null; criado_em: string }[]
+  grupos: number[] // grupos de disparo (cliente do produto Disparos)
 }
 
 async function ultimosAcessos() {
@@ -45,12 +46,13 @@ async function ultimosAcessos() {
 export async function listarUsuarios(): Promise<Usuario[]> {
   await exigirAdmin()
   const db = supabaseAdmin()
-  const [{ data: usuarios }, { data: ramos }, { data: acessos }, { data: pacotes }, acessosAuth] = await Promise.all([
+  const [{ data: usuarios }, { data: ramos }, { data: acessos }, { data: pacotes }, acessosAuth, { data: membros }] = await Promise.all([
     db.from('app_usuarios').select('*').order('criado_em'),
     db.from('equipe_ramos').select('*'),
     db.from('clientes_acesso').select('*'),
     db.from('clientes_pacotes').select('*').order('criado_em'),
-    ultimosAcessos()
+    ultimosAcessos(),
+    db.from('grupo_membros').select('*')
   ])
   const supabase = await createClient() // cliente_saldo(p_user) confere que quem pede é admin
   const clientes = ((usuarios ?? []) as { user_id: string; papel: string }[]).filter(u => u.papel === 'cliente')
@@ -59,7 +61,7 @@ export async function listarUsuarios(): Promise<Usuario[]> {
       clientes.map(async u => [u.user_id, (await supabase.rpc('cliente_saldo', { p_user: u.user_id })).data as SaldoCliente | null] as const)
     )
   )
-  return ((usuarios ?? []) as Omit<Usuario, 'ramos' | 'plano' | 'pacotes' | 'ultimo_acesso'>[]).map(u => {
+  return ((usuarios ?? []) as Omit<Usuario, 'ramos' | 'plano' | 'pacotes' | 'ultimo_acesso' | 'grupos'>[]).map(u => {
     const acesso = ((acessos ?? []) as { user_id: string; cota_mensal: number | null; observacao: string | null }[]).find(a => a.user_id === u.user_id)
     const saldo = saldos.get(u.user_id)
     return {
@@ -67,7 +69,8 @@ export async function listarUsuarios(): Promise<Usuario[]> {
       ultimo_acesso: acessosAuth.get(u.user_id) ?? null,
       ramos: ((ramos ?? []) as { user_id: string; ramo: string }[]).filter(r => r.user_id === u.user_id).map(r => r.ramo).sort(),
       plano: acesso && saldo ? { ...saldo, cota_mensal: acesso.cota_mensal, observacao: acesso.observacao } : null,
-      pacotes: ((pacotes ?? []) as (Usuario['pacotes'][number] & { user_id: string })[]).filter(p => p.user_id === u.user_id)
+      pacotes: ((pacotes ?? []) as (Usuario['pacotes'][number] & { user_id: string })[]).filter(p => p.user_id === u.user_id),
+      grupos: ((membros ?? []) as { user_id: string; grupo_id: number }[]).filter(m => m.user_id === u.user_id).map(m => m.grupo_id)
     }
   })
 }

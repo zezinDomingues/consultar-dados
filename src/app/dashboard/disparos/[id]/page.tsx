@@ -8,6 +8,7 @@ import { SeloStatus } from '@/components/disparos/selos'
 import { marcarComoVisto } from '@/app/dashboard/disparos/actions'
 import { linkFormulario } from '@/lib/disparos/config'
 import { obterDisparo } from '@/lib/disparos/dados'
+import { usuarioAtual } from '@/lib/empresas/consulta'
 import { fmtCnpj, fmtFone } from '@/lib/disparos/mensagens'
 import type { EventoDisparo } from '@/lib/disparos/tipos'
 import { fmtDataHora } from '@/lib/formatar'
@@ -22,6 +23,7 @@ export default async function DisparoPage({ params }: { params: Promise<{ id: st
   const r = await obterDisparo(id)
   if (!r) notFound()
   const { disparo: d, eventos, campanha, numero } = r
+  const interno = (await usuarioAtual())?.autorizado === true // cliente do grupo não tem ficha da base nem calendário
 
   const marcos = [
     { rotulo: 'Na fila', em: d.criado_em },
@@ -33,7 +35,12 @@ export default async function DisparoPage({ params }: { params: Promise<{ id: st
     { rotulo: 'Enviou nome e contato', em: d.preenchido_em }
   ]
 
-  const ETAPAS: Record<string, string> = { nome: 'Esperando o nome completo', contato: 'Esperando a escolha do número de contato', telefone: 'Esperando o outro número', cnpj: 'Esperando o CNPJ' }
+  const ETAPAS: Record<string, string> = {
+    nome: 'Esperando o nome completo',
+    contato: 'Esperando a escolha do número de contato',
+    telefone: 'Esperando o outro número',
+    cnpj: 'Esperando o CNPJ'
+  }
   const etapaAberta = d.etapa ? ETAPAS[d.etapa] : null
 
   const bloqueioResposta =
@@ -45,7 +52,10 @@ export default async function DisparoPage({ params }: { params: Promise<{ id: st
 
   return (
     <div className='space-y-5'>
-      <Link href={ROTAS.disparos} className='inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-marca-700'>
+      <Link
+        href={ROTAS.disparos}
+        className='inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-marca-700'
+      >
         <ArrowLeft className='size-3.5' /> Voltar ao painel
       </Link>
 
@@ -55,14 +65,20 @@ export default async function DisparoPage({ params }: { params: Promise<{ id: st
           <div className='rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-marca-900/[0.03]'>
             <div className='flex flex-wrap items-start justify-between gap-3'>
               <div className='min-w-0'>
-                <h2 className='font-serif text-2xl font-bold leading-tight text-marca-800'>{d.nome_fantasia || d.razao_social}</h2>
+                <h2 className='font-serif text-2xl font-bold leading-tight text-marca-800'>
+                  {d.nome_fantasia || d.razao_social}
+                </h2>
                 {d.nome_fantasia && <p className='text-sm text-slate-500'>{d.razao_social}</p>}
                 <p className='mt-1 text-xs text-slate-400'>
                   CNPJ {fmtCnpj(d.cnpj)} · {d.municipio}
                 </p>
               </div>
               <div className='flex items-center gap-1.5'>
-                {d.teste && <span className='rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-semibold text-violet-800'>teste</span>}
+                {d.teste && (
+                  <span className='rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-semibold text-violet-800'>
+                    teste
+                  </span>
+                )}
                 <SeloStatus status={d.status} className='text-xs' />
               </div>
             </div>
@@ -74,42 +90,63 @@ export default async function DisparoPage({ params }: { params: Promise<{ id: st
               <div>
                 <dt className='text-[11px] uppercase tracking-wide text-slate-400'>Campanha</dt>
                 <dd className='truncate font-medium text-slate-700'>
-                  {campanha ? <Link href={ROTAS.campanha(campanha.id)} className='hover:text-marca-700 hover:underline'>{campanha.nome}</Link> : '—'}
+                  {campanha ? (
+                    <Link href={ROTAS.campanha(campanha.id)} className='hover:text-marca-700 hover:underline'>
+                      {campanha.nome}
+                    </Link>
+                  ) : (
+                    '—'
+                  )}
                 </dd>
               </div>
               <div>
                 <dt className='text-[11px] uppercase tracking-wide text-slate-400'>Enviado por</dt>
-                <dd className='font-medium text-slate-700'>{numero ? `${numero.rotulo}${numero.telefone ? ` · ${fmtFone(numero.telefone)}` : ''}` : '—'}</dd>
+                <dd className='font-medium text-slate-700'>
+                  {numero ? `${numero.rotulo}${numero.telefone ? ` · ${fmtFone(numero.telefone)}` : ''}` : '—'}
+                </dd>
               </div>
               <div>
                 <dt className='text-[11px] uppercase tracking-wide text-slate-400'>Formulário</dt>
                 <dd>
-                  <a href={linkFormulario(d.token)} target='_blank' rel='noreferrer' className='inline-flex items-center gap-1 font-medium text-marca-700 hover:underline'>
+                  <a
+                    href={linkFormulario(d.token)}
+                    target='_blank'
+                    rel='noreferrer'
+                    className='inline-flex items-center gap-1 font-medium text-marca-700 hover:underline'
+                  >
                     abrir <ExternalLink className='size-3' />
                   </a>
                 </dd>
               </div>
             </dl>
             <div className='mt-4 flex flex-wrap gap-2'>
-              <Link
-                href={ROTAS.empresa(d.cnpj)}
-                className='inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-700 hover:border-marca-300 hover:text-marca-800'
-              >
-                <Building2 className='size-3.5' /> Ficha da empresa
-              </Link>
-              <Link
-                href={`${ROTAS.calendario}?nova=1&disparo=${d.id}`}
-                className='inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-700 hover:border-marca-300 hover:text-marca-800'
-              >
-                <CalendarPlus className='size-3.5' /> Agendar reunião
-              </Link>
+              {interno && (
+                <Link
+                  href={ROTAS.empresa(d.cnpj)}
+                  className='inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-700 hover:border-marca-300 hover:text-marca-800'
+                >
+                  <Building2 className='size-3.5' /> Ficha da empresa
+                </Link>
+              )}
+              {interno && (
+                <Link
+                  href={`${ROTAS.calendario}?nova=1&disparo=${d.id}`}
+                  className='inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-700 hover:border-marca-300 hover:text-marca-800'
+                >
+                  <CalendarPlus className='size-3.5' /> Agendar reunião
+                </Link>
+              )}
               {d.atencao && (
                 <BotaoAcao acao={marcarComoVisto.bind(null, d.id)} variante='primario'>
                   <BellRing className='size-3.5' /> Marcar como visto
                 </BotaoAcao>
               )}
             </div>
-            {etapaAberta && <p className='mt-4 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800'>Robô: {etapaAberta.toLowerCase()}…</p>}
+            {etapaAberta && (
+              <p className='mt-4 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800'>
+                Robô: {etapaAberta.toLowerCase()}…
+              </p>
+            )}
             {d.erro && <p className='mt-4 rounded-xl bg-red-50 px-3 py-2 text-xs text-red-700'>{d.erro}</p>}
           </div>
 
@@ -120,9 +157,20 @@ export default async function DisparoPage({ params }: { params: Promise<{ id: st
               </p>
               <dl className='mt-3 grid gap-3 text-sm sm:grid-cols-2'>
                 <Campo rotulo='Nome completo' valor={d.lead_nome} />
-                {d.lead_cnpj && <Campo rotulo='CNPJ informado' valor={fmtCnpj(d.lead_cnpj)} link={ROTAS.empresa(d.lead_cnpj)} interno />}
+                {d.lead_cnpj && (
+                  <Campo
+                    rotulo='CNPJ informado'
+                    valor={fmtCnpj(d.lead_cnpj)}
+                    link={ROTAS.empresa(d.lead_cnpj)}
+                    interno
+                  />
+                )}
                 <Campo
-                  rotulo={d.lead_whatsapp && d.lead_whatsapp !== d.telefone ? 'Número de contato (informado)' : 'Número de contato (o mesmo)'}
+                  rotulo={
+                    d.lead_whatsapp && d.lead_whatsapp !== d.telefone
+                      ? 'Número de contato (informado)'
+                      : 'Número de contato (o mesmo)'
+                  }
                   valor={fmtFone(d.lead_whatsapp ?? d.telefone)}
                   link={`https://wa.me/55${d.lead_whatsapp ?? d.telefone}`}
                 />
@@ -138,7 +186,12 @@ export default async function DisparoPage({ params }: { params: Promise<{ id: st
             <ol className='mt-3 space-y-2'>
               {marcos.map(m => (
                 <li key={m.rotulo} className='flex items-center gap-3 text-sm'>
-                  <span className={cn('size-2.5 shrink-0 rounded-full', m.em ? 'bg-marca-700' : 'border border-slate-300 bg-white')} />
+                  <span
+                    className={cn(
+                      'size-2.5 shrink-0 rounded-full',
+                      m.em ? 'bg-marca-700' : 'border border-slate-300 bg-white'
+                    )}
+                  />
                   <span className={cn('flex-1', m.em ? 'text-slate-700' : 'text-slate-400')}>{m.rotulo}</span>
                   <span className='text-xs tabular-nums text-slate-400'>{m.em ? fmtDataHora(m.em) : '—'}</span>
                 </li>
@@ -146,7 +199,9 @@ export default async function DisparoPage({ params }: { params: Promise<{ id: st
               {d.encerrado_em && (
                 <li className='flex items-center gap-3 text-sm'>
                   <span className='size-2.5 shrink-0 rounded-full bg-rose-500' />
-                  <span className='flex-1 text-slate-700'>{d.status === 'descadastrado' ? 'Pediu para sair' : 'Sem interesse'}</span>
+                  <span className='flex-1 text-slate-700'>
+                    {d.status === 'descadastrado' ? 'Pediu para sair' : 'Sem interesse'}
+                  </span>
                   <span className='text-xs tabular-nums text-slate-400'>{fmtDataHora(d.encerrado_em)}</span>
                 </li>
               )}
@@ -176,7 +231,17 @@ export default async function DisparoPage({ params }: { params: Promise<{ id: st
   )
 }
 
-function Campo({ rotulo, valor, link, interno }: { rotulo: string; valor: string | null; link?: string; interno?: boolean }) {
+function Campo({
+  rotulo,
+  valor,
+  link,
+  interno
+}: {
+  rotulo: string
+  valor: string | null
+  link?: string
+  interno?: boolean
+}) {
   return (
     <div className='min-w-0'>
       <dt className='text-[11px] uppercase tracking-wide text-slate-400'>{rotulo}</dt>
@@ -219,8 +284,22 @@ function Balao({ e }: { e: EventoDisparo }) {
     )
   }
   const cor =
-    e.tipo === 'voto' ? 'bg-amber-50 text-amber-900' : e.tipo === 'formulario' ? 'bg-emerald-50 text-emerald-900' : e.tipo === 'erro' ? 'bg-red-50 text-red-800' : 'bg-white/70 text-slate-500'
-  const titulo = { voto: '📊 Votou na enquete', formulario: '📝 Preencheu o formulário', link: '🔗', status: '•', erro: '⚠️', nota: '•' }[e.tipo] ?? '•'
+    e.tipo === 'voto'
+      ? 'bg-amber-50 text-amber-900'
+      : e.tipo === 'formulario'
+        ? 'bg-emerald-50 text-emerald-900'
+        : e.tipo === 'erro'
+          ? 'bg-red-50 text-red-800'
+          : 'bg-white/70 text-slate-500'
+  const titulo =
+    {
+      voto: '📊 Votou na enquete',
+      formulario: '📝 Preencheu o formulário',
+      link: '🔗',
+      status: '•',
+      erro: '⚠️',
+      nota: '•'
+    }[e.tipo] ?? '•'
   return (
     <div className='flex justify-center'>
       <p className={cn('max-w-[90%] rounded-full px-3 py-1 text-center text-[11.5px]', cor)}>

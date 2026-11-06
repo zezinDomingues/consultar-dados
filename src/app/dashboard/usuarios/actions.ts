@@ -42,6 +42,8 @@ const ler = (fd: FormData) => {
     papel: v('papel'),
     ativo: fd.get('ativo') === 'on',
     ramos: fd.getAll('ramos').map(String),
+    temConsulta: fd.get('tem_consulta') === 'on',
+    grupos: fd.getAll('grupos').map(Number).filter(n => Number.isInteger(n) && n > 0),
     plano: {
       ramos: fd.getAll('ramos').map(String),
       ufs: fd.getAll('ufs').map(String),
@@ -68,7 +70,12 @@ async function gravarExtras(userId: string, papel: (typeof PAPEIS)[number], dado
       if (error) return error.message
     }
   }
-  if (papel === 'cliente') {
+  await db.from('grupo_membros').delete().eq('user_id', userId)
+  if (papel === 'cliente' && dados.grupos.length) {
+    const { error } = await db.from('grupo_membros').insert(dados.grupos.map(grupo_id => ({ user_id: userId, grupo_id })))
+    if (error) return error.message
+  }
+  if (papel === 'cliente' && dados.temConsulta) {
     const p = Plano.safeParse(dados.plano)
     if (!p.success) return p.error.issues[0]?.message ?? 'Plano inválido.'
     const { error } = await db.from('clientes_acesso').upsert({
@@ -87,7 +94,8 @@ async function gravarExtras(userId: string, papel: (typeof PAPEIS)[number], dado
       if (e2) return e2.message
     }
   } else {
-    await db.from('clientes_acesso').delete().eq('user_id', userId) // deixou de ser cliente: plano sai (liberações ficam no histórico)
+    // sem o produto Consulta (ou deixou de ser cliente): o plano sai; as liberações ficam no histórico
+    await db.from('clientes_acesso').delete().eq('user_id', userId)
   }
   return null
 }
@@ -106,8 +114,11 @@ export async function criarUsuario(_: Retorno, fd: FormData): Promise<Retorno> {
     .safeParse(d)
   if (!base.success) return { erro: base.error.issues[0]?.message ?? 'Dados inválidos.' }
   if (base.data.papel === 'cliente') {
-    const p = Plano.safeParse(d.plano)
-    if (!p.success) return { erro: p.error.issues[0]?.message ?? 'Plano inválido.' }
+    if (!d.temConsulta && !d.grupos.length) return { erro: 'Escolha pelo menos um produto para o cliente: Consulta de dados ou um grupo de Disparos.' }
+    if (d.temConsulta) {
+      const p = Plano.safeParse(d.plano)
+      if (!p.success) return { erro: p.error.issues[0]?.message ?? 'Plano inválido.' }
+    }
   }
   const senha = base.data.senha ?? senhaProvisoria()
   const db = supabaseAdmin()
@@ -136,6 +147,7 @@ export async function atualizarUsuario(_: Retorno, fd: FormData): Promise<Retorn
   const p = z.object({ nome: z.string().trim().min(2).max(120), papel: z.enum(PAPEIS) }).safeParse(d)
   if (!p.success) return { erro: p.error.issues[0]?.message ?? 'Dados inválidos.' }
   if (id === eu.id && (p.data.papel !== 'admin' || !d.ativo)) return { erro: 'Você não pode tirar o seu próprio acesso de admin.' }
+  if (p.data.papel === 'cliente' && !d.temConsulta && !d.grupos.length) return { erro: 'Escolha pelo menos um produto para o cliente.' }
   const db = supabaseAdmin()
   const { error } = await db.from('app_usuarios').update({ nome: p.data.nome, papel: p.data.papel, ativo: d.ativo }).eq('user_id', id)
   if (error) return { erro: error.message }

@@ -11,7 +11,8 @@ export const metadata: Metadata = { title: { default: 'Disparos', template: '%s 
 
 export default async function DisparosLayout({ children }: { children: React.ReactNode }) {
   const u = await usuarioAtual()
-  if (u?.papel !== 'admin' && u?.papel !== 'equipe') {
+  const cliente = u?.papel === 'cliente' && !!u.produtos?.disparos
+  if (u?.papel !== 'admin' && u?.papel !== 'equipe' && !cliente) {
     return (
       <div className='grid min-h-[70vh] place-items-center p-6'>
         <div className='max-w-md space-y-3 text-center'>
@@ -46,9 +47,9 @@ export default async function DisparosLayout({ children }: { children: React.Rea
     <div className='space-y-5 p-6'>
       <header className='flex flex-wrap items-end justify-between gap-4'>
         <div className='max-w-2xl'>
-          <span className='rotulo-secao'>Administrativo</span>
+          <span className='rotulo-secao'>{cliente ? 'WhatsApp' : 'Administrativo'}</span>
           <h1 className='mt-2 font-serif text-[2rem] font-bold leading-tight tracking-[-0.02em] text-marca-800'>
-            Disparos de WhatsApp
+            {cliente ? 'Meus disparos' : 'Disparos de WhatsApp'}
           </h1>
           <p className='text-sm text-slate-500'>
             Quem já recebeu, quem respondeu e quem pediu a consulta gratuita, separados por ramo — cada pessoa da equipe

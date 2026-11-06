@@ -43,13 +43,22 @@ export const usuarioAtual = cache(async () => {
   // o cliente NÃO é autorizado — ele só usa "Minhas empresas", pelas funções cliente_* do banco.
   const [{ data: autorizado }, { data: papel }] = await Promise.all([supabase.rpc('is_app_user'), supabase.rpc('meu_papel')])
   const p = (typeof papel === 'string' ? papel : null) as Papel | null
-  return { id: user.id, email: user.email ?? '', autorizado: autorizado === true, admin: autorizado === true && p === 'admin', papel: p }
+  // cliente: quais produtos contratou (Consulta de dados e/ou Disparos de um grupo)
+  let produtos: { consulta: boolean; disparos: boolean } | null = null
+  if (p === 'cliente') {
+    const [{ count: plano }, { count: grupos }] = await Promise.all([
+      supabase.from('clientes_acesso').select('user_id', { count: 'exact', head: true }).eq('user_id', user.id),
+      supabase.from('grupo_membros').select('grupo_id', { count: 'exact', head: true }).eq('user_id', user.id)
+    ])
+    produtos = { consulta: !!plano, disparos: !!grupos }
+  }
+  return { id: user.id, email: user.email ?? '', autorizado: autorizado === true, admin: autorizado === true && p === 'admin', papel: p, produtos }
 })
 
 /** Páginas da equipe interna: o cliente vai para "Minhas empresas"; quem não entrou, para o login. */
 export async function paginaInterna() {
   const u = await usuarioAtual()
-  if (u?.papel === 'cliente') redirect(ROTAS.minhasEmpresas)
+  if (u?.papel === 'cliente') redirect(u.produtos?.consulta || !u.produtos?.disparos ? ROTAS.minhasEmpresas : ROTAS.disparos)
   return u
 }
 

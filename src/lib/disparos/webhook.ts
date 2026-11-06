@@ -53,8 +53,14 @@ function textoRecebido(p: Record<string, unknown>) {
   }
 }
 
-async function disparoPor(coluna: 'telefone' | 'lid' | 'enquete_id' | 'chat_id', valor: string) {
-  const { data } = await supabaseAdmin().from('disparos').select('*').eq(coluna, valor).limit(1).maybeSingle()
+/**
+ * Contato do livro. O mesmo telefone pode estar em grupos diferentes (a regra "nunca 2 vezes" é por grupo), então
+ * a busca fica no grupo do número que recebeu a mensagem; sem número conhecido, vale o contato mais recente.
+ */
+async function disparoPor(coluna: 'telefone' | 'lid' | 'enquete_id' | 'chat_id', valor: string, grupoId?: number | null) {
+  let q = supabaseAdmin().from('disparos').select('*').eq(coluna, valor)
+  if (grupoId) q = q.eq('grupo_id', grupoId)
+  const { data } = await q.order('criado_em', { ascending: false }).limit(1).maybeSingle()
   return (data as Disparo | null) ?? null
 }
 
@@ -148,13 +154,14 @@ export async function processarEvento(ev: EventoWaha, numeroId: number | null, d
       let fone = jidFone ? foneDoJid(jidFone) : null
       const lid = from.endsWith('@lid') ? from.replace(/@.*$/, '') : null
 
-      let d = fone ? await disparoPor('telefone', fone) : null
-      if (!d && jidFone) d = await disparoPor('chat_id', jidFone.replace(/@.*$/, '') + '@c.us')
-      if (!d && lid) d = await disparoPor('lid', lid)
+      const grupo = numero?.grupo_id ?? null
+      let d = fone ? await disparoPor('telefone', fone, grupo) : null
+      if (!d && jidFone) d = await disparoPor('chat_id', jidFone.replace(/@.*$/, '') + '@c.us', grupo)
+      if (!d && lid) d = await disparoPor('lid', lid, grupo)
       if (!d && lid && numero) {
         const pn = await telefoneDoLid(canalDe(numero), lid)
         fone = pn ? foneDoJid(pn) : null
-        if (fone) d = await disparoPor('telefone', fone)
+        if (fone) d = await disparoPor('telefone', fone, grupo)
       }
       if (!d) return 'mensagem de quem não está no livro'
       if (lid && !d.lid) await atualizar(d.id, { lid })
@@ -181,7 +188,15 @@ export async function processarEvento(ev: EventoWaha, numeroId: number | null, d
       const n = await numeroDoDisparo(d, numero)
       const c = comFormatoDoNumero(await carregarCampanha(d.campanha_id), n)
       const quer = corpo ? intencao(corpo) : 'outro'
-      if (quer === 'sair') return marcarDescadastro(d, n, depois)
+      const marca = c.grupo?.nome ?? 'OficialCert'
+      if (quer === 'sair') return marcarDescadastro(d, n, depois, marca)
+      // SÓ DIVULGAÇÃO: não há perguntas. "Não" encerra com educação; o resto vai para alguém do grupo responder.
+      if (c.grupo?.fluxo === 'divulgacao') {
+        if (quer === 'nao' && !['descadastrado', 'sem_interesse'].includes(d.status)) return marcarSemInteresse(d, n, c.mensagem_nao, depois)
+        if (corpo && cortesia(corpo) && d.status !== 'enviado') return 'cortesia'
+        await atualizar(d.id, { atencao: true, ...(d.status === 'enviado' ? { status: 'respondeu' as const } : {}) })
+        return 'divulgação: mensagem para o grupo'
+      }
       const educado = !!corpo && cortesia(corpo)
       const tocouBotao = !!corpo && normalizar(corpo) === normalizar(c.botao_texto)
       // Coleta aberta (nome → CNPJ): a mensagem é a resposta da pergunta, não um "sim/não"
@@ -259,7 +274,7 @@ async function coletar(d: Disparo, n: NumeroComChave | null, c: Campanha, corpo:
     if (tentativas >= 3) {
       // não insiste: chama a equipe
       await atualizar(d.id, { etapa: null, tentativas, atencao: true })
-      responda(RESPOSTAS.desistiu_da_coleta)
+      responda(RESPOSTAS.desistiu_da_coleta(c.grupo?.nome ?? 'OficialCert'))
       return `coleta interrompida (${d.etapa}): equipe avisada`
     }
     await atualizar(d.id, { tentativas })
@@ -330,12 +345,14 @@ async function marcarSemInteresse(d: Disparo, n: NumeroComChave | null, modelo: 
   return 'sem interesse'
 }
 
-async function marcarDescadastro(d: Disparo, n: NumeroComChave | null, depois: Depois) {
+async function marcarDescadastro(d: Disparo, n: NumeroComChave | null, depois: Depois, marca = 'OficialCert') {
   const jaEstava = d.status === 'descadastrado'
   await atualizar(d.id, { status: 'descadastrado', etapa: null, encerrado_em: d.encerrado_em ?? agora(), atencao: false })
-  await supabaseAdmin()
+  // bloqueia no grupo de quem falou (outra marca ainda pode falar com ele); duplicado = já bloqueado, tudo bem
+  const { error } = await supabaseAdmin()
     .from('disparo_bloqueios')
-    .upsert({ telefone: d.telefone, motivo: 'pediu para sair', observacao: `disparo #${d.id}` }, { onConflict: 'telefone', ignoreDuplicates: true })
-  if (n && !jaEstava) depois(() => responder(d, n, RESPOSTAS.descadastro))
+    .insert({ telefone: d.telefone, grupo_id: d.grupo_id, motivo: 'pediu para sair', observacao: `disparo #${d.id}` })
+  if (error && error.code !== '23505') console.error('[webhook] bloqueio', error.message)
+  if (n && !jaEstava) depois(() => responder(d, n, RESPOSTAS.descadastro(marca)))
   return 'descadastrado'
 }

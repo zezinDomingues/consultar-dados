@@ -4,6 +4,7 @@ import { notFound, redirect } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import { FormPacote, RedefinirSenha } from '@/components/usuarios/acoes-usuario'
 import { FormUsuario } from '@/components/usuarios/form-usuario'
+import { listarGrupos } from '@/lib/disparos/dados'
 import { opcoesFiltros, usuarioAtual } from '@/lib/empresas/consulta'
 import { fmtDataHora, fmtInt } from '@/lib/formatar'
 import { ROTAS } from '@/lib/rotas'
@@ -14,7 +15,8 @@ export const metadata: Metadata = { title: 'Usuário' }
 export default async function UsuarioPage({ params }: { params: Promise<{ id: string }> }) {
   if (!(await usuarioAtual())?.admin) redirect(ROTAS.dashboard)
   const { id } = await params
-  const [u, opcoes] = await Promise.all([obterUsuario(id), opcoesFiltros()])
+  const [u, opcoes, gruposDisparo] = await Promise.all([obterUsuario(id), opcoesFiltros(), listarGrupos()])
+  const opcoesGrupos = gruposDisparo.map(g => ({ chave: String(g.id), nome: g.nome, n: g.enviados }))
   if (!u) notFound()
 
   return (
@@ -31,7 +33,7 @@ export default async function UsuarioPage({ params }: { params: Promise<{ id: st
 
       <div className='grid gap-5 xl:grid-cols-[1.4fr_1fr]'>
         <section className='rounded-2xl border border-slate-200 bg-white p-5'>
-          <FormUsuario usuario={u} ramos={opcoes.ramos} ufs={opcoes.ufs} />
+          <FormUsuario usuario={u} ramos={opcoes.ramos} ufs={opcoes.ufs} grupos={opcoesGrupos} />
         </section>
 
         <aside className='space-y-4'>

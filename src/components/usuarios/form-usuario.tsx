@@ -13,7 +13,7 @@ import { cn } from '@/lib/utils'
 const ENTRADA = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-marca-400 focus:ring-4 focus:ring-marca-50'
 
 
-export function FormUsuario({ usuario, ramos, ufs }: { usuario?: Usuario; ramos: Opcao[]; ufs: Opcao[] }) {
+export function FormUsuario({ usuario, ramos, ufs, grupos }: { usuario?: Usuario; ramos: Opcao[]; ufs: Opcao[]; grupos: Opcao[] }) {
   const novo = !usuario
   const [estado, acao, salvando] = useActionState<Retorno, FormData>(novo ? criarUsuario : atualizarUsuario, {})
   const [papel, setPapel] = useState<string>(usuario?.papel ?? 'equipe')
@@ -22,6 +22,8 @@ export function FormUsuario({ usuario, ramos, ufs }: { usuario?: Usuario; ramos:
   )
   const [selUfs, setSelUfs] = useState<string[] | undefined>(usuario?.plano?.ufs ?? undefined)
   const [modalidade, setModalidade] = useState<'mensal' | 'pacote'>(usuario?.plano?.modalidade ?? 'mensal')
+  const [temConsulta, setTemConsulta] = useState<boolean>(usuario ? !!usuario.plano : true)
+  const [selGrupos, setSelGrupos] = useState<string[] | undefined>(usuario?.grupos?.length ? usuario.grupos.map(String) : undefined)
 
   useEffect(() => {
     if (estado.ok && !estado.senha) toast.success(estado.mensagem ?? 'Salvo.')
@@ -56,6 +58,8 @@ export function FormUsuario({ usuario, ramos, ufs }: { usuario?: Usuario; ramos:
       {(papel === 'equipe' || papel === 'cliente') && (selRamos ?? []).map(r => <input key={r} type='hidden' name='ramos' value={r} />)}
       {papel === 'cliente' && (selUfs ?? []).map(u => <input key={u} type='hidden' name='ufs' value={u} />)}
       {papel === 'cliente' && <input type='hidden' name='modalidade' value={modalidade} />}
+      {papel === 'cliente' && temConsulta && <input type='hidden' name='tem_consulta' value='on' />}
+      {papel === 'cliente' && (selGrupos ?? []).map(g => <input key={g} type='hidden' name='grupos' value={g} />)}
 
       <div className='grid gap-3 sm:grid-cols-2'>
         <label className='block space-y-1'>
@@ -99,6 +103,19 @@ export function FormUsuario({ usuario, ramos, ufs }: { usuario?: Usuario; ramos:
       )}
 
       {papel === 'cliente' && (
+        <div className='space-y-1.5 rounded-xl bg-slate-50 p-3'>
+          <MultiSelect rotulo='Disparos: grupos que este cliente acompanha' opcoes={grupos} selecionados={selGrupos} aoMudar={setSelGrupos} placeholder='Nenhum' />
+          <p className='text-[11px] text-slate-400'>Ele entra em “Meus disparos” e vê só o painel, as conversas e os leads desses grupos.</p>
+        </div>
+      )}
+
+      {papel === 'cliente' && (
+        <label className='flex items-center gap-2 text-sm font-semibold text-slate-700'>
+          <input type='checkbox' checked={temConsulta} onChange={e => setTemConsulta(e.target.checked)} className='size-4 accent-[#1a2d5a]' /> Produto “Consulta de dados”
+        </label>
+      )}
+
+      {papel === 'cliente' && temConsulta && (
         <div className='space-y-3 rounded-xl bg-slate-50 p-3'>
           <p className='text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500'>Plano do cliente</p>
           <MultiSelect rotulo='Ramos contratados' opcoes={ramos} selecionados={selRamos} aoMudar={setSelRamos} mostrarCodigo placeholder='Escolha' />

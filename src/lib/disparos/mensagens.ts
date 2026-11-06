@@ -12,7 +12,7 @@ import type { Campanha } from './tipos'
  */
 export const MODELOS = {
   mensagem:
-    '{saudacao}! Aqui é da *OficialCert*, especialista em recuperação de créditos tributários.\n\n' +
+    '{saudacao}! Aqui é da *{marca}*, especialista em recuperação de créditos tributários.\n\n' +
     'Identificamos que a *{empresa}* tem perfil para *valores a serem restituídos* pelo governo — tributos pagos ' +
     'a mais nos últimos 5 anos (PIS, COFINS, INSS e outros), devolvidos com correção pela Selic.\n\n' +
     'Deseja fazer uma *consulta gratuita* para saber quanto a sua empresa tem a receber?',
@@ -27,7 +27,7 @@ export const MODELOS = {
   mensagem_obrigado:
     'Pronto, {primeiro_nome}! ✅ Recebemos o seu pedido de consulta.\n\n' +
     'Nossa equipe já está analisando e vai entrar em contato pelo número *{telefone}* com o resultado.\n\n' +
-    'Enquanto isso, conheça a OficialCert e a nossa plataforma 👇',
+    'Enquanto isso, conheça a {marca} e a nossa plataforma 👇',
   botao_site_texto: 'Acessar a plataforma',
   mensagem_nao:
     'Tudo bem, obrigado pelo retorno! Não enviaremos mais mensagens. Se um dia quiser a consulta, é só responder aqui. 👋',
@@ -36,6 +36,17 @@ export const MODELOS = {
   opcao_sim: '✅ Sim, quero consultar',
   opcao_nao: 'Não tenho interesse',
   mensagem_sim: '{Ótimo|Perfeito}! 🙌 Vamos começar a sua consulta.\n\nQual é o seu *nome completo*?'
+} as const
+
+/** Modelo de um grupo de SÓ DIVULGAÇÃO: logo + texto + link (sem perguntas). */
+export const MODELO_DIVULGACAO = {
+  mensagem:
+    '{saudacao}! Aqui é da *{marca}*. 👋\n\n' +
+    'Escreva aqui a oferta: o que a {empresa} ganha, em uma ou duas frases.\n\n' +
+    'Conheça os detalhes no link abaixo 👇',
+  rodape: 'Responda SAIR para não receber mais mensagens.',
+  botao_site_texto: 'Conhecer',
+  mensagem_nao: 'Tudo bem, obrigado pelo retorno! Não enviaremos mais mensagens. 👋'
 } as const
 
 /** Logo enviada no alto da 1ª e da última mensagem (precisa ser um endereço público: o WAHA baixa a imagem). */
@@ -88,7 +99,7 @@ export const campanhaPadrao = (nome: string, base: string): CampanhaEditavel => 
 
 /** Respostas fixas do robô (não variam por campanha). */
 export const RESPOSTAS = {
-  descadastro: 'Pronto, você não receberá mais mensagens da OficialCert. Desculpe o incômodo.',
+  descadastro: (marca: string) => `Pronto, você não receberá mais mensagens da ${marca}. Desculpe o incômodo.`,
   voto_ilegivel:
     'Recebi seu toque na enquete, mas não consegui ler a opção 😅\n\nSe quer a consulta gratuita, responda *SIM* ' +
     'aqui. Se não tem interesse, pode ignorar esta mensagem.',
@@ -97,10 +108,11 @@ export const RESPOSTAS = {
   cnpj_invalido: 'Esse CNPJ não parece válido 🤔 Confira e me envie os 14 números, por favor.',
   telefone_invalido: 'Não consegui entender o número 🤔 Me envie com DDD, por favor. Ex.: (11) 98765-4321',
   contato_sem_botao: (fone: string) => `Responda *1* para usar este número (${fone}) ou *2* para informar outro.`,
-  desistiu_da_coleta: 'Sem problemas! Um especialista da OficialCert vai falar com você por aqui para confirmar os dados. 🙂'
+  desistiu_da_coleta: (marca: string) => `Sem problemas! Um especialista da ${marca} vai falar com você por aqui para confirmar os dados. 🙂`
 } as const
 
 export const VARIAVEIS = [
+  { nome: '{marca}', texto: 'nome do grupo (quem está falando)' },
   { nome: '{empresa}', texto: 'nome da empresa contatada' },
   { nome: '{saudacao}', texto: 'Bom dia / Boa tarde / Boa noite' },
   { nome: '{municipio}', texto: 'cidade da empresa' },
@@ -109,7 +121,7 @@ export const VARIAVEIS = [
 ] as const
 
 export type Variaveis = Partial<
-  Record<'empresa' | 'saudacao' | 'municipio' | 'link' | 'nome' | 'primeiro_nome' | 'cnpj' | 'telefone', string>
+  Record<'marca' | 'empresa' | 'saudacao' | 'municipio' | 'link' | 'nome' | 'primeiro_nome' | 'cnpj' | 'telefone', string>
 >
 
 /** Dígitos verificadores do CNPJ. */

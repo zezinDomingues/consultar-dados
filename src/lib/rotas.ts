@@ -13,6 +13,8 @@ export const ROTAS = {
   novaCampanha: '/dashboard/disparos/campanhas/nova',
   campanha: (id: number) => `/dashboard/disparos/campanhas/${id}`,
   numeros: '/dashboard/disparos/numeros',
+  grupos: '/dashboard/disparos/grupos',
+  grupo: (id: number | 'novo') => `/dashboard/disparos/grupos/${id}`,
   calendario: '/dashboard/calendario',
   usuarios: '/dashboard/usuarios',
   usuario: (id: string) => `/dashboard/usuarios/${id}`,

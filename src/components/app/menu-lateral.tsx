@@ -26,10 +26,9 @@ const ITENS_ADMIN: (Item & { papeis: Papel[] })[] = [
   { href: ROTAS.usuarios, rotulo: 'Usuários', icone: UsersRound, ativo: (p: string) => p.startsWith(ROTAS.usuarios), papeis: ['admin'] }
 ]
 
-// O cliente (produto "Consulta de dados") só tem a área dele
-const ITENS_CLIENTE: Item[] = [
-  { href: ROTAS.minhasEmpresas, rotulo: 'Minhas empresas', icone: Search, ativo: (p: string) => p.startsWith(ROTAS.minhasEmpresas) }
-]
+// O cliente só tem as áreas dos produtos que contratou
+const CLIENTE_CONSULTA: Item = { href: ROTAS.minhasEmpresas, rotulo: 'Minhas empresas', icone: Search, ativo: (p: string) => p.startsWith(ROTAS.minhasEmpresas) }
+const CLIENTE_DISPAROS: Item = { href: ROTAS.disparos, rotulo: 'Meus disparos', icone: Send, ativo: (p: string) => p.startsWith(ROTAS.disparos) }
 
 function ItemMenu({ item, pathname }: { item: Item; pathname: string }) {
   const ativo = item.ativo(pathname)
@@ -49,8 +48,20 @@ function ItemMenu({ item, pathname }: { item: Item; pathname: string }) {
   )
 }
 
-export function MenuLateral({ email, papel }: { email: string; papel: Papel }) {
+export function MenuLateral({
+  email,
+  papel,
+  produtos
+}: {
+  email: string
+  papel: Papel
+  produtos?: { consulta: boolean; disparos: boolean } | null
+}) {
   const cliente = papel === 'cliente'
+  const ITENS_CLIENTE = [
+    ...(produtos?.consulta || !produtos?.disparos ? [CLIENTE_CONSULTA] : []),
+    ...(produtos?.disparos ? [CLIENTE_DISPAROS] : [])
+  ]
   const administrativos = ITENS_ADMIN.filter(i => i.papeis.includes(papel))
   const pathname = usePathname()
 

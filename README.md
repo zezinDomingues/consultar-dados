@@ -113,6 +113,19 @@ Ligar um número: instância WAHA (NOWEB, HTTPS público) → parear por código
 Adicionar número** (URL + API key) → **Conectar webhook** (configura HMAC + eventos + store do NOWEB; reinicia a sessão
 ~20 s). Número novo: 20–30 envios/dia e subir aos poucos.
 
+## Grupos de disparo (06/11/2026 · migração 014)
+
+Cada **grupo** é um cliente que contrata a divulgação pelo WhatsApp (a OficialCert é o grupo 1): nome (`{marca}` nas
+mensagens), logo (upload para o bucket público `marcas` do Storage), site, **fluxo** (`coleta` = SIM → nome → contato →
+final; `divulgacao` = logo + texto + link, sem perguntas), **modelo** de mensagens (campanhas novas do grupo nascem com
+ele) e opção de **medir cliques** (o link passa por `/r/<token>`, que ignora robôs de pré-visualização).
+- Números e campanhas pertencem a um grupo; cada número só envia campanhas do grupo dele.
+- "Nunca 2 vezes" vale **por grupo** (índices `(grupo_id, telefone)` e `(grupo_id, cnpj)`); SAIR bloqueia o telefone
+  no grupo (`disparo_bloqueios.grupo_id`; nulo = todos os grupos).
+- O webhook acha o contato no grupo do número que recebeu (o mesmo telefone pode estar em vários grupos).
+- Cliente do grupo = papel `cliente` + `grupo_membros`: menu "Meus disparos", vê só painel/conversas/leads do grupo,
+  responde e exporta. Um cliente pode ter os dois produtos (Consulta de dados e Disparos).
+
 ## Papéis, calendário e o produto "Consulta de dados" (06/11/2026 · migrações 012 e 013)
 
 | Papel | O que vê |

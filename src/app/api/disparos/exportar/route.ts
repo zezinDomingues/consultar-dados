@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
       ].join(';')
     ]
     for (let pagina = 1; pagina <= 40; pagina++) {
-      const { itens } = await listarDisparos({ grupo, campanha: Number(sp.get('campanha')) || undefined, ramo: sp.get('ramo') || undefined, q: sp.get('q') ?? undefined, pagina, por: 500 })
+      const { itens } = await listarDisparos({ grupo, campanha: Number(sp.get('campanha')) || undefined, ramo: sp.get('ramo') || undefined, grupoId: Number(sp.get('gr')) || undefined, q: sp.get('q') ?? undefined, pagina, por: 500 })
       for (const d of itens) {
         linhas.push(
           [
