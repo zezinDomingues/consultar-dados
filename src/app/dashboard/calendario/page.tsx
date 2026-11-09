@@ -99,8 +99,8 @@ export default async function CalendarioPage({ searchParams }: { searchParams: P
         <h1 className='mt-2 font-serif text-[2rem] font-bold leading-tight tracking-[-0.02em] text-marca-800'>Calendário</h1>
         <p className='text-sm text-slate-500'>
           {cliente
-            ? 'As reuniões marcadas com os contatos dos seus disparos. Você vê todas as reuniões da sua conta e pode alterar as que você marcou. Para marcar, use “Marcar reunião” ou escolha um dia.'
-            : 'As reuniões de cada grupo: você vê as de todos do(s) seu(s) grupo(s) e edita as suas. Para marcar, use “Marcar reunião” ou escolha um dia.'}
+            ? 'As reuniões marcadas com os contatos dos seus disparos. Você vê todas as reuniões da sua conta e pode alterar as que você marcou. Para marcar, use “Marcar reunião”.'
+            : 'As reuniões de cada grupo: você vê as de todos do(s) seu(s) grupo(s) e edita as suas. Para marcar, use “Marcar reunião”.'}
         </p>
       </header>
       <div className='grid min-w-0 gap-5 2xl:grid-cols-[1fr_320px]'>
