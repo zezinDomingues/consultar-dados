@@ -1,6 +1,7 @@
 import { ChevronLeft, ChevronRight, SearchX } from 'lucide-react'
 import { LinkNav } from './contexto'
 import { TabelaEmpresas } from './tabela-empresas'
+import { FOCO } from '@/components/ui/foco'
 import { buscarEmpresas, resumoEmpresas } from '@/lib/empresas/consulta'
 import { hrefConsulta, type Consulta } from '@/lib/empresas/filtros'
 import { fmtInt } from '@/lib/formatar'
@@ -17,10 +18,10 @@ export async function Resultados({ consulta }: { consulta: Consulta }) {
   if (total === 0) {
     return (
       <div className='rounded-xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center'>
-        <SearchX className='mx-auto size-10 text-slate-300' />
+        <SearchX className='mx-auto size-10 text-slate-300' aria-hidden />
         <p className='mt-3 font-medium'>Nenhuma empresa com esses filtros</p>
         <p className='mt-1 text-sm text-slate-500'>Tire algum filtro ou amplie a faixa de capital/idade.</p>
-        <LinkNav href={ROTAS.dashboard} className='mt-4 inline-block text-sm font-medium text-marca-700 hover:underline'>
+        <LinkNav href={ROTAS.dashboard} className={cn('mt-4 inline-block rounded-sm text-sm font-medium text-marca-700 hover:underline', FOCO)}>
           Limpar todos os filtros
         </LinkNav>
       </div>
@@ -52,36 +53,44 @@ function Paginacao({ consulta, paginas }: { consulta: Consulta; paginas: number 
   const janela = new Set([1, paginas, atual - 1, atual, atual + 1].filter(p => p >= 1 && p <= paginas))
   const lista = [...janela].sort((a, b) => a - b)
   const botao = 'grid h-8 min-w-8 place-items-center rounded-md px-2 text-sm transition'
+  const link = cn(botao, 'text-slate-600 hover:bg-slate-100', FOCO)
 
   return (
-    <nav className='flex items-center gap-1' aria-label='Paginação'>
+    <nav className='flex flex-wrap items-center gap-1' aria-label='Paginação'>
       {atual > 1 ? (
-        <LinkNav href={href(atual - 1)} className={cn(botao, 'text-slate-600 hover:bg-slate-100')} title='Página anterior'>
-          <ChevronLeft className='size-4' />
+        <LinkNav href={href(atual - 1)} className={link} aria-label='Página anterior' title='Página anterior'>
+          <ChevronLeft className='size-4' aria-hidden />
         </LinkNav>
       ) : (
-        <span className={cn(botao, 'text-slate-300')}>
+        <span className={cn(botao, 'text-slate-300')} aria-hidden>
           <ChevronLeft className='size-4' />
         </span>
       )}
       {lista.map((p, i) => (
         <span key={p} className='flex items-center gap-1'>
-          {i > 0 && p - lista[i - 1] > 1 && <span className='px-1 text-slate-400'>…</span>}
+          {i > 0 && p - lista[i - 1] > 1 && (
+            <span className='px-1 text-slate-500' aria-hidden>
+              …
+            </span>
+          )}
           {p === atual ? (
-            <span className={cn(botao, 'bg-marca-800 font-medium text-white')}>{fmtInt(p)}</span>
+            <span className={cn(botao, 'bg-marca-800 font-medium text-white')} aria-current='page'>
+              <span className='sr-only'>Página </span>
+              {fmtInt(p)}
+            </span>
           ) : (
-            <LinkNav href={href(p)} className={cn(botao, 'text-slate-600 hover:bg-slate-100')}>
+            <LinkNav href={href(p)} className={link} aria-label={`Página ${fmtInt(p)}`}>
               {fmtInt(p)}
             </LinkNav>
           )}
         </span>
       ))}
       {atual < paginas ? (
-        <LinkNav href={href(atual + 1)} className={cn(botao, 'text-slate-600 hover:bg-slate-100')} title='Próxima página'>
-          <ChevronRight className='size-4' />
+        <LinkNav href={href(atual + 1)} className={link} aria-label='Próxima página' title='Próxima página'>
+          <ChevronRight className='size-4' aria-hidden />
         </LinkNav>
       ) : (
-        <span className={cn(botao, 'text-slate-300')}>
+        <span className={cn(botao, 'text-slate-300')} aria-hidden>
           <ChevronRight className='size-4' />
         </span>
       )}

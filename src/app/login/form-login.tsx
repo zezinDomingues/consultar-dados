@@ -48,9 +48,9 @@ export function FormLogin({ next }: { next?: string }) {
             type='button'
             onClick={() => setVerSenha(v => !v)}
             aria-label={verSenha ? 'Ocultar senha' : 'Mostrar senha'}
-            className='absolute right-2 top-1/2 grid size-9 -translate-y-1/2 place-items-center rounded-lg text-oc-700/45 transition hover:bg-oc-700/5 hover:text-oc-700'
+            className='absolute right-2 top-1/2 grid size-9 -translate-y-1/2 place-items-center rounded-lg text-oc-700/60 transition hover:bg-oc-700/5 hover:text-oc-700 focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-oc-700'
           >
-            {verSenha ? <EyeOff className='size-4' /> : <Eye className='size-4' />}
+            {verSenha ? <EyeOff className='size-4' aria-hidden /> : <Eye className='size-4' aria-hidden />}
           </button>
         </span>
       </label>
@@ -62,7 +62,7 @@ export function FormLogin({ next }: { next?: string }) {
       <button
         type='submit'
         disabled={enviando}
-        className='group mt-2 flex w-full items-center justify-center gap-2.5 rounded-full bg-oc-700 px-8 py-4 text-[15px] font-bold tracking-wide text-creme shadow-lg shadow-oc-700/15 transition hover:bg-oc-900 disabled:opacity-70'
+        className='group mt-2 flex w-full items-center justify-center gap-2.5 rounded-full bg-oc-700 px-8 py-4 text-[15px] font-bold tracking-wide text-creme shadow-lg shadow-oc-700/15 transition hover:bg-oc-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-oc-700 disabled:opacity-70'
       >
         {enviando ? <LoaderCircle className='size-4 animate-spin' /> : null}
         {enviando ? 'Entrando…' : 'Entrar na plataforma'}

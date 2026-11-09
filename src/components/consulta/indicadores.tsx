@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { Building, Landmark, Mail, MessageCircle, Star, TrendingUp } from 'lucide-react'
 import type { ItemResumo, Resumo } from '@/lib/empresas/tipos'
 import { fmtInt, fmtPct } from '@/lib/formatar'
+import { FOCO } from '@/components/ui/foco'
 import { cn } from '@/lib/utils'
 
 type LinkComp = React.ComponentType<{ href: string; className?: string; title?: string; children: React.ReactNode }>
@@ -25,38 +26,50 @@ export function CartoesIndicadores({
     { rotulo: 'E-mail próprio', valor: t.email_proprio, nota: 'não é do contador', icone: Mail },
     { rotulo: 'Prioridade A', valor: t.prioridade_a, nota: 'score ≥ 75', icone: Star }
   ]
+  // Colunas pela largura do CONTÊINER (não da tela): o mesmo componente vive na Consulta e na coluna do chat.
   return (
-    <div className={cn('grid gap-3', compacto ? 'grid-cols-2 sm:grid-cols-3 xl:grid-cols-6' : 'grid-cols-2 md:grid-cols-3 2xl:grid-cols-6')}>
-      {cards.map(c => (
-        <div
-          key={c.rotulo}
-          className={cn(
-            'relative overflow-hidden rounded-2xl border',
-            compacto ? 'p-3' : 'p-4',
-            c.destaque ? 'fundo-marinho border-marca-800 text-white shadow-lg shadow-marca-900/15' : 'border-slate-200 bg-white shadow-sm shadow-marca-900/[0.03]'
-          )}
-        >
+    <div className='@container'>
+      <div
+        className={cn(
+          'grid gap-3',
+          compacto ? 'grid-cols-2 @lg:grid-cols-3 @4xl:grid-cols-6' : 'grid-cols-2 @xl:grid-cols-3 @5xl:grid-cols-6'
+        )}
+      >
+        {cards.map(c => (
           <div
+            key={c.rotulo}
             className={cn(
-              'flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.12em]',
-              c.destaque ? 'text-ouro' : 'text-slate-500'
+              'relative overflow-hidden rounded-2xl border',
+              compacto ? 'p-3' : 'p-4',
+              c.destaque ? 'fundo-marinho border-marca-800 text-white shadow-lg shadow-marca-900/15' : 'border-slate-200 bg-white shadow-sm shadow-marca-900/[0.03]'
             )}
           >
-            <c.icone className={cn('size-3.5 shrink-0', c.destaque ? 'text-ouro' : 'text-ouro-escuro')} />
-            <span className='truncate'>{c.rotulo}</span>
+            <div
+              className={cn(
+                'flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.12em]',
+                c.destaque ? 'text-ouro' : 'text-slate-500'
+              )}
+            >
+              <c.icone className={cn('size-3.5 shrink-0', c.destaque ? 'text-ouro' : 'text-ouro-escuro')} />
+              <span className='truncate' title={c.rotulo}>
+                {c.rotulo}
+              </span>
+            </div>
+            <p
+              className={cn(
+                'whitespace-nowrap font-serif font-bold leading-none tracking-[-0.01em] lining-nums tabular-nums',
+                compacto ? 'mt-2 text-[1.35rem]' : 'mt-3 text-[1.75rem]',
+                c.destaque ? 'text-white' : 'text-marca-800'
+              )}
+            >
+              {fmtInt(c.valor)}
+            </p>
+            <p className={cn('mt-1.5 truncate text-xs', c.destaque ? 'text-areia/80' : 'text-slate-500')} title={c.nota}>
+              {c.nota}
+            </p>
           </div>
-          <p
-            className={cn(
-              'font-serif font-bold leading-none tracking-[-0.01em] lining-nums tabular-nums',
-              compacto ? 'mt-2 text-[1.35rem]' : 'mt-3 text-[1.75rem]',
-              c.destaque ? 'text-white' : 'text-marca-800'
-            )}
-          >
-            {fmtInt(c.valor)}
-          </p>
-          <p className={cn('mt-1.5 truncate text-xs', c.destaque ? 'text-areia/80' : 'text-slate-400')}>{c.nota}</p>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   )
 }
@@ -86,7 +99,7 @@ export function BarrasDistribuicao({
     <div className='rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-marca-900/[0.03]'>
       <div className='mb-3 flex items-baseline justify-between gap-2'>
         <h3 className='font-serif text-[1.05rem] font-bold text-marca-800'>{titulo}</h3>
-        <span className='truncate text-[11px] text-slate-400'>{nota}</span>
+        <span className='truncate text-[11px] text-slate-500'>{nota}</span>
       </div>
       <ul className='space-y-1'>
         {visiveis.map(item => {
@@ -96,7 +109,7 @@ export function BarrasDistribuicao({
               <Componente
                 href={hrefDe(item)}
                 title={ativo ? `Remover filtro: ${item.nome}` : `Filtrar por ${item.nome}`}
-                className='group relative block overflow-hidden rounded-md px-2 py-1.5'
+                className={cn('group relative block overflow-hidden rounded-md px-2 py-1.5', FOCO)}
               >
                 <span
                   className={cn(
@@ -114,7 +127,7 @@ export function BarrasDistribuicao({
           )
         })}
       </ul>
-      {resto > 0 && <p className='mt-2 px-2 text-xs text-slate-400'>+ {fmtInt(resto)} outros</p>}
+      {resto > 0 && <p className='mt-2 px-2 text-xs text-slate-500'>+ {fmtInt(resto)} outros</p>}
     </div>
   )
 }
