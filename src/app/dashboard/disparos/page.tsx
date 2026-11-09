@@ -16,6 +16,7 @@ import {
   Send,
   TriangleAlert
 } from 'lucide-react'
+import { AoVivo } from '@/components/disparos/ao-vivo'
 import { SeloStatus } from '@/components/disparos/selos'
 import { dentroDaJanela } from '@/lib/disparos/config'
 import {
@@ -274,7 +275,7 @@ export default async function PainelDisparos({
             </thead>
             <tbody>
               {lista.itens.map(d => (
-                <tr key={d.id} className='border-t border-slate-100 align-top hover:bg-marca-50/50'>
+                <tr key={d.id} data-disparo-id={d.id} className='border-t border-slate-100 align-top hover:bg-marca-50/50'>
                   <td className='max-w-[300px] px-4 py-3'>
                     <Link href={ROTAS.disparo(d.id)} className='block'>
                       <span className='flex items-center gap-1.5'>
@@ -494,7 +495,9 @@ function PorRamo({
   return (
     <section className='space-y-2'>
       <div className='flex items-center justify-between'>
-        <p className='text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500'>Por ramo</p>
+        <p className='flex items-center gap-3 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500'>
+          Por ramo <AoVivo />
+        </p>
         {atual && (
           <Link href={hrefDe(undefined)} className='text-xs font-semibold text-marca-700 hover:underline'>
             ver todos os ramos

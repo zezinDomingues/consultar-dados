@@ -114,3 +114,7 @@ summary {
   caret-color: #1a2d5a;
   transition: background-color 9999s;
 }
+
+/* Painel de disparos ao vivo: linha que acabou de chegar pisca dourado e volta ao normal */
+@keyframes linha-nova { 0% { background-color: rgb(196 185 154 / 0.55); } 100% { background-color: transparent; } }
+.linha-nova { animation: linha-nova 3.5s ease-out; }

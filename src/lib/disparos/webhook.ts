@@ -101,8 +101,8 @@ export async function processarEvento(ev: EventoWaha, numeroId: number | null, d
       const ack = Number(p.ack)
       if (!chave || !/^[A-Za-z0-9]+$/.test(chave) || !(ack >= 2)) return 'ack ignorado'
       const filtro = `msg_id.eq.${chave},enquete_id.eq.${chave}`
-      await db.from('disparos').update({ entregue_em: agora() }).or(filtro).is('entregue_em', null)
-      if (ack >= 3) await db.from('disparos').update({ lido_em: agora() }).or(filtro).is('lido_em', null)
+      await db.from('disparos').update({ entregue_em: agora(), atualizado_em: agora() }).or(filtro).is('entregue_em', null)
+      if (ack >= 3) await db.from('disparos').update({ lido_em: agora(), atualizado_em: agora() }).or(filtro).is('lido_em', null)
       return 'ack'
     }
 

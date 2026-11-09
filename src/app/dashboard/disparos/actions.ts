@@ -459,3 +459,17 @@ export async function desbloquearTelefone(id: number): Promise<Retorno> {
   atualizarTelas()
   return { ok: true, mensagem: 'Bloqueio removido.' }
 }
+
+/**
+ * Assinatura barata do Painel (para a tela "ao vivo"): muda quando algum disparo visível é criado, muda de situação
+ * (enviado, entregue, lido, respondeu…) ou some. O RLS limita aos ramos da equipe. A tela só se atualiza quando muda.
+ */
+export async function versaoPainel(): Promise<string | null> {
+  await exigirAtendimento()
+  const supabase = await createClient()
+  const [{ data }, { count }] = await Promise.all([
+    supabase.from('disparos').select('atualizado_em').order('atualizado_em', { ascending: false }).limit(1),
+    supabase.from('disparos').select('id', { count: 'exact', head: true })
+  ])
+  return `${data?.[0]?.atualizado_em ?? ''}|${count ?? 0}`
+}
