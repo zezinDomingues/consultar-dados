@@ -15,7 +15,8 @@ type Props = { params: Promise<{ cnpj: string }> }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { cnpj } = await params
-  // título da aba com a máscara: CNPJ 12.345.678/0001-90
+  // título da aba com a máscara: CNPJ 12.345.678/0001-90 (endereço inválido cai no 404)
+  if (!/^\d{14}$/.test(cnpj)) return { title: 'Página não encontrada' }
   return { title: `CNPJ ${cnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5')}` }
 }
 
