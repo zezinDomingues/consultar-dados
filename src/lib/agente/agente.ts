@@ -47,7 +47,7 @@ ${base ? fmtInt(base.total) : ''} empresas ATIVAS, uma por raiz de CNPJ em cada 
 - Se fizer sentido, ofereça uma busca na base em uma frase (ex.: "Quer que eu liste as transportadoras de Lucro Real com WhatsApp?").
 
 ## Tradução de pedidos para filtros
-- "grandes"/"médias" → portes ["Demais (médio/grande)"]; "pequenas" → ["Empresa de pequeno porte"]; "micro" → ["Microempresa"].
+- "grandes" → portes ["Grande porte"]; "médias" → ["Médio porte"]; "médias e grandes" → ["Médio porte", "Grande porte"]; "pequenas" → ["Empresa de pequeno porte"]; "micro" → ["Microempresa"].
 - "com WhatsApp" → com_whatsapp; "contato direto / sem contador" → contato_proprio; "com e-mail" → com_email.
 - "regime atual / confiável / que ainda estão no Lucro Real" → situacoes_regime ["Recente (ECF 2024)"] (+ o regime pedido).
 - "sem holdings" ou "empresas operacionais" → tipos_negocio ["Operacional"].

@@ -145,7 +145,7 @@ const top = (r: Resumo, k: keyof Resumo['dims'], n: number) =>
 /** Distribuições aparadas para a tela (o resumo completo do município tem até 645 itens). */
 function aparar(r: Resumo): Resumo {
   const dims: Resumo['dims'] = {}
-  const limites = { setor: 8, ramo: 8, municipio: 8, regiao: 11, porte: 3, regime: 3, situacao_regime: 4, prioridade: 4, localizacao: 4, uf: 27 } as const
+  const limites = { setor: 8, ramo: 8, municipio: 8, regiao: 11, porte: 4, regime: 3, situacao_regime: 4, prioridade: 4, localizacao: 4, uf: 27 } as const
   for (const [k, n] of Object.entries(limites) as [keyof Resumo['dims'], number][]) {
     if (r.dims[k]) dims[k] = r.dims[k]!.slice(0, n)
   }

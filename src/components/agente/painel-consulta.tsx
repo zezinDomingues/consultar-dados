@@ -98,7 +98,7 @@ export function PainelConsulta({ anexo }: { anexo: AnexoConsulta }) {
               {primeiraBarra}
               {barras('Ramos', dims.ramo, 'ramos')}
               {barras('Municípios', dims.municipio, 'municipios')}
-              {barras('Porte', ordenarPorte(dims.porte), 'portes', 3)}
+              {barras('Porte', ordenarPorte(dims.porte), 'portes', 4)}
             </div>
 
             <div className='overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm shadow-marca-900/[0.03]'>

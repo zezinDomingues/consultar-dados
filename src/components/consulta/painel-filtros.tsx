@@ -168,7 +168,7 @@ export function PainelFiltros({ consulta, opcoes }: { consulta: Consulta; opcoes
           <Chips
             rotulo='Porte'
             valores={PORTES}
-            rotulos={{ 'Empresa de pequeno porte': 'EPP', 'Demais (médio/grande)': 'Médio/grande', Microempresa: 'ME' }}
+            rotulos={{ 'Empresa de pequeno porte': 'EPP', 'Médio porte': 'Médio', 'Grande porte': 'Grande', Microempresa: 'ME' }}
             selecionados={f.portes}
             aoAlternar={v => aplicar({ portes: alternar(f.portes, v) })}
           />

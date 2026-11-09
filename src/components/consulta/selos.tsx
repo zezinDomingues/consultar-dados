@@ -43,5 +43,7 @@ export function SeloSituacao({ situacao }: { situacao: string | null }) {
 export const PORTE_CURTO: Record<string, string> = {
   Microempresa: 'ME',
   'Empresa de pequeno porte': 'EPP',
+  'Médio porte': 'Médio',
+  'Grande porte': 'Grande',
   'Demais (médio/grande)': 'Médio/grande'
 }

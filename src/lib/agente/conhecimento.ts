@@ -58,7 +58,7 @@ Obrigações
 - ECD (contabilidade digital): obrigatória no Real; no Presumido, obrigatória para quem distribui lucro isento acima da base presumida (descontados os tributos).
 CNAE e cadastro
 - CNAE: seção (letra) → divisão (2 dígitos) → grupo (3) → classe (5) → subclasse (7). Nesta plataforma: setor = seção, ramo = divisão, segmento = grupo, atividade = subclasse.
-- Porte da Receita: ME (até R$ 360 mil), EPP (até R$ 4,8 milhões), "Demais" (acima ou sem enquadramento).
+- Porte da Receita: ME (até R$ 360 mil), EPP (até R$ 4,8 milhões), "Demais" (acima ou sem enquadramento). Na plataforma o "Demais" é dividido em Médio porte e Grande porte pelo capital social: Grande = a partir de R$ 10 milhões (a Receita não informa faturamento).
 Reforma tributária (EC 132/2023 e LC 214/2025)
 - CBS (federal) substitui PIS/Cofins; IBS (estados e municípios) substitui ICMS e ISS; Imposto Seletivo sobre itens prejudiciais à saúde e ao meio ambiente.
 - 2026: ano de teste (CBS 0,9% e IBS 0,1% destacados na nota, compensáveis). 2027: CBS plena, fim de PIS/Cofins, IPI zerado (exceto Zona Franca), início do Imposto Seletivo. 2029 a 2032: ICMS e ISS caem gradualmente. 2033: modelo completo.

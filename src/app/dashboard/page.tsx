@@ -18,7 +18,7 @@ const ATALHOS: { rotulo: string; filtros: Filtros }[] = [
   { rotulo: 'Prioridade A na Capital', filtros: { prioridades: ['A'], localizacoes: ['Capital'] } },
   {
     rotulo: 'Indústrias médias/grandes no interior',
-    filtros: { setores: ['C'], portes: ['Demais (médio/grande)'], localizacoes: ['Interior'] }
+    filtros: { setores: ['C'], portes: ['Médio porte', 'Grande porte'], localizacoes: ['Interior'] }
   },
   { rotulo: 'Saúde com contato próprio', filtros: { setores: ['Q'], contato_proprio: true, tipos_negocio: ['Operacional'] } },
   { rotulo: 'Farmácias de manipulação', filtros: { cnaes: ['4771702'] } },

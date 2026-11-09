@@ -35,7 +35,7 @@ export async function Resumo({ consulta, opcoes }: { consulta: Consulta; opcoes:
           {barras('Setores', dims.setor, 'setores')}
           {barras('Ramos', dims.ramo, 'ramos')}
           {barras('Municípios', dims.municipio, 'municipios')}
-          {barras('Porte', ordenarPorte(dims.porte), 'portes', 3)}
+          {barras('Porte', ordenarPorte(dims.porte), 'portes', 4)}
         </div>
       )}
     </div>

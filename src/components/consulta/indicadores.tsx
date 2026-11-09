@@ -119,6 +119,6 @@ export function BarrasDistribuicao({
   )
 }
 
-export const ORDEM_PORTE = ['Demais (médio/grande)', 'Empresa de pequeno porte', 'Microempresa']
+export const ORDEM_PORTE = ['Grande porte', 'Médio porte', 'Empresa de pequeno porte', 'Microempresa']
 export const ordenarPorte = (itens: ItemResumo[] = []) =>
   [...itens].sort((a, b) => ORDEM_PORTE.indexOf(a.chave) - ORDEM_PORTE.indexOf(b.chave))

@@ -5,7 +5,8 @@
 import { z } from 'zod'
 import { ROTAS } from '@/lib/rotas'
 
-export const PORTES = ['Microempresa', 'Empresa de pequeno porte', 'Demais (médio/grande)'] as const
+/** Médio × Grande não existe na Receita (lá é só "Demais"): Grande = capital social >= R$ 10 mi (migração 018). */
+export const PORTES = ['Microempresa', 'Empresa de pequeno porte', 'Médio porte', 'Grande porte'] as const
 export const REGIMES = ['Lucro Real', 'Lucro Presumido', 'Tributação mista'] as const
 export const SITUACOES = ['Recente (ECF 2024)', 'ECF 2023', 'Antigo (ECF ≤ 2022)', 'Hoje no Simples'] as const
 export const LOCALIZACOES = ['Capital', 'Região metropolitana', 'Litoral', 'Interior'] as const
@@ -20,6 +21,9 @@ export const TIPOS_NEGOCIO = [
   'SPE (propósito específico)',
   'Empresário individual'
 ] as const
+
+/** Valor antigo (antes da 018): links e consultas salvas com ele viram Médio + Grande. */
+const PORTE_ANTIGO = 'Demais (médio/grande)'
 
 const lista = (descricao: string) => z.array(z.string().min(1).max(120)).max(700).optional().describe(descricao)
 const inteiro = (descricao: string) => z.number().int().min(0).max(1000).optional().describe(descricao)
@@ -38,7 +42,8 @@ export const FiltrosSchema = z.object({
   regioes: lista('Regiões intermediárias do IBGE. Ex.: ["Campinas", "Ribeirão Preto", "Belo Horizonte", "Salvador"]'),
   localizacoes: z.array(z.enum(LOCALIZACOES)).optional()
     .describe('Capital do estado, região metropolitana da capital (Grande SP, Grande BH, Grande Salvador…), litoral (só SP) ou interior'),
-  portes: z.array(z.enum(PORTES)).optional().describe('Porte no cadastro da Receita'),
+  portes: z.array(z.enum(PORTES)).optional()
+    .describe('Porte: ME e EPP da Receita; "Médio porte" e "Grande porte" dividem o "Demais" da Receita pelo capital social (grande = a partir de R$ 10 milhões)'),
   regimes: z.array(z.enum(REGIMES)).optional().describe('Regime declarado na ECF (histórico, 2016–2024)'),
   situacoes_regime: z.array(z.enum(SITUACOES)).optional()
     .describe('Quão atual é o regime: "Recente (ECF 2024)" é o mais confiável; "Hoje no Simples" saiu do LR/LP'),
@@ -89,6 +94,9 @@ export function lerConsulta(get: (chave: string) => string | null | undefined): 
   for (const k of LISTAS) {
     const v = get(k)
     if (v) bruto[k] = v.split(',').map(s => s.trim()).filter(Boolean)
+  }
+  if (Array.isArray(bruto.portes) && bruto.portes.includes(PORTE_ANTIGO)) {
+    bruto.portes = [...new Set(bruto.portes.flatMap(p => (p === PORTE_ANTIGO ? ['Médio porte', 'Grande porte'] : [p])))]
   }
   for (const k of NUMEROS) {
     const v = get(k)?.trim()
