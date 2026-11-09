@@ -6,6 +6,7 @@ import { AlertTriangle, CalendarPlus, ChevronLeft, ChevronRight, Clock, External
 import { toast } from 'sonner'
 import { excluirReuniao, salvarReuniao, type Retorno } from '@/app/dashboard/calendario/actions'
 import { cn } from '@/lib/utils'
+import { agoraBrasilia, horarioPadrao } from './horario'
 
 export type ReuniaoTela = {
   id: number
@@ -41,15 +42,6 @@ const porExtenso = (dia: string) => {
   const d = new Date(`${dia}T12:00:00Z`)
   return `${SEMANA_LONGA[d.getUTCDay()]}, ${d.getUTCDate()} de ${MESES[d.getUTCMonth()]}`
 }
-/** Agora em Brasília como "AAAA-MM-DD HH:MM" (dá para comparar como texto com a data e a hora do formulário). */
-const agoraBrasilia = () => {
-  const p = Object.fromEntries(
-    new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
-      .formatToParts(new Date())
-      .map(x => [x.type, x.value])
-  )
-  return `${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute}`
-}
 const nReunioes = (n: number) => `${n} ${n === 1 ? 'reunião' : 'reuniões'}`
 
 export function Calendario({
@@ -76,7 +68,8 @@ export function Calendario({
   const [editando, setEditando] = useState<Rascunho | null>(inicial)
   const [vendo, setVendo] = useState<ReuniaoTela | null>(null)
   const [diaAberto, setDiaAberto] = useState<string | null>(null)
-  const marcar = (dia: string) => setEditando({ dia, hi: '10:00', hf: '11:00' })
+  // hoje sugere a próxima hora cheia (não nasce no passado); o botão geral pula para amanhã depois das 22h
+  const marcar = (dia: string, podeMudarDia = false) => setEditando(horarioPadrao(dia, agoraBrasilia(), podeMudarDia))
 
   const [ano, m] = mes.split('-').map(Number)
   const primeiro = new Date(Date.UTC(ano, m - 1, 1, 12))
@@ -128,7 +121,7 @@ export function Calendario({
         )}
         <button
           type='button'
-          onClick={() => marcar(mes === hoje.slice(0, 7) ? hoje : `${mes}-01`)}
+          onClick={() => marcar(mes === hoje.slice(0, 7) ? hoje : `${mes}-01`, true)}
           className={cn('ml-auto inline-flex h-10 items-center gap-2 rounded-full bg-marca-800 px-5 text-sm font-bold text-creme shadow-md shadow-marca-900/15 hover:bg-marca-950', FOCO)}
         >
           <CalendarPlus className='size-4' /> Marcar reunião

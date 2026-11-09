@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Calendario, type Rascunho, type ReuniaoTela } from '@/components/calendario/calendario'
 import { CORES_PESSOA } from '@/components/calendario/cores'
+import { horarioPadrao } from '@/components/calendario/horario'
 import { meusGruposCalendario, pessoasEquipe, proximasReunioes, reunioesEntre } from '@/lib/calendario/dados'
 import { redirect } from 'next/navigation'
 import { usuarioAtual } from '@/lib/empresas/consulta'
@@ -27,8 +28,10 @@ export default async function CalendarioPage({ searchParams }: { searchParams: P
   const sp = await searchParams
   const grupos = await meusGruposCalendario(!!u.admin, u.id)
   const grupoAtual = grupos.find(g => String(g.id) === sp.g)?.id
-  const hoje = fuso(new Date().toISOString()).dia
-  const mes = sp.mes && /^\d{4}-\d{2}$/.test(sp.mes) ? sp.mes : hoje.slice(0, 7)
+  const agora = fuso(new Date().toISOString())
+  const hoje = agora.dia
+  // ?mes= só com mês de verdade (2026-13 virava data inválida e derrubava a página)
+  const mes = sp.mes && /^(19|20|21)\d{2}-(0[1-9]|1[0-2])$/.test(sp.mes) ? sp.mes : hoje.slice(0, 7)
   const [ano, m] = mes.split('-').map(Number)
   const inicio = new Date(`${mes}-01T00:00:00-03:00`).toISOString()
   const fim = new Date(`${m === 12 ? ano + 1 : ano}-${String(m === 12 ? 1 : m + 1).padStart(2, '0')}-01T00:00:00-03:00`).toISOString()
@@ -64,7 +67,8 @@ export default async function CalendarioPage({ searchParams }: { searchParams: P
   // "Agendar reunião" a partir de um contato dos disparos (?nova=1&disparo=ID)
   let inicial: Rascunho | null = null
   if (sp.nova) {
-    inicial = { dia: sp.data && /^\d{4}-\d{2}-\d{2}$/.test(sp.data) ? sp.data : hoje, hi: '10:00', hf: '11:00' }
+    // hoje sugere a próxima hora cheia, para o formulário não nascer com "esse horário já passou"
+    inicial = horarioPadrao(sp.data && /^\d{4}-\d{2}-\d{2}$/.test(sp.data) ? sp.data : hoje, `${agora.dia} ${agora.hora}`, !sp.data)
     const disparoId = Number(sp.disparo)
     if (disparoId) {
       const supabase = await createClient()
