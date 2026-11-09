@@ -3,6 +3,7 @@ import 'server-only'
 import { cache } from 'react'
 import { usuarioAtual } from '@/lib/empresas/consulta'
 import type { Filtros } from '@/lib/empresas/filtros'
+import { supabaseAdmin } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { inicioDoDiaBrasilia } from './config'
 import {
@@ -10,6 +11,7 @@ import {
   type Campanha,
   type ConfigDisparo,
   type Disparo,
+  type Divisao,
   type EventoDisparo,
   type Grupo,
   type GrupoDisparo,
@@ -127,6 +129,14 @@ export async function obterCampanha(id: number) {
   const { data, error } = await supabase.from('disparo_campanhas').select('*').eq('id', id).maybeSingle()
   if (error) throw new Error(`campanha: ${error.message}`)
   return data as Campanha | null
+}
+
+/** Como a quantidade da campanha se divide: o que já saiu + os próximos da fila (nicho, estado, regime…). */
+export async function divisaoCampanha(id: number) {
+  await exigirAdmin()
+  const { data, error } = await supabaseAdmin().rpc('disparo_divisao', { p_campanha: id })
+  if (error) throw new Error(`divisão: ${error.message}`)
+  return data as Divisao
 }
 
 /** Nomes das campanhas (para filtros e rótulos). */

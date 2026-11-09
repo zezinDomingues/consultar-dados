@@ -65,7 +65,7 @@ export default async function CampanhasPage({ searchParams }: { searchParams: Pr
                 <p className='mt-0.5 text-[11px] text-slate-400'>
                   Criada {fmtDataHora(c.criada_em)}
                   {n?.ultimo_envio_em ? ` · último envio ${fmtRelativo(n.ultimo_envio_em)}` : ''}
-                  {c.limite_total ? ` · limite ${fmtInt(c.limite_total)}` : ''}
+                  {c.limite_total ? ` · ${fmtInt(enviados)} de ${fmtInt(c.limite_total)} disparos` : ' · sem limite'}
                   {c.motivo_status ? ` · ${c.motivo_status}` : ''}
                 </p>
               </div>

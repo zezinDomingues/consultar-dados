@@ -1,6 +1,6 @@
 // Variáveis de ambiente e relógio dos disparos (só servidor).
 import 'server-only'
-import type { ConfigDisparo } from './tipos'
+import type { ConfigDisparo, Numero } from './tipos'
 
 /** Endereço público da plataforma (links do formulário e webhook). Runtime, não NEXT_PUBLIC_ (que é assado no build). */
 export function urlApp() {
@@ -50,4 +50,18 @@ export function dentroDaJanela(cfg: Pick<ConfigDisparo, 'hora_inicio' | 'hora_fi
   if (!cfg.dias_semana.includes(dia)) return { ok: false, motivo: 'fora dos dias de envio' }
   if (hora < cfg.hora_inicio || hora >= cfg.hora_fim) return { ok: false, motivo: 'fora do horário de envio' }
   return { ok: true, motivo: null }
+}
+
+/**
+ * Quantos disparos por dia os números conseguem: o menor entre o limite diário e o que cabe na janela de envio
+ * com o intervalo médio sorteado (+ ~20 s de verificação e "digitando…" por envio).
+ */
+export function capacidadeDiaria(
+  numeros: Pick<Numero, 'ativo' | 'limite_diario' | 'intervalo_min_s' | 'intervalo_max_s'>[],
+  cfg: Pick<ConfigDisparo, 'hora_inicio' | 'hora_fim'>
+) {
+  const janela = Math.max(0, cfg.hora_fim - cfg.hora_inicio) * 3600
+  return numeros
+    .filter(n => n.ativo)
+    .reduce((s, n) => s + Math.min(n.limite_diario, Math.floor(janela / ((n.intervalo_min_s + n.intervalo_max_s) / 2 + 20))), 0)
 }

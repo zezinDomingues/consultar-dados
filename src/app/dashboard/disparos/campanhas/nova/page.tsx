@@ -2,8 +2,8 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { FormCampanha } from '@/components/disparos/form-campanha'
-import { urlApp } from '@/lib/disparos/config'
-import { contarElegiveis, listarGrupos, listarNumeros } from '@/lib/disparos/dados'
+import { capacidadeDiaria, urlApp } from '@/lib/disparos/config'
+import { contarElegiveis, lerConfig, listarGrupos, listarNumeros } from '@/lib/disparos/dados'
 import { campanhaPadrao, MODELO_DIVULGACAO, nomeEmpresa } from '@/lib/disparos/mensagens'
 import { buscarEmpresas, opcoesFiltros, usuarioAtual } from '@/lib/empresas/consulta'
 import { hrefConsulta, lerDeSearchParams, paraQuery } from '@/lib/empresas/filtros'
@@ -23,12 +23,13 @@ export default async function NovaCampanhaPage({ searchParams }: { searchParams:
   const grupos = (await listarGrupos()).filter(g => g.ativo)
   const grupo = grupos.find(g => String(g.id) === String(sp.grupo)) ?? grupos[0]
   if (!grupo) redirect(ROTAS.grupos)
-  const [opcoes, com, sem, [exemplo], numeros] = await Promise.all([
+  const [opcoes, com, sem, [exemplo], numeros, cfg] = await Promise.all([
     opcoesFiltros(),
     contarElegiveis(filtros, true, grupo.id),
     contarElegiveis(filtros, false, grupo.id),
     buscarEmpresas({ ...filtros, com_whatsapp: true }, ordem, 1, 1, 'razao_social,nome_fantasia,municipio'),
-    listarNumeros()
+    listarNumeros(),
+    lerConfig()
   ])
   const rotulos = rotulosFiltros(filtros, opcoes).map(r => r.rotulo)
   const hoje = fmtData(new Date().toISOString())
@@ -77,6 +78,7 @@ export default async function NovaCampanhaPage({ searchParams }: { searchParams:
         exemplo={{ empresa: nomeEmpresa(exemplo ?? { razao_social: 'Empresa Exemplo' }), municipio: exemplo?.municipio ?? 'São Paulo' }}
         numeros={numerosDoGrupo.map(n => ({ id: n.id, rotulo: n.rotulo, status: n.status }))}
         grupo={{ id: grupo.id, nome: grupo.nome, fluxo: grupo.fluxo, medir_cliques: grupo.medir_cliques }}
+        ritmo={{ porDia: capacidadeDiaria(numerosDoGrupo, cfg), numeros: numerosDoGrupo.length }}
       />
     </div>
   )

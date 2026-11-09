@@ -14,12 +14,17 @@ import {
   SlidersHorizontal
 } from 'lucide-react'
 import { enviarTeste, salvarCampanha, type Retorno } from '@/app/dashboard/disparos/actions'
+import { DivisaoDisparos, LOTE_SEM_LIMITE } from '@/components/disparos/divisao-disparos'
 import { montar, RESPOSTAS, saudacao, VARIAVEIS, type CampanhaEditavel } from '@/lib/disparos/mensagens'
+import type { Divisao } from '@/lib/disparos/tipos'
 import { ORDENS, type Filtros } from '@/lib/empresas/filtros'
 import { fmtInt } from '@/lib/formatar'
+import { ROTAS } from '@/lib/rotas'
 import { cn } from '@/lib/utils'
 
 type Inicial = CampanhaEditavel
+
+const QUANTIDADES = [100, 300, 500, 1000, 2000] as const
 
 const ENTRADA =
   'w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none transition focus:border-marca-400 focus:ring-4 focus:ring-marca-50'
@@ -32,7 +37,9 @@ export function FormCampanha({
   elegiveis,
   exemplo,
   numeros,
-  grupo
+  grupo,
+  divisao,
+  ritmo
 }: {
   inicial: Inicial
   filtros: Filtros
@@ -43,6 +50,10 @@ export function FormCampanha({
   numeros: { id: number; rotulo: string; status: string | null }[]
   /** grupo da campanha: dá a marca ({marca}) e o fluxo (coleta ou só divulgação) */
   grupo: { id: number; nome: string; fluxo: 'coleta' | 'divulgacao'; medir_cliques: boolean }
+  /** campanha salva: o que já saiu + a fila (nova campanha calcula a prévia na hora) */
+  divisao?: Divisao | null
+  /** disparos/dia que os números ativos do grupo aguentam (limite diário × janela × intervalo) */
+  ritmo: { porDia: number; numeros: number }
 }) {
   const divulgacao = grupo.fluxo === 'divulgacao'
   const [v, setV] = useState<Inicial>({
@@ -140,8 +151,62 @@ export function FormCampanha({
               <span className='text-xs font-semibold text-slate-600'>Nome da campanha</span>
               <input name='nome' value={v.nome} onChange={set('nome')} required maxLength={120} className={ENTRADA} />
             </label>
+
+            {/* ---------- quantidade ---------- */}
+            <div className='space-y-2 sm:col-span-2'>
+              <span className='block text-xs font-semibold text-slate-600'>Quantos disparos</span>
+              <div className='flex flex-wrap items-center gap-1.5'>
+                {QUANTIDADES.map(q => (
+                  <button
+                    key={q}
+                    type='button'
+                    onClick={() => setV(x => ({ ...x, limite_total: q }))}
+                    className={cn(
+                      'h-9 rounded-full border px-3.5 text-sm font-semibold tabular-nums transition',
+                      v.limite_total === q
+                        ? 'border-marca-800 bg-marca-800 text-creme'
+                        : 'border-slate-200 bg-white text-slate-700 hover:border-marca-300'
+                    )}
+                  >
+                    {fmtInt(q)}
+                  </button>
+                ))}
+                <button
+                  type='button'
+                  onClick={() => setV(x => ({ ...x, limite_total: null }))}
+                  className={cn(
+                    'h-9 rounded-full border px-3.5 text-sm font-semibold transition',
+                    v.limite_total === null
+                      ? 'border-marca-800 bg-marca-800 text-creme'
+                      : 'border-slate-200 bg-white text-slate-700 hover:border-marca-300'
+                  )}
+                >
+                  Sem limite
+                </button>
+                <input
+                  name='limite_total'
+                  type='number'
+                  min={1}
+                  value={v.limite_total ?? ''}
+                  onChange={e => setV(x => ({ ...x, limite_total: e.target.value ? Number(e.target.value) : null }))}
+                  placeholder='outro'
+                  aria-label='Quantidade de disparos'
+                  className={cn(ENTRADA, 'h-9 w-28 py-0 tabular-nums')}
+                />
+              </div>
+              <p className='text-xs text-slate-500'>
+                {v.limite_total
+                  ? `Conta só as mensagens que saíram (celular sem WhatsApp não conta). Ao chegar em ${fmtInt(v.limite_total)}, a campanha encerra sozinha.`
+                  : 'Sem limite: vai até acabar a base dos filtros, em lotes divididos de 1.000.'}
+                {disponiveis !== null && v.limite_total && v.limite_total > disponiveis && (
+                  <span className='text-amber-700'> Há só {fmtInt(disponiveis)} empresas disponíveis.</span>
+                )}
+              </p>
+              <Ritmo quantidade={v.limite_total} ritmo={ritmo} />
+            </div>
+
             <label className='block space-y-1.5'>
-              <span className='text-xs font-semibold text-slate-600'>Ordem de envio</span>
+              <span className='text-xs font-semibold text-slate-600'>Dentro de cada nicho, começar por</span>
               <select name='ordem' value={v.ordem} onChange={set('ordem')} className={ENTRADA}>
                 {Object.entries(ORDENS).map(([k, r]) => (
                   <option key={k} value={k}>
@@ -150,19 +215,7 @@ export function FormCampanha({
                 ))}
               </select>
             </label>
-            <label className='block space-y-1.5'>
-              <span className='text-xs font-semibold text-slate-600'>Limite de envios (opcional)</span>
-              <input
-                name='limite_total'
-                type='number'
-                min={1}
-                value={v.limite_total ?? ''}
-                onChange={e => setV(x => ({ ...x, limite_total: e.target.value ? Number(e.target.value) : null }))}
-                placeholder='sem limite'
-                className={ENTRADA}
-              />
-            </label>
-            <label className='flex items-start gap-2.5 text-sm text-slate-700 sm:col-span-2'>
+            <label className='flex items-start gap-2.5 self-end pb-1 text-sm text-slate-700'>
               <input
                 type='checkbox'
                 name='excluir_compartilhados'
@@ -178,6 +231,21 @@ export function FormCampanha({
               </span>
             </label>
           </div>
+          <DivisaoDisparos
+            quantidade={v.limite_total}
+            consulta={
+              editando
+                ? undefined
+                : { filtros, ordem: v.ordem, excluir_compartilhados: v.excluir_compartilhados, grupo_id: grupo.id }
+            }
+            salva={editando ? divisao : undefined}
+            alterada={
+              editando &&
+              (v.limite_total !== inicial.limite_total ||
+                v.ordem !== inicial.ordem ||
+                v.excluir_compartilhados !== inicial.excluir_compartilhados)
+            }
+          />
         </section>
 
         {/* ---------- 1ª mensagem ---------- */}
@@ -648,5 +716,35 @@ export function BolhaCliente({ texto }: { texto: string }) {
         {texto}
       </p>
     </div>
+  )
+}
+
+/** Quanto tempo a quantidade leva no ritmo dos números do grupo. */
+function Ritmo({ quantidade, ritmo }: { quantidade: number | null; ritmo: { porDia: number; numeros: number } }) {
+  if (!ritmo.porDia) {
+    return (
+      <p className='text-xs text-amber-700'>
+        Nenhum número ativo neste grupo: a campanha só envia depois de cadastrar um.
+      </p>
+    )
+  }
+  const alvo = quantidade ?? LOTE_SEM_LIMITE
+  const dias = Math.ceil(alvo / ritmo.porDia)
+  return (
+    <p className={cn('text-xs', dias > 1 ? 'text-amber-700' : 'text-slate-500')}>
+      Ritmo atual: até <strong>{fmtInt(ritmo.porDia)}/dia</strong> com {ritmo.numeros}{' '}
+      {ritmo.numeros === 1 ? 'número' : 'números'} →{' '}
+      {dias <= 1 ? 'cabe em 1 dia de envio.' : `~${fmtInt(dias)} dias de envio${quantidade ? '' : ' para cada 1.000'}.`}
+      {dias > 1 && (
+        <>
+          {' '}
+          Para ir mais rápido, aumente o limite diário ou acrescente números em{' '}
+          <Link href={ROTAS.numeros} className='font-semibold underline'>
+            Números e regras
+          </Link>
+          .
+        </>
+      )}
+    </p>
   )
 }

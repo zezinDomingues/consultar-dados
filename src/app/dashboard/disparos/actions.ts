@@ -7,7 +7,7 @@ import { pendenciasServidor, segredoDisparos, urlWebhook } from '@/lib/disparos/
 import { exigirAdmin, exigirAtendimento } from '@/lib/disparos/dados'
 import { fmtFone, MODELOS, nomeEmpresa, normalizarFone } from '@/lib/disparos/mensagens'
 import { canalDe, carregarNumero, enviarPrimeiraDeTeste, responder } from '@/lib/disparos/motor'
-import type { Disparo } from '@/lib/disparos/tipos'
+import type { Disparo, Divisao } from '@/lib/disparos/tipos'
 import { configurarWebhook, lerSessao } from '@/lib/disparos/waha'
 import { buscarEmpresas } from '@/lib/empresas/consulta'
 import { FiltrosSchema, ORDENS } from '@/lib/empresas/filtros'
@@ -67,7 +67,7 @@ const CampanhaSchema = z.object({
     .string()
     .trim()
     .transform(v => (v ? Number(v) : null))
-    .pipe(z.number().int().positive('Limite deve ser maior que zero.').nullable()),
+    .pipe(z.number().int().positive('Quantidade de disparos: maior que zero (ou deixe em branco para sem limite).').nullable()),
   ativar: z.coerce.boolean()
 })
 
@@ -104,7 +104,18 @@ export async function salvarCampanha(_: Retorno, fd: FormData): Promise<Retorno>
   const { id, ativar, ...c } = p.data
   const supabase = await createClient()
   let novoId = id
+  let refazerFila = !id
   if (id) {
+    const { data: antes } = await supabase
+      .from('disparo_campanhas')
+      .select('limite_total,ordem,excluir_compartilhados')
+      .eq('id', id)
+      .maybeSingle()
+    refazerFila =
+      !antes ||
+      antes.limite_total !== c.limite_total ||
+      antes.ordem !== c.ordem ||
+      antes.excluir_compartilhados !== c.excluir_compartilhados
     const { error } = await supabase.from('disparo_campanhas').update(colunas(c)).eq('id', id)
     if (error) return { erro: error.message }
   } else {
@@ -116,8 +127,47 @@ export async function salvarCampanha(_: Retorno, fd: FormData): Promise<Retorno>
     if (error) return { erro: error.message }
     novoId = data.id
   }
+  // Fila já dividida por nicho/estado/regime/porte/localização (~3 s). Se falhar, o ciclo monta sozinho quando
+  // encontrar a fila vazia — a campanha salva não depende disto.
+  if (refazerFila && novoId) {
+    const { error } = await supabaseAdmin().rpc('disparo_replanejar', { p_campanha: novoId })
+    if (error) console.error('[disparos] replanejar campanha', novoId, error.message)
+  }
   atualizarTelas()
   redirect(`${ROTAS.campanhas}?salva=${novoId}`)
+}
+
+const PreviaSchema = z.object({
+  filtros: FiltrosSchema,
+  ordem: z.enum(Object.keys(ORDENS) as [keyof typeof ORDENS, ...(keyof typeof ORDENS)[]]).default('score'),
+  excluir_compartilhados: z.boolean(),
+  grupo_id: z.number().int().positive(),
+  quantidade: z.number().int().min(1).max(20000)
+})
+
+/**
+ * Prévia de campanha nova: como a quantidade se divide entre nichos, estados, regimes, portes e localizações
+ * (o que não foi filtrado divide por igual). Não grava nada.
+ */
+export async function previaDivisao(entrada: z.input<typeof PreviaSchema>): Promise<{ divisao?: Divisao; erro?: string }> {
+  await exigirAdmin()
+  const p = PreviaSchema.safeParse(entrada)
+  if (!p.success) return { erro: 'Quantidade entre 1 e 20.000.' }
+  const { data, error } = await supabaseAdmin().rpc('disparo_divisao_previa', {
+    f: p.data.filtros,
+    p_ordem: p.data.ordem,
+    p_excluir_compartilhados: p.data.excluir_compartilhados,
+    p_grupo: p.data.grupo_id,
+    p_quantidade: p.data.quantidade
+  })
+  if (error) {
+    return {
+      erro: /could not find the function/i.test(error.message)
+        ? 'a migração 017 (divisão dos disparos) ainda não foi aplicada no banco.'
+        : error.message
+    }
+  }
+  return { divisao: data as Divisao }
 }
 
 export async function mudarStatusCampanha(id: number, status: 'ativa' | 'pausada' | 'concluida'): Promise<Retorno> {

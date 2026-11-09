@@ -179,6 +179,23 @@ export type Campanha = {
   atualizada_em: string
 }
 
+/** Uma fatia da divisão (valor da dimensão + quantos disparos). `nome` só nos nichos. */
+export type ItemDivisao = { v: string | null; n: number; nome?: string }
+
+/** Como a quantidade de disparos se divide: prévia de campanha nova ou o que já saiu + a fila de uma campanha salva. */
+export type Divisao = {
+  total: number
+  segmentos: number
+  ramo: ItemDivisao[]
+  uf: ItemDivisao[]
+  regime: ItemDivisao[]
+  porte: ItemDivisao[]
+  localizacao: ItemDivisao[]
+  /** só na campanha salva */
+  enviados?: number
+  na_fila?: number
+}
+
 export type NumerosCampanha = {
   campanha_id: number
   total: number
