@@ -4,16 +4,20 @@ import { notFound } from 'next/navigation'
 import { ArrowLeft, Building2, ExternalLink, Mail, MapPin, MessageCircle, Phone, TriangleAlert } from 'lucide-react'
 import { PORTE_CURTO, SeloPrioridade, SeloSituacao } from '@/components/consulta/selos'
 import { Copiar } from '@/components/ui/copiar'
+import { FOCO } from '@/components/ui/foco'
 import { obterEmpresa, paginaInterna } from '@/lib/empresas/consulta'
 import { fmtData, fmtInt, fmtMoeda } from '@/lib/formatar'
 import { ROTAS } from '@/lib/rotas'
 import { hrefConsulta } from '@/lib/empresas/filtros'
+import { cn } from '@/lib/utils'
 
 type Props = { params: Promise<{ cnpj: string }> }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { cnpj } = await params
-  return { title: `CNPJ ${cnpj}` }
+  // título da aba com a máscara: CNPJ 12.345.678/0001-90 (endereço inválido cai no 404)
+  if (!/^\d{14}$/.test(cnpj)) return { title: 'Página não encontrada' }
+  return { title: `CNPJ ${cnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5')}` }
 }
 
 export default async function EmpresaPage({ params }: Props) {
@@ -30,17 +34,22 @@ export default async function EmpresaPage({ params }: Props) {
   )}`
 
   return (
-    <div className='mx-auto max-w-6xl space-y-5 p-6'>
-      <Link href={ROTAS.dashboard} className='inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-marca-700'>
-        <ArrowLeft className='size-4' /> Voltar à consulta
+    <div className='mx-auto max-w-6xl space-y-5 p-4 md:p-6'>
+      <Link
+        href={ROTAS.dashboard}
+        className={cn('inline-flex items-center gap-1.5 rounded-sm text-sm text-slate-500 hover:text-marca-700', FOCO)}
+      >
+        <ArrowLeft className='size-4' aria-hidden /> Voltar à consulta
       </Link>
 
-      <header className='flex flex-wrap items-start gap-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm shadow-marca-900/[0.03]'>
-        <div className='grid size-12 place-items-center rounded-xl bg-marca-50 text-marca-700'>
-          <Building2 className='size-6' />
+      <header className='flex flex-wrap items-start gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-marca-900/[0.03] sm:p-6'>
+        <div className='hidden size-12 shrink-0 place-items-center rounded-xl bg-marca-50 text-marca-700 sm:grid'>
+          <Building2 className='size-6' aria-hidden />
         </div>
-        <div className='min-w-0 flex-1 space-y-1'>
-          <h1 className='font-serif text-[1.7rem] font-bold leading-tight tracking-[-0.01em] text-marca-800'>{e.razao_social}</h1>
+        <div className='min-w-0 flex-1 basis-60 space-y-1'>
+          <h1 className='break-words font-serif text-[1.4rem] font-bold leading-tight tracking-[-0.01em] text-marca-800 sm:text-[1.7rem]'>
+            {e.razao_social}
+          </h1>
           {e.nome_fantasia && <p className='text-slate-500'>{e.nome_fantasia}</p>}
           <div className='flex flex-wrap items-center gap-2 pt-1 text-sm'>
             <span className='flex items-center font-mono text-slate-600'>
@@ -52,9 +61,9 @@ export default async function EmpresaPage({ params }: Props) {
             <SeloSituacao situacao={e.situacao_regime} />
           </div>
         </div>
-        <div className='text-right'>
+        <div className='sm:text-right'>
           <SeloPrioridade prioridade={e.prioridade} score={e.score} grande />
-          <p className='mt-1 text-xs text-slate-400'>prioridade · score 0–100</p>
+          <p className='mt-1 text-xs text-slate-500'>prioridade · score 0–100</p>
         </div>
       </header>
 
@@ -74,11 +83,14 @@ export default async function EmpresaPage({ params }: Props) {
                 <p className='mb-2 text-xs font-medium text-slate-500'>Atividades secundárias ({secundarias.length})</p>
                 <ul className='grid gap-1 text-sm sm:grid-cols-2'>
                   {secundarias.map(s => (
-                    <li key={s.cnae} className='flex gap-2'>
-                      <Link href={hrefConsulta({ filtros: { cnae_secundario: s.cnae } })} className='font-mono text-xs text-marca-700 hover:underline'>
+                    <li key={s.cnae} className='flex min-w-0 gap-2'>
+                      <Link
+                        href={hrefConsulta({ filtros: { cnae_secundario: s.cnae } })}
+                        className={cn('shrink-0 rounded-sm font-mono text-xs text-marca-700 hover:underline', FOCO)}
+                      >
                         {s.cnae_fmt}
                       </Link>
-                      <span className='text-slate-600'>{s.atividade}</span>
+                      <span className='min-w-0 break-words text-slate-600'>{s.atividade}</span>
                     </li>
                   ))}
                 </ul>
@@ -98,7 +110,7 @@ export default async function EmpresaPage({ params }: Props) {
                   ['Exclusão do Simples', fmtData(e.data_exclusao_simples)]
                 ]}
               />
-              <p className='mt-3 text-xs text-slate-400'>
+              <p className='mt-3 text-xs text-slate-500'>
                 O regime vem da ECF e é histórico: não confirma o enquadramento atual.
               </p>
             </Cartao>
@@ -120,16 +132,16 @@ export default async function EmpresaPage({ params }: Props) {
               <ul className='divide-y divide-slate-100 text-sm'>
                 {mesmoEmail.map(o => (
                   <li key={o.cnpj} className='flex items-center justify-between gap-3 py-2'>
-                    <Link href={ROTAS.empresa(o.cnpj)} className='truncate text-slate-700 hover:text-marca-700'>
+                    <Link href={ROTAS.empresa(o.cnpj)} className={cn('truncate rounded-sm text-slate-700 hover:text-marca-700', FOCO)}>
                       {o.razao_social}
                     </Link>
-                    <span className='shrink-0 text-xs text-slate-400'>{o.municipio}</span>
+                    <span className='shrink-0 text-xs text-slate-500'>{o.municipio}</span>
                   </li>
                 ))}
               </ul>
               <Link
                 href={hrefConsulta({ filtros: { email: e.email! } })}
-                className='mt-3 inline-block text-sm font-medium text-marca-700 hover:underline'
+                className={cn('mt-3 inline-block rounded-sm text-sm font-medium text-marca-700 hover:underline', FOCO)}
               >
                 Ver todas na consulta →
               </Link>
@@ -145,9 +157,12 @@ export default async function EmpresaPage({ params }: Props) {
                   href={e.whatsapp_link}
                   target='_blank'
                   rel='noreferrer'
-                  className='flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 font-medium text-white hover:bg-emerald-700'
+                  className={cn(
+                    'flex items-center justify-center gap-2 rounded-lg bg-marca-800 px-3 py-2 font-medium text-creme hover:bg-marca-950',
+                    FOCO
+                  )}
                 >
-                  <MessageCircle className='size-4' /> WhatsApp {e.whatsapp}
+                  <MessageCircle className='size-4' aria-hidden /> WhatsApp {e.whatsapp}
                 </a>
               )}
               <Telefone rotulo='Telefone 1' numero={e.telefone1} tipo={e.telefone1_tipo} original={e.telefone1_original} />
@@ -160,9 +175,12 @@ export default async function EmpresaPage({ params }: Props) {
               )}
               {e.email ? (
                 <div>
-                  <p className='text-xs text-slate-400'>E-mail · {e.email_tipo}</p>
-                  <a href={`mailto:${e.email}`} className='flex items-center gap-1.5 break-all text-marca-700 hover:underline'>
-                    <Mail className='size-3.5 shrink-0' /> {e.email}
+                  <p className='text-xs text-slate-500'>E-mail · {e.email_tipo}</p>
+                  <a
+                    href={`mailto:${e.email}`}
+                    className={cn('flex items-center gap-1.5 rounded-sm text-marca-700 wrap-anywhere hover:underline', FOCO)}
+                  >
+                    <Mail className='size-3.5 shrink-0' aria-hidden /> <span className='min-w-0'>{e.email}</span>
                   </a>
                   {contador && (
                     <p className='mt-1 flex gap-1.5 text-xs text-amber-700'>
@@ -171,27 +189,29 @@ export default async function EmpresaPage({ params }: Props) {
                   )}
                 </div>
               ) : (
-                e.email_original && <p className='text-xs text-slate-400'>E-mail inválido no cadastro: {e.email_original}</p>
+                e.email_original && (
+                  <p className='text-xs text-slate-500 wrap-anywhere'>E-mail inválido no cadastro: {e.email_original}</p>
+                )
               )}
             </div>
           </Cartao>
 
           <Cartao titulo='Endereço'>
-            <div className='space-y-1 text-sm text-slate-700'>
+            <div className='space-y-1 text-sm text-slate-700 wrap-break-word'>
               <p>{e.endereco}</p>
               <p>
                 {e.bairro} · {e.municipio}/{e.uf} · {e.cep}
               </p>
-              <p className='text-xs text-slate-400'>
+              <p className='text-xs text-slate-500'>
                 {e.localizacao} · região de {e.regiao_intermediaria} ({e.regiao_imediata})
               </p>
               <a
                 href={mapa}
                 target='_blank'
                 rel='noreferrer'
-                className='mt-2 inline-flex items-center gap-1.5 text-sm font-medium text-marca-700 hover:underline'
+                className={cn('mt-2 inline-flex items-center gap-1.5 rounded-sm text-sm font-medium text-marca-700 hover:underline', FOCO)}
               >
-                <MapPin className='size-4' /> Ver no mapa <ExternalLink className='size-3' />
+                <MapPin className='size-4' aria-hidden /> Ver no mapa <ExternalLink className='size-3' aria-hidden />
               </a>
             </div>
           </Cartao>
@@ -203,7 +223,7 @@ export default async function EmpresaPage({ params }: Props) {
 
 function Cartao({ titulo, children }: { titulo: string; children: React.ReactNode }) {
   return (
-    <section className='rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-marca-900/[0.03]'>
+    <section className='min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-marca-900/[0.03] sm:p-5'>
       <h2 className='mb-3 font-serif text-[1.05rem] font-bold text-marca-800'>{titulo}</h2>
       {children}
     </section>
@@ -215,8 +235,8 @@ function Campos({ itens }: { itens: [string, string | null | undefined][] }) {
     <dl className='grid gap-x-6 gap-y-2.5 text-sm sm:grid-cols-[minmax(130px,auto)_1fr]'>
       {itens.map(([k, v]) => (
         <div key={k} className='contents'>
-          <dt className='text-slate-400'>{k}</dt>
-          <dd className='text-slate-700'>{v && v !== '—' ? v : <span className='text-slate-300'>—</span>}</dd>
+          <dt className='text-slate-500'>{k}</dt>
+          <dd className='min-w-0 text-slate-700 wrap-break-word'>{v && v !== '—' ? v : <span className='text-slate-400'>—</span>}</dd>
         </div>
       ))}
     </dl>
@@ -237,16 +257,19 @@ function Telefone({
   if (!numero && !original) return null
   return (
     <div>
-      <p className='text-xs text-slate-400'>
+      <p className='text-xs text-slate-500'>
         {rotulo}
         {tipo && ` · ${tipo}`}
       </p>
       {numero ? (
-        <a href={`tel:+55${numero.replace(/\D/g, '')}`} className='flex items-center gap-1.5 text-slate-700 hover:text-marca-700'>
-          <Phone className='size-3.5 text-slate-400' /> {numero}
+        <a
+          href={`tel:+55${numero.replace(/\D/g, '')}`}
+          className={cn('flex items-center gap-1.5 rounded-sm text-slate-700 hover:text-marca-700', FOCO)}
+        >
+          <Phone className='size-3.5 text-slate-400' aria-hidden /> {numero}
         </a>
       ) : (
-        <p className='text-slate-400'>{original} (como está no cadastro)</p>
+        <p className='text-slate-500 wrap-anywhere'>{original} (como está no cadastro)</p>
       )}
     </div>
   )

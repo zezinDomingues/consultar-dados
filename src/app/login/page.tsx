@@ -58,7 +58,11 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
 
         <div className='login-coluna flex h-full flex-col gap-8 px-6 py-6 sm:px-10 lg:min-h-dvh lg:justify-between lg:gap-6 lg:px-14 lg:py-10 xl:px-20'>
           <div className='flex items-start justify-between gap-6'>
-            <Link href={ROTAS.inicio} className='w-fit' aria-label='OficialCert — voltar ao site'>
+            <Link
+              href={ROTAS.inicio}
+              className='w-fit rounded-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ouro'
+              aria-label='OficialCert — voltar ao site'
+            >
               <img src='/site/marca/vertical-escuro.svg' alt='OficialCert' className='h-14 w-auto lg:h-[4.5rem]' />
             </Link>
             {/* notebooks: o selo flutua no canto, longe do texto */}
@@ -100,7 +104,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
             </ul>
           </div>
 
-          <p className='hidden text-[11px] text-areia/55 lg:block'>© 2026 OficialCert · Afiliada GWT Solution</p>
+          <p className='hidden text-[11px] text-areia/75 lg:block'>© 2026 OficialCert · Afiliada GWT Solution</p>
         </div>
       </section>
 
@@ -108,7 +112,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
       <section className='relative flex flex-col px-6 py-8 sm:px-10 lg:py-10'>
         <Link
           href={ROTAS.inicio}
-          className='inline-flex w-fit items-center gap-2 text-[13px] font-semibold text-oc-700/70 transition-colors hover:text-oc-700'
+          className='inline-flex w-fit items-center gap-2 rounded-sm text-[13px] font-semibold text-oc-700/75 transition-colors hover:text-oc-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-oc-700'
         >
           <ArrowLeft className='size-4' /> Voltar ao site
         </Link>
@@ -129,13 +133,14 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
               <FormLogin next={next} />
             </div>
 
-            <p className='mt-6 flex items-center gap-2 text-[11px] font-medium text-oc-700/55'>
+            <p className='mt-6 flex items-center gap-2 text-[11px] font-medium text-oc-700/75'>
               <ShieldCheck className='size-3.5 shrink-0' /> Acesso protegido e sigiloso, conforme a LGPD.
             </p>
           </div>
         </div>
 
-        <p className='text-center text-[11px] text-oc-700/45 lg:hidden'>© 2026 OficialCert · Afiliada GWT Solution</p>
+        {/* contraste ≥ 4,5:1 sobre o creme (antes /45 = 2,5:1) */}
+        <p className='text-center text-[11px] text-oc-700/75 lg:hidden'>© 2026 OficialCert · Afiliada GWT Solution</p>
       </section>
     </main>
   )

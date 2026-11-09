@@ -1,9 +1,11 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronDown, LoaderCircle, RotateCcw, Search } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { ChevronDown, LoaderCircle, RotateCcw, Search, SlidersHorizontal, X } from 'lucide-react'
 import { MultiSelect } from './multi-select'
 import { useConsulta } from './contexto'
+import { FOCO } from '@/components/ui/foco'
+import { useGaveta, useMidia } from '@/components/ui/gaveta'
 import {
   alternar,
   contarFiltros,
@@ -20,8 +22,9 @@ import {
 } from '@/lib/empresas/filtros'
 import type { Opcoes } from '@/lib/empresas/tipos'
 
-type Uf = (typeof UFS)[number]
 import { cn } from '@/lib/utils'
+
+type Uf = (typeof UFS)[number]
 
 /** Remove chaves vazias: lista vazia, false, '' e undefined = "sem filtro". */
 function limpar(f: Filtros): Filtros {
@@ -33,8 +36,46 @@ function limpar(f: Filtros): Filtros {
   return r as Filtros
 }
 
+/** Abaixo de xl (1280 px) os filtros saem da lateral e abrem por este botão. */
+export function BotaoFiltros({ total }: { total: number }) {
+  const { filtrosAbertos, abrirFiltros } = useConsulta()
+  return (
+    <button
+      type='button'
+      id='botao-filtros'
+      onClick={() => abrirFiltros(true)}
+      aria-expanded={filtrosAbertos}
+      aria-controls='painel-filtros'
+      className={cn(
+        'inline-flex h-10 items-center gap-2 rounded-full border border-marca-800 bg-white px-4 text-sm font-bold tracking-wide text-marca-800 transition hover:bg-marca-50 xl:hidden',
+        FOCO
+      )}
+    >
+      <SlidersHorizontal className='size-4' aria-hidden />
+      Filtros
+      {total > 0 && (
+        <span className='rounded-full bg-marca-800 px-1.5 py-px text-xs text-creme' aria-label={`${total} aplicados`}>
+          {total}
+        </span>
+      )}
+    </button>
+  )
+}
+
 export function PainelFiltros({ consulta, opcoes }: { consulta: Consulta; opcoes: Opcoes }) {
-  const { navegar, pendente } = useConsulta()
+  const { navegar, pendente, filtrosAbertos, abrirFiltros } = useConsulta()
+  // Abaixo de xl é uma folha que desliza por cima (Esc, toque fora e o botão "Ver resultados" fecham)
+  const largo = useMidia('(min-width: 1280px)')
+  const folha = filtrosAbertos && !largo
+  const fechar = useCallback(() => abrirFiltros(false), [abrirFiltros])
+  const gatilho = useRef<HTMLElement | null>(null)
+  useEffect(() => {
+    gatilho.current = document.getElementById('botao-filtros')
+  }, [])
+  const painel = useGaveta<HTMLElement>(folha, fechar, gatilho)
+  useEffect(() => {
+    if (largo) abrirFiltros(false)
+  }, [largo, abrirFiltros])
   const [f, setF] = useState<Filtros>(consulta.filtros)
   const fRef = useRef(f)
   fRef.current = f
@@ -100,183 +141,225 @@ export function PainelFiltros({ consulta, opcoes }: { consulta: Consulta; opcoes
   const total = contarFiltros(f)
 
   return (
-    <aside className='sticky top-0 flex h-screen w-[296px] shrink-0 flex-col border-r border-slate-200 bg-white'>
-      <div className='flex items-center justify-between border-b border-slate-100 px-5 py-4'>
-        <div className='flex items-center gap-2'>
-          <h2 className='font-serif text-lg font-bold text-marca-800'>Filtros</h2>
-          {total > 0 && (
-            <span className='rounded-full bg-marca-100 px-2 py-0.5 text-xs font-medium text-marca-800'>{total}</span>
-          )}
-          {pendente && <LoaderCircle className='size-3.5 animate-spin text-marca-500' aria-label='Atualizando' />}
+    <>
+      {folha && <div aria-hidden className='fixed inset-0 z-40 bg-oc-950/50 xl:hidden' onClick={fechar} />}
+      <aside
+        id='painel-filtros'
+        ref={painel}
+        aria-labelledby='titulo-filtros'
+        {...(folha ? { role: 'dialog', 'aria-modal': true } : {})}
+        className={cn(
+          'fixed inset-y-0 left-0 z-50 flex h-dvh w-[22rem] max-w-[calc(100vw-2.5rem)] flex-col border-r border-slate-200 bg-white shadow-2xl shadow-oc-950/30',
+          'duration-200 ease-out motion-reduce:transition-none',
+          filtrosAbertos ? 'visible translate-x-0 transition-[translate,transform]' : 'invisible -translate-x-full transition-[translate,transform,visibility]',
+          'xl:visible xl:sticky xl:top-0 xl:z-auto xl:w-[264px] xl:max-w-none xl:shrink-0 xl:translate-x-0 xl:shadow-none xl:transition-none 2xl:w-[296px]'
+        )}
+      >
+        <div className='flex items-center justify-between gap-2 border-b border-slate-100 px-5 py-4'>
+          <div className='flex items-center gap-2'>
+            <h2 id='titulo-filtros' className='font-serif text-lg font-bold text-marca-800'>
+              Filtros
+            </h2>
+            {total > 0 && (
+              <span className='rounded-full bg-marca-100 px-2 py-0.5 text-xs font-medium text-marca-800'>{total}</span>
+            )}
+            {pendente && <LoaderCircle className='size-3.5 animate-spin text-marca-500' aria-label='Atualizando' />}
+          </div>
+          <div className='flex items-center gap-1'>
+            {total > 0 && (
+              <button
+                type='button'
+                onClick={() => {
+                  setTexto('')
+                  setF({})
+                  navegar(hrefConsulta({ filtros: {}, ordem: consulta.ordem, por: consulta.por }))
+                }}
+                className={cn('flex items-center gap-1 rounded-md px-1.5 py-1 text-xs text-slate-500 hover:text-marca-700', FOCO)}
+              >
+                <RotateCcw className='size-3' aria-hidden /> Limpar
+              </button>
+            )}
+            <button
+              type='button'
+              onClick={fechar}
+              aria-label='Fechar filtros'
+              data-foco-inicial
+              className={cn('-mr-2 grid size-9 place-items-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-marca-800 xl:hidden', FOCO)}
+            >
+              <X className='size-5' aria-hidden />
+            </button>
+          </div>
         </div>
-        {total > 0 && (
+
+        <div className='flex-1 space-y-1 overflow-y-auto px-5 py-4'>
+          <div className='relative mb-3'>
+            <Search className='absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400' aria-hidden />
+            <input
+              type='search'
+              aria-label='Buscar por razão social, nome fantasia ou CNPJ'
+              value={texto}
+              onChange={e => setTexto(e.target.value)}
+              onFocus={() => (focado.current = true)}
+              onBlur={() => (focado.current = false)}
+              placeholder='Razão social, fantasia ou CNPJ'
+              className='h-10 w-full rounded-lg border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm outline-none transition focus:border-marca-400 focus:bg-white focus:ring-4 focus:ring-marca-50'
+            />
+          </div>
+
+          <Secao titulo='O que a empresa faz' ativos={[f.setores, f.ramos, f.segmentos, f.cnaes, f.cnae_secundario]}>
+            <MultiSelect rotulo='Setor' opcoes={opcoes.setores} selecionados={f.setores} aoMudar={v => aplicar({ setores: v })} />
+            <MultiSelect rotulo='Ramo' opcoes={ramos} selecionados={f.ramos} aoMudar={v => aplicar({ ramos: v })} />
+            <MultiSelect
+              rotulo='Segmento'
+              opcoes={segmentos}
+              selecionados={f.segmentos}
+              aoMudar={v => aplicar({ segmentos: v })}
+            />
+            <MultiSelect
+              rotulo='Atividade (CNAE)'
+              opcoes={atividades}
+              selecionados={f.cnaes}
+              aoMudar={v => aplicar({ cnaes: v })}
+              mostrarCodigo
+            />
+            <CampoTexto
+              rotulo='Também faz (CNAE secundário)'
+              placeholder='ex.: 4771-7/02'
+              valor={f.cnae_secundario}
+              aoAplicar={v => {
+                const dig = v?.replace(/\D/g, '')
+                aplicar({ cnae_secundario: dig && dig.length >= 4 ? dig.slice(0, 7) : undefined })
+              }}
+            />
+          </Secao>
+
+          <Secao titulo='Tamanho' ativos={[f.portes, f.capital_min, f.capital_max, f.idade_min, f.idade_max, f.estab_min]}>
+            <Chips
+              rotulo='Porte'
+              valores={PORTES}
+              rotulos={{ 'Empresa de pequeno porte': 'EPP', 'Médio porte': 'Médio', 'Grande porte': 'Grande', Microempresa: 'ME' }}
+              selecionados={f.portes}
+              aoAlternar={v => aplicar({ portes: alternar(f.portes, v) })}
+            />
+            <Faixa
+              rotulo='Capital social (R$)'
+              min={f.capital_min}
+              max={f.capital_max}
+              aoAplicar={(min, max) => aplicar({ capital_min: min, capital_max: max })}
+            />
+            <Faixa
+              rotulo='Idade da empresa (anos)'
+              min={f.idade_min}
+              max={f.idade_max}
+              inteiro
+              aoAplicar={(min, max) => aplicar({ idade_min: min, idade_max: max })}
+            />
+            <Faixa
+              rotulo='Estabelecimentos no estado (mínimo)'
+              min={f.estab_min}
+              inteiro
+              soMinimo
+              aoAplicar={min => aplicar({ estab_min: min })}
+            />
+          </Secao>
+
+          <Secao titulo='Tributação' ativos={[f.regimes, f.situacoes_regime]}>
+            <Chips
+              rotulo='Regime (ECF)'
+              valores={REGIMES}
+              rotulos={{ 'Tributação mista': 'Mista' }}
+              selecionados={f.regimes}
+              aoAlternar={v => aplicar({ regimes: alternar(f.regimes, v) })}
+            />
+            <Chips
+              rotulo='Situação do regime'
+              valores={SITUACOES}
+              selecionados={f.situacoes_regime}
+              aoAlternar={v => aplicar({ situacoes_regime: alternar(f.situacoes_regime, v) })}
+            />
+          </Secao>
+
+          <Secao titulo='Onde fica' ativos={[f.ufs, f.localizacoes, f.regioes, f.municipios]}>
+            {ufs.length > 1 && (
+              <Chips
+                rotulo='Estado'
+                valores={ufs}
+                selecionados={f.ufs}
+                aoAlternar={v => aplicar({ ufs: alternar(f.ufs, v) })}
+              />
+            )}
+            <Chips
+              rotulo='Localização'
+              valores={LOCALIZACOES}
+              selecionados={f.localizacoes}
+              aoAlternar={v => aplicar({ localizacoes: alternar(f.localizacoes, v) })}
+            />
+            <MultiSelect
+              rotulo='Região (IBGE)'
+              opcoes={regioes}
+              selecionados={f.regioes}
+              aoMudar={v => aplicar({ regioes: v })}
+            />
+            <MultiSelect
+              rotulo='Município'
+              opcoes={municipios}
+              selecionados={f.municipios}
+              aoMudar={v => aplicar({ municipios: v })}
+            />
+          </Secao>
+
+          <Secao titulo='Contato' ativos={[f.com_whatsapp, f.com_email, f.contato_proprio, f.email]}>
+            <Interruptor
+              rotulo='Com WhatsApp'
+              descricao='Celular válido no cadastro'
+              ligado={!!f.com_whatsapp}
+              aoMudar={v => aplicar({ com_whatsapp: v || undefined })}
+            />
+            <Interruptor
+              rotulo='Com e-mail'
+              descricao='E-mail válido no cadastro'
+              ligado={!!f.com_email}
+              aoMudar={v => aplicar({ com_email: v || undefined })}
+            />
+            <Interruptor
+              rotulo='Contato da própria empresa'
+              descricao='Exclui e-mail de contador ou compartilhado'
+              ligado={!!f.contato_proprio}
+              aoMudar={v => aplicar({ contato_proprio: v || undefined })}
+            />
+          </Secao>
+
+          <Secao titulo='Prioridade e tipo' ativos={[f.prioridades, f.tipos_negocio]}>
+            <Chips
+              rotulo='Prioridade (score)'
+              valores={PRIORIDADES}
+              selecionados={f.prioridades}
+              aoAlternar={v => aplicar({ prioridades: alternar(f.prioridades, v) })}
+            />
+            <Chips
+              rotulo='Tipo de negócio'
+              valores={TIPOS_NEGOCIO}
+              rotulos={{ 'SPE (propósito específico)': 'SPE', 'Holding / patrimonial': 'Holding' }}
+              selecionados={f.tipos_negocio}
+              aoAlternar={v => aplicar({ tipos_negocio: alternar(f.tipos_negocio, v) })}
+            />
+          </Secao>
+        </div>
+
+        <div className='border-t border-slate-100 p-4 xl:hidden'>
           <button
             type='button'
-            onClick={() => {
-              setTexto('')
-              setF({})
-              navegar(hrefConsulta({ filtros: {}, ordem: consulta.ordem, por: consulta.por }))
-            }}
-            className='flex items-center gap-1 text-xs text-slate-500 hover:text-marca-700'
+            onClick={fechar}
+            className={cn(
+              'flex h-11 w-full items-center justify-center gap-2 rounded-full bg-marca-800 text-sm font-bold tracking-wide text-creme shadow-md shadow-marca-900/15 transition hover:bg-marca-950',
+              FOCO
+            )}
           >
-            <RotateCcw className='size-3' /> Limpar
+            {pendente && <LoaderCircle className='size-4 animate-spin' aria-hidden />} Ver resultados
           </button>
-        )}
-      </div>
-
-      <div className='flex-1 space-y-1 overflow-y-auto px-5 py-4'>
-        <div className='relative mb-3'>
-          <Search className='absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400' />
-          <input
-            value={texto}
-            onChange={e => setTexto(e.target.value)}
-            onFocus={() => (focado.current = true)}
-            onBlur={() => (focado.current = false)}
-            placeholder='Razão social, fantasia ou CNPJ'
-            className='h-10 w-full rounded-lg border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm outline-none transition focus:border-marca-400 focus:bg-white focus:ring-4 focus:ring-marca-50'
-          />
         </div>
-
-        <Secao titulo='O que a empresa faz' ativos={[f.setores, f.ramos, f.segmentos, f.cnaes, f.cnae_secundario]}>
-          <MultiSelect rotulo='Setor' opcoes={opcoes.setores} selecionados={f.setores} aoMudar={v => aplicar({ setores: v })} />
-          <MultiSelect rotulo='Ramo' opcoes={ramos} selecionados={f.ramos} aoMudar={v => aplicar({ ramos: v })} />
-          <MultiSelect
-            rotulo='Segmento'
-            opcoes={segmentos}
-            selecionados={f.segmentos}
-            aoMudar={v => aplicar({ segmentos: v })}
-          />
-          <MultiSelect
-            rotulo='Atividade (CNAE)'
-            opcoes={atividades}
-            selecionados={f.cnaes}
-            aoMudar={v => aplicar({ cnaes: v })}
-            mostrarCodigo
-          />
-          <CampoTexto
-            rotulo='Também faz (CNAE secundário)'
-            placeholder='ex.: 4771-7/02'
-            valor={f.cnae_secundario}
-            aoAplicar={v => {
-              const dig = v?.replace(/\D/g, '')
-              aplicar({ cnae_secundario: dig && dig.length >= 4 ? dig.slice(0, 7) : undefined })
-            }}
-          />
-        </Secao>
-
-        <Secao titulo='Tamanho' ativos={[f.portes, f.capital_min, f.capital_max, f.idade_min, f.idade_max, f.estab_min]}>
-          <Chips
-            rotulo='Porte'
-            valores={PORTES}
-            rotulos={{ 'Empresa de pequeno porte': 'EPP', 'Médio porte': 'Médio', 'Grande porte': 'Grande', Microempresa: 'ME' }}
-            selecionados={f.portes}
-            aoAlternar={v => aplicar({ portes: alternar(f.portes, v) })}
-          />
-          <Faixa
-            rotulo='Capital social (R$)'
-            min={f.capital_min}
-            max={f.capital_max}
-            aoAplicar={(min, max) => aplicar({ capital_min: min, capital_max: max })}
-          />
-          <Faixa
-            rotulo='Idade da empresa (anos)'
-            min={f.idade_min}
-            max={f.idade_max}
-            inteiro
-            aoAplicar={(min, max) => aplicar({ idade_min: min, idade_max: max })}
-          />
-          <Faixa
-            rotulo='Estabelecimentos no estado (mínimo)'
-            min={f.estab_min}
-            inteiro
-            soMinimo
-            aoAplicar={min => aplicar({ estab_min: min })}
-          />
-        </Secao>
-
-        <Secao titulo='Tributação' ativos={[f.regimes, f.situacoes_regime]}>
-          <Chips
-            rotulo='Regime (ECF)'
-            valores={REGIMES}
-            rotulos={{ 'Tributação mista': 'Mista' }}
-            selecionados={f.regimes}
-            aoAlternar={v => aplicar({ regimes: alternar(f.regimes, v) })}
-          />
-          <Chips
-            rotulo='Situação do regime'
-            valores={SITUACOES}
-            selecionados={f.situacoes_regime}
-            aoAlternar={v => aplicar({ situacoes_regime: alternar(f.situacoes_regime, v) })}
-          />
-        </Secao>
-
-        <Secao titulo='Onde fica' ativos={[f.ufs, f.localizacoes, f.regioes, f.municipios]}>
-          {ufs.length > 1 && (
-            <Chips
-              rotulo='Estado'
-              valores={ufs}
-              selecionados={f.ufs}
-              aoAlternar={v => aplicar({ ufs: alternar(f.ufs, v) })}
-            />
-          )}
-          <Chips
-            rotulo='Localização'
-            valores={LOCALIZACOES}
-            selecionados={f.localizacoes}
-            aoAlternar={v => aplicar({ localizacoes: alternar(f.localizacoes, v) })}
-          />
-          <MultiSelect
-            rotulo='Região (IBGE)'
-            opcoes={regioes}
-            selecionados={f.regioes}
-            aoMudar={v => aplicar({ regioes: v })}
-          />
-          <MultiSelect
-            rotulo='Município'
-            opcoes={municipios}
-            selecionados={f.municipios}
-            aoMudar={v => aplicar({ municipios: v })}
-          />
-        </Secao>
-
-        <Secao titulo='Contato' ativos={[f.com_whatsapp, f.com_email, f.contato_proprio, f.email]}>
-          <Interruptor
-            rotulo='Com WhatsApp'
-            descricao='Celular válido no cadastro'
-            ligado={!!f.com_whatsapp}
-            aoMudar={v => aplicar({ com_whatsapp: v || undefined })}
-          />
-          <Interruptor
-            rotulo='Com e-mail'
-            descricao='E-mail válido no cadastro'
-            ligado={!!f.com_email}
-            aoMudar={v => aplicar({ com_email: v || undefined })}
-          />
-          <Interruptor
-            rotulo='Contato da própria empresa'
-            descricao='Exclui e-mail de contador ou compartilhado'
-            ligado={!!f.contato_proprio}
-            aoMudar={v => aplicar({ contato_proprio: v || undefined })}
-          />
-        </Secao>
-
-        <Secao titulo='Prioridade e tipo' ativos={[f.prioridades, f.tipos_negocio]}>
-          <Chips
-            rotulo='Prioridade (score)'
-            valores={PRIORIDADES}
-            selecionados={f.prioridades}
-            aoAlternar={v => aplicar({ prioridades: alternar(f.prioridades, v) })}
-          />
-          <Chips
-            rotulo='Tipo de negócio'
-            valores={TIPOS_NEGOCIO}
-            rotulos={{ 'SPE (propósito específico)': 'SPE', 'Holding / patrimonial': 'Holding' }}
-            selecionados={f.tipos_negocio}
-            aoAlternar={v => aplicar({ tipos_negocio: alternar(f.tipos_negocio, v) })}
-          />
-        </Secao>
-      </div>
-    </aside>
+      </aside>
+    </>
   )
 }
 
@@ -284,12 +367,17 @@ function Secao({ titulo, ativos, children }: { titulo: string; ativos: unknown[]
   const n = ativos.filter(v => (Array.isArray(v) ? v.length > 0 : v !== undefined && v !== false)).length
   return (
     <details open className='group border-b border-slate-100 py-3 last:border-0'>
-      <summary className='flex cursor-pointer select-none items-center justify-between text-[11px] font-bold uppercase tracking-[0.16em] text-marca-800/70'>
+      <summary
+        className={cn(
+          'flex cursor-pointer select-none items-center justify-between rounded-md text-[11px] font-bold uppercase tracking-[0.16em] text-marca-800/75',
+          FOCO
+        )}
+      >
         <span className='flex items-center gap-2'>
           {titulo}
-          {n > 0 && <span className='size-1.5 rounded-full bg-marca-500' />}
+          {n > 0 && <span className='size-1.5 rounded-full bg-marca-500' aria-label='com filtro' />}
         </span>
-        <ChevronDown className='size-4 transition group-open:rotate-180' />
+        <ChevronDown className='size-4 transition group-open:rotate-180' aria-hidden />
       </summary>
       <div className='mt-3 space-y-3'>{children}</div>
     </details>
@@ -310,8 +398,10 @@ function Chips<T extends string>({
   aoAlternar: (v: T) => void
 }) {
   return (
-    <div className='space-y-1.5'>
-      <span className='text-xs font-medium text-slate-600'>{rotulo}</span>
+    <div className='space-y-1.5' role='group' aria-label={rotulo}>
+      <span className='text-xs font-medium text-slate-600' aria-hidden>
+        {rotulo}
+      </span>
       <div className='flex flex-wrap gap-1.5'>
         {valores.map(v => {
           const ativo = selecionados?.includes(v)
@@ -319,11 +409,12 @@ function Chips<T extends string>({
             <button
               key={v}
               type='button'
-              aria-pressed={ativo}
+              aria-pressed={!!ativo}
               title={v}
               onClick={() => aoAlternar(v)}
               className={cn(
                 'rounded-full border px-2.5 py-1 text-xs transition',
+                FOCO,
                 ativo
                   ? 'border-marca-700 bg-marca-700 text-white'
                   : 'border-slate-200 bg-white text-slate-600 hover:border-marca-300 hover:text-marca-800'
@@ -355,11 +446,11 @@ function Interruptor({
       role='switch'
       aria-checked={ligado}
       onClick={() => aoMudar(!ligado)}
-      className='flex w-full items-center justify-between gap-3 text-left'
+      className={cn('flex w-full items-center justify-between gap-3 rounded-md text-left', FOCO)}
     >
       <span>
         <span className='block text-sm text-slate-700'>{rotulo}</span>
-        <span className='block text-xs text-slate-400'>{descricao}</span>
+        <span className='block text-xs text-slate-500'>{descricao}</span>
       </span>
       <span
         className={cn(
@@ -422,13 +513,17 @@ function Faixa({
       'h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-marca-400 focus:ring-4 focus:ring-marca-50'
   }
   return (
-    <div className='space-y-1.5'>
-      <span className='text-xs font-medium text-slate-600'>{rotulo}</span>
+    <div className='space-y-1.5' role='group' aria-label={rotulo}>
+      <span className='text-xs font-medium text-slate-600' aria-hidden>
+        {rotulo}
+      </span>
       <div className='flex items-center gap-2'>
         <input {...props} value={a} onChange={e => setA(e.target.value)} placeholder='mín.' aria-label={`${rotulo} mínimo`} />
         {!soMinimo && (
           <>
-            <span className='text-slate-300'>–</span>
+            <span className='text-slate-300' aria-hidden>
+              –
+            </span>
             <input {...props} value={b} onChange={e => setB(e.target.value)} placeholder='máx.' aria-label={`${rotulo} máximo`} />
           </>
         )}
