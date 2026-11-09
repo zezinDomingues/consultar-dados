@@ -2,6 +2,7 @@ import 'server-only'
 import { DICIONARIO, FATOS } from './conhecimento'
 import { descreverEtapa, executarFerramenta, FERRAMENTAS, type Contexto } from './ferramentas'
 import { novaSessao, type Mensagem } from './provedores'
+import { novoSigilo } from './sigilo'
 import type { Anexo, AnexoConsulta, AnexoContadores, EventoAgente } from './tipos'
 import { fmtInt } from '@/lib/formatar'
 import { opcoesFiltros } from '@/lib/empresas/consulta'
@@ -31,7 +32,8 @@ ${base ? fmtInt(base.total) : ''} empresas ATIVAS, uma por raiz de CNPJ em cada 
 - Use as ferramentas. consultar_empresas mostra AO USUÁRIO um painel igual ao da tela de Consulta (filtros entendidos, indicadores, distribuições e tabela com contatos). detalhar_empresa mostra o cartão da empresa. listar_contadores mostra a tabela de escritórios.
 - Vá direto à ferramenta: na mesma resposta, sem texto antes. A legenda com os números é escrita pelo sistema a partir do resultado.
 - PROIBIDO na resposta do tipo A: listas, tabelas, enumerar empresas/municípios/regiões, repetir os indicadores. O painel já mostra tudo isso.
-- Números, nomes, CNPJs e contatos vêm SEMPRE das ferramentas. Nunca invente nem estime.
+- Números, nomes e CNPJs vêm SEMPRE das ferramentas. Nunca invente nem estime.
+- Você NÃO recebe os contatos das empresas (WhatsApp, telefones, e-mail, endereço): eles aparecem para o usuário na tabela e no cartão. Se pedirem um contato, abra a ficha (detalhar_empresa) e diga que está no cartão. E-mails de escritórios chegam como "[contato:…]": repita a referência exatamente como veio.
 - Não acrescente filtros que o usuário não pediu (ex.: não filtre regime, porte ou contato se ele não falou disso). A base inteira já é Lucro Real/Presumido/mista.
 - Comparações ("Campinas ou Sorocaba?") → chame consultar_empresas uma vez por opção, TODAS NA MESMA RESPOSTA (chamadas em paralelo); a tela compara os totais.
 - Refinamentos ("dessas…", "agora só…", "e em Campinas?") → pegue os filtros da busca anterior (estão na seção "O que o usuário já está vendo na tela") e mude só o que foi pedido.
@@ -120,8 +122,23 @@ function limpar(texto: string) {
     .trim()
 }
 
-export async function responder(historico: TurnoUsuario[], emitir: (e: EventoAgente) => void, contexto?: string) {
+/** Turno cancelado (prazo total estourou ou o usuário fechou a conversa). */
+const parar = (sinal?: AbortSignal) => {
+  if (sinal?.aborted) throw sinal.reason instanceof Error ? sinal.reason : new Error('cancelado')
+}
+
+/**
+ * `sinal`: prazo total do turno + desistência do usuário (a rota junta os dois); cancela as chamadas ao modelo.
+ * Tudo que vai para o modelo passa pelo sigilo: sem telefone e com e-mail trocado por referência.
+ */
+export async function responder(
+  historico: TurnoUsuario[],
+  emitir: (e: EventoAgente) => void,
+  contexto?: string,
+  sinal?: AbortSignal
+) {
   const inicio = Date.now()
+  const sigilo = novoSigilo()
   const mensagens: Mensagem[] = [
     {
       role: 'system',
@@ -132,13 +149,13 @@ export async function responder(historico: TurnoUsuario[], emitir: (e: EventoAge
             .catch(() => undefined)
         ) +
         (contexto?.trim()
-          ? `\n\n## O que o usuário já está vendo na tela (mais recente por último)\nUse para refinamentos ("dessas…") e para "a segunda da lista". É informação interna: NUNCA copie este bloco na resposta.\n${contexto}`
+          ? `\n\n## O que o usuário já está vendo na tela (mais recente por último)\nUse para refinamentos ("dessas…") e para "a segunda da lista". É informação interna: NUNCA copie este bloco na resposta.\n${sigilo.ocultar(contexto)}`
           : '')
     },
     ...historico.slice(-MAX_HISTORICO).map(t =>
       t.papel === 'usuario'
-        ? ({ role: 'user', content: t.texto } as const)
-        : ({ role: 'assistant', content: t.texto } as const)
+        ? ({ role: 'user', content: sigilo.ocultar(t.texto) } as const)
+        : ({ role: 'assistant', content: sigilo.ocultar(t.texto) } as const)
     )
   ]
   const sessao = novaSessao()
@@ -150,10 +167,11 @@ export async function responder(historico: TurnoUsuario[], emitir: (e: EventoAge
   emitir({ tipo: 'etapa', texto: 'Entendendo o pedido' })
 
   for (let i = 0; i < MAX_ITERACOES; i++) {
+    parar(sinal)
     const ultima = i === MAX_ITERACOES - 1
-    const r = await sessao.completar(mensagens, ultima ? [] : FERRAMENTAS)
+    const r = await sessao.completar(mensagens, ultima ? [] : FERRAMENTAS, sinal)
     if (!r.chamadas.length) {
-      const texto = limpar(r.texto ?? '') || (anexos.length ? '' : 'Não consegui montar uma resposta. Pode reformular a pergunta?')
+      const texto = sigilo.revelar(limpar(r.texto ?? '')) || (anexos.length ? '' : 'Não consegui montar uma resposta. Pode reformular a pergunta?')
       const fim = { texto, motor: sessao.motor, ms: Date.now() - inicio, ferramentas }
       emitir({ tipo: 'fim', ...fim })
       return { ...fim, anexos }
@@ -162,10 +180,12 @@ export async function responder(historico: TurnoUsuario[], emitir: (e: EventoAge
     const anexosAntes = anexos.length
     let falhou = false
     for (const c of r.chamadas) {
+      parar(sinal)
       ferramentas.push(c.function.name)
-      emitir({ tipo: 'etapa', texto: descreverEtapa(c.function.name, c.function.arguments) })
+      const args = sigilo.revelar(c.function.arguments) // "[contato:…]" que o modelo devolveu → e-mail de verdade
+      emitir({ tipo: 'etapa', texto: descreverEtapa(c.function.name, args) })
       let resultado: unknown
-      const assinatura = `${c.function.name}:${c.function.arguments}`
+      const assinatura = `${c.function.name}:${args}`
       if (falhasFerramenta.size >= 2 || falhasFerramenta.has(assinatura)) {
         const fim = {
           texto: 'A base demorou mais que o normal para responder agora. Tente de novo em instantes — se persistir, use menos filtros de uma vez.',
@@ -177,16 +197,16 @@ export async function responder(historico: TurnoUsuario[], emitir: (e: EventoAge
         return { ...fim, anexos }
       }
       try {
-        resultado = await executarFerramenta(c.function.name, c.function.arguments, ctx)
+        resultado = await executarFerramenta(c.function.name, args, ctx)
       } catch (e) {
         resultado = { erro: `Falha ao consultar: ${(e as Error).message}` }
       }
       if (resultado && typeof resultado === 'object' && 'erro' in resultado) {
         falhou = true
         if (String((resultado as { erro: unknown }).erro).startsWith('Falha ao consultar')) falhasFerramenta.add(assinatura)
-        console.warn(`[agente] ${c.function.name} recusou ${c.function.arguments.slice(0, 400)} → ${JSON.stringify(resultado).slice(0, 400)}`)
+        console.warn(`[agente] ${c.function.name} recusou ${args.slice(0, 400)} → ${JSON.stringify(resultado).slice(0, 400)}`)
       }
-      mensagens.push({ role: 'tool', tool_call_id: c.id, content: JSON.stringify(resultado).slice(0, 30_000) })
+      mensagens.push({ role: 'tool', tool_call_id: c.id, content: sigilo.ocultarEmails(JSON.stringify(resultado)).slice(0, 30_000) })
     }
     // Só ferramentas de painel, todas deram certo → a legenda sai do código e o turno acaba aqui.
     if (!falhou && anexos.length > anexosAntes && r.chamadas.every(c => MOSTRAM_PAINEL.has(c.function.name))) {

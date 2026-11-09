@@ -5,8 +5,10 @@
 // Divisão de trabalho: a ferramenta devolve DOIS resultados.
 //   • um "anexo" para a TELA (indicadores, distribuições, tabela, ficha) — é o
 //     que o usuário vê, idêntico à Consulta;
-//   • um resumo curto para o MODELO, que só escreve a legenda. Os contatos não
-//     vão para o modelo: assim ele não repete a tabela em texto.
+//   • um resumo curto para o MODELO, que só escreve a legenda. Os contatos
+//     (WhatsApp, telefones, e-mail, endereço) NUNCA vão para o modelo: os
+//     provedores de IA são externos (LGPD) e a tela já mostra tudo. E-mail de
+//     contador vai como referência opaca (sigilo.ts).
 import 'server-only'
 import { z } from 'zod'
 import { buscarEmpresas, listarContadores, obterEmpresa, opcoesFiltros, resumoEmpresas } from '@/lib/empresas/consulta'
@@ -103,7 +105,8 @@ export const FERRAMENTAS = [
       name: 'listar_contadores',
       description:
         'Mostra ao usuário a tabela de e-mails presentes no cadastro de 5+ empresas (escritórios contábeis e grupos), ' +
-        'com quantas empresas cada um atende. Para ver os clientes de um deles, use consultar_empresas com filtros.email.',
+        'com quantas empresas cada um atende. Para ver os clientes de um deles, use consultar_empresas com filtros.email. ' +
+        'Os e-mails chegam como referência "[contato:…]": use a referência exatamente como veio, o sistema troca pelo e-mail.',
       parameters: {
         type: 'object',
         properties: {
@@ -219,7 +222,7 @@ export function descreverEtapa(nome: string, argsTexto: string) {
     case 'buscar_codigos':
       return `Procurando “${String(a.termo ?? '').slice(0, 40)}” na CNAE e nos municípios`
     case 'consultar_empresas':
-      return 'Consultando as 628 mil empresas'
+      return 'Consultando a base de empresas'
     case 'detalhar_empresa':
       return 'Abrindo a ficha da empresa'
     case 'listar_contadores':
@@ -298,14 +301,15 @@ export async function executarFerramenta(nome: string, argsTexto: string, ctx: C
       if (!ctx.anexos.some(a => a.chave === anexo.chave)) ctx.anexos.push(anexo)
       ctx.emitir({ tipo: 'anexo', anexo })
       return {
-        instrucao: 'O USUÁRIO JÁ ESTÁ VENDO o cartão da empresa com todos os contatos. Responda em 1 a 3 frases exatamente o que foi pedido.',
+        instrucao:
+          'O USUÁRIO JÁ ESTÁ VENDO o cartão da empresa com todos os contatos (WhatsApp, telefones, e-mail e endereço). ' +
+          'Você NÃO recebe os contatos: se pedirem um, diga que está no cartão acima. Responda em 1 a 3 frases exatamente o que foi pedido.',
         razao_social: e.razao_social,
         fantasia: e.nome_fantasia,
         cnpj: e.cnpj_formatado,
         atividade: `${e.cnae_fmt} ${e.atividade_principal}`,
         ramo: e.ramo,
-        municipio: e.municipio,
-        endereco: [e.endereco, e.bairro, `${e.municipio}/${e.uf}`, e.cep].filter(Boolean).join(', '),
+        municipio: `${e.municipio}/${e.uf}`,
         porte: e.porte,
         capital_social: e.capital_social,
         abertura: e.data_abertura,
@@ -314,10 +318,12 @@ export async function executarFerramenta(nome: string, argsTexto: string, ctx: C
         simples_out2026: e.simples_out2026,
         prioridade: e.prioridade,
         score: e.score,
-        whatsapp: e.whatsapp,
-        telefone1: e.telefone1,
-        telefone2: e.telefone2,
-        email: e.email,
+        contatos_no_cartao: {
+          whatsapp: !!e.whatsapp,
+          telefones: [e.telefone1, e.telefone2].filter(Boolean).length,
+          email: !!e.email,
+          endereco: !!e.endereco
+        },
         email_tipo: e.email_tipo,
         empresas_com_o_mesmo_email: e.empresas_mesmo_email,
         atividades_secundarias: d.secundarias.map(s => `${s.cnae_fmt} ${s.atividade}`).slice(0, 15),
