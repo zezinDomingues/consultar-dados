@@ -51,3 +51,41 @@ a.radar-card:hover .radar-foto img { transform: scale(1.04); }
 [data-radar-escuro] .radar-esqueleto { background: rgba(255, 255, 255, .04); }
 [data-radar-escuro] .radar-esqueleto::after { background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .06), transparent); }
 [data-radar-escuro] .radar-vazio { color: rgba(213, 205, 186, .7); }
+
+/* Impressão / "salvar como PDF": as animações de entrada não podem esconder conteúdo. */
+@media print {
+  .gwt-anim { opacity: 1 !important; transform: none !important; }
+}
+
+/* Formulários: erro por campo, aviso geral (falha no envio) e o segmento vindo de /diagnostico?segmento=.
+   data-tema="escuro" (Diagnóstico, Parceiro) ou "claro" (home) é posto pelo site.js. */
+.oc-erro-campo { margin: .45rem .25rem 0; font-size: 12.5px; line-height: 1.45; font-weight: 600; color: #b91c1c; }
+form[data-tema="escuro"] .oc-erro-campo { color: #fca5a5; }
+form[data-tema] [aria-invalid="true"] { border-color: #dc2626; }
+form[data-tema="escuro"] [aria-invalid="true"] { border-color: rgba(252, 165, 165, .75); }
+.oc-aviso {
+  grid-column: 1 / -1; display: block; padding: .85rem 1rem; border-radius: .75rem; text-align: left;
+  font-size: 13px; line-height: 1.5; background: #fef2f2; border: 1px solid #fecaca; color: #991b1b;
+}
+form[data-tema="escuro"] .oc-aviso { background: rgba(248, 113, 113, .12); border-color: rgba(252, 165, 165, .35); color: #fee2e2; }
+.oc-aviso.oc-aviso-ok { background: rgba(33, 56, 112, .08); border-color: rgba(33, 56, 112, .2); color: #1a2d5a; }
+form[data-tema="escuro"] .oc-aviso.oc-aviso-ok { background: rgba(196, 185, 154, .15); border-color: rgba(196, 185, 154, .3); color: #f5f1e8; }
+.oc-aviso-saidas { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .65rem; }
+.oc-aviso-acao {
+  display: inline-flex; align-items: center; padding: .45rem .95rem; border-radius: 999px; border: 1px solid currentColor;
+  background: transparent; color: inherit; font: inherit; font-size: 12px; font-weight: 700; text-decoration: none; cursor: pointer;
+}
+.oc-aviso-acao:hover { background: rgba(127, 127, 127, .12); }
+.oc-aviso-acao:focus-visible, [data-aviso-sucesso]:focus-visible { outline: 2px solid #c4b99a; outline-offset: 2px; }
+[data-aviso-sucesso]:focus { outline: none; }
+.oc-segmento {
+  grid-column: 1 / -1; justify-self: start; display: inline-block; margin: 0; padding: .45rem .95rem; border-radius: 999px;
+  font-size: 13px; color: #d5cdba; border: 1px solid rgba(196, 185, 154, .3); background: rgba(196, 185, 154, .08);
+}
+.oc-segmento strong { color: #f5f1e8; font-weight: 700; }
+form[data-tema="claro"] .oc-segmento { color: #213870; border-color: rgba(33, 56, 112, .2); background: rgba(33, 56, 112, .05); }
+form[data-tema="claro"] .oc-segmento strong { color: #1a2d5a; }
+form[aria-busy="true"] button[type="submit"] { cursor: progress; }
+/* o cabeçalho fixo não pode cobrir o campo com erro quando o foco vai até ele */
+form[data-tema] [data-campo], form[data-tema] [data-oc-aviso] { scroll-margin-top: 7.5rem; scroll-margin-bottom: 2rem; }
+.oc-noscript { margin: 0 0 .5rem; }
