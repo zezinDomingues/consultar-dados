@@ -1,40 +1,56 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { z } from 'zod'
+import { chaveDeLimite, ipDoCliente } from '@/lib/ip-cliente'
+import { interpretarRegistro, LeadSite, MAX_CORPO } from '@/lib/leads-site'
+import { supabaseAdmin, temChaveSecreta } from '@/lib/supabase/admin'
 
-// Recebe os formulários do site institucional (público, sem login).
-// Grava pela função registrar_lead_site, que valida e limita envios por IP.
-const texto = (max: number) => z.string().trim().max(max).optional().default('')
+// Recebe os formulários do site institucional (público, sem login) e grava pela função registrar_lead_site,
+// que limita os envios por IP. Respostas: 200 gravou · 400 dado inválido (com a mensagem de cada campo) ·
+// 429 limite de envios · 500 falha do banco. O site só diz "recebemos" com 200.
+export const dynamic = 'force-dynamic'
 
-const Lead = z.object({
-  tipo: z.enum(['contato', 'parceiro']),
-  origem: texto(60),
-  pagina: texto(200),
-  nome: z.string().trim().min(1).max(200),
-  empresa: texto(200),
-  cnpj: texto(30),
-  email: texto(200),
-  whatsapp: texto(40),
-  mensagem: texto(4000),
-  segmento: texto(120)
-})
+const resposta = (status: number, corpo: Record<string, unknown>, headers?: HeadersInit) =>
+  NextResponse.json(corpo, { status, headers: { 'Cache-Control': 'no-store', ...headers } })
 
 export async function POST(request: NextRequest) {
-  const p = Lead.safeParse(await request.json().catch(() => null))
-  if (!p.success) return NextResponse.json({ erro: 'Dados inválidos.' }, { status: 400 })
-
-  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!, {
-    auth: { persistSession: false, autoRefreshToken: false }
-  })
-  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null
-  const { error } = await supabase.rpc('registrar_lead_site', {
-    dados: p.data,
-    ip,
-    user_agent: request.headers.get('user-agent')
-  })
-  if (error) {
-    console.error('[lead do site]', error.message)
-    return NextResponse.json({ erro: 'Não foi possível registrar agora.' }, { status: 400 })
+  const bruto = await request.text().catch(() => '')
+  if (bruto.length > MAX_CORPO) return resposta(413, { erro: 'Mensagem grande demais. Resuma o texto e envie de novo.' })
+  let json: unknown = null
+  try {
+    json = JSON.parse(bruto)
+  } catch {}
+  const p = LeadSite.safeParse(json)
+  if (!p.success) {
+    const campos: Record<string, string> = {}
+    for (const i of p.error.issues) {
+      const k = String(i.path[0] ?? '')
+      if (k && !campos[k]) campos[k] = i.message
+    }
+    const erro = Object.keys(campos).length ? 'Confira os campos destacados.' : 'Dados inválidos.'
+    return resposta(400, { erro, campos })
   }
-  return NextResponse.json({ ok: true })
+
+  // chave secreta quando houver (assim a Segurança pode tirar o execute do anon); senão, a pública de sempre
+  const db = temChaveSecreta()
+    ? supabaseAdmin()
+    : createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!, {
+        auth: { persistSession: false, autoRefreshToken: false }
+      })
+  const { data, error, status } = await db.rpc('registrar_lead_site', {
+    dados: p.data,
+    ip: chaveDeLimite(ipDoCliente(request.headers)),
+    user_agent: request.headers.get('user-agent')?.slice(0, 300) ?? null
+  })
+  const r = interpretarRegistro(data, error, status)
+  if (r === 'ok') return resposta(200, { ok: true })
+  if (r === 'limite') {
+    return resposta(
+      429,
+      { erro: 'Recebemos muitos envios da sua conexão nos últimos minutos. Aguarde uns 10 minutos e envie de novo.' },
+      { 'Retry-After': '600' }
+    )
+  }
+  if (r === 'invalido') return resposta(400, { erro: 'Confira os dados e envie de novo.' })
+  console.error('[lead do site]', status, error?.code, error?.message)
+  return resposta(500, { erro: 'Não foi possível registrar agora. Tente de novo em instantes.' })
 }
