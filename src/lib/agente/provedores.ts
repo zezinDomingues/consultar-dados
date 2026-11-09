@@ -124,13 +124,29 @@ type Candidato = { p: Provedor; modelo: string }
  * Corrida escalonada: começa no 1º candidato; a cada TEMPO_CORRIDA sem resposta (ou na hora, se ele falhar),
  * entra o próximo em paralelo. Vale a primeira resposta boa; as outras são canceladas.
  */
-async function correr(fila: Candidato[], mensagens: Mensagem[], ferramentas: readonly unknown[], falhas: string[]) {
+async function correr(
+  fila: Candidato[],
+  mensagens: Mensagem[],
+  ferramentas: readonly unknown[],
+  falhas: string[],
+  sinal?: AbortSignal
+) {
   const controles = fila.map(() => new AbortController())
   return new Promise<{ r: RespostaModelo; c: Candidato }>((resolve, reject) => {
     let proximo = 0
     let pendentes = 0
     let terminou = false
     let relogio: ReturnType<typeof setTimeout> | undefined
+    // prazo total do turno estourou ou o usuário desistiu: cancela todas as chamadas em voo
+    const cancelar = () => {
+      if (terminou) return
+      terminou = true
+      clearTimeout(relogio)
+      controles.forEach(ctl => ctl.abort())
+      reject(sinal?.reason instanceof Error ? sinal.reason : new Error('cancelado'))
+    }
+    if (sinal?.aborted) return cancelar()
+    sinal?.addEventListener('abort', cancelar, { once: true })
     const lancar = () => {
       if (terminou || proximo >= fila.length) return
       const i = proximo++
@@ -143,6 +159,7 @@ async function correr(fila: Candidato[], mensagens: Mensagem[], ferramentas: rea
           if (terminou) return
           terminou = true
           clearTimeout(relogio)
+          sinal?.removeEventListener('abort', cancelar)
           controles.forEach((ctl, j) => j !== i && ctl.abort())
           resolve({ r, c })
         },
@@ -154,6 +171,7 @@ async function correr(fila: Candidato[], mensagens: Mensagem[], ferramentas: rea
           else if (pendentes === 0) {
             terminou = true
             clearTimeout(relogio)
+            sinal?.removeEventListener('abort', cancelar)
             reject(new Error(`Nenhum modelo respondeu: ${falhas.join(' | ')}`))
           }
         }
@@ -179,9 +197,10 @@ export function novaSessao() {
       return escolhido ? `${escolhido.p.rotulo} · ${escolhido.modelo}` : null
     },
     falhas,
-    async completar(mensagens: Mensagem[], ferramentas: readonly unknown[]): Promise<RespostaModelo> {
+    /** `sinal`: prazo total do turno / usuário desistiu — cancela as chamadas em voo. */
+    async completar(mensagens: Mensagem[], ferramentas: readonly unknown[], sinal?: AbortSignal): Promise<RespostaModelo> {
       const ordem = escolhido ? [escolhido, ...fila.filter(c => c !== escolhido)] : fila
-      const { r, c } = await correr(ordem, mensagens, ferramentas, falhas)
+      const { r, c } = await correr(ordem, mensagens, ferramentas, falhas, sinal)
       escolhido = c
       return r
     }

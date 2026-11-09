@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { buscarEmpresas, SemAcessoError } from '@/lib/empresas/consulta'
+import { avisoCorte, celula, respostaCsv } from '@/lib/csv'
+import { buscarEmpresas, resumoEmpresas, SemAcessoError } from '@/lib/empresas/consulta'
 import { LIMITE_EXPORTACAO, lerConsulta } from '@/lib/empresas/filtros'
 
 // Colunas do CSV (nome no arquivo, coluna da view empresas_completa)
@@ -17,38 +18,59 @@ const COLUNAS: [string, string][] = [
   ['Tipo de e-mail', 'email_tipo'], ['Empresas c/ mesmo e-mail', 'empresas_mesmo_email']
 ]
 
-const celula = (v: unknown, coluna: string) => {
+const LOTE = 1000
+
+const valor = (v: unknown, coluna: string) => {
   if (v === null || v === undefined) return ''
-  let s = String(v)
-  if (coluna === 'capital_social') s = s.replace('.', ',')
-  if (coluna === 'data_abertura') s = s.split('-').reverse().join('/')
-  return /[";\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+  if (coluna === 'capital_social') return String(v).replace('.', ',')
+  if (coluna === 'data_abertura') return String(v).split('-').reverse().join('/')
+  return v
+}
+
+/** Total da consulta (o mesmo resumo da tela, em cache): o "Exportar CSV" avisa antes quando passa do limite. */
+async function totalDe(filtros: ReturnType<typeof lerConsulta>['filtros']) {
+  return (await resumoEmpresas(JSON.stringify(filtros))).total.n
 }
 
 export async function GET(request: NextRequest) {
   const sp = request.nextUrl.searchParams
   const { filtros, ordem } = lerConsulta(k => sp.get(k))
-  const select = COLUNAS.map(([, c]) => c).join(',')
 
-  const linhas: string[] = [COLUNAS.map(([n]) => n).join(';')]
+  if (sp.get('contar') === '1') {
+    try {
+      return NextResponse.json({ total: await totalDe(filtros), limite: LIMITE_EXPORTACAO }, { headers: { 'Cache-Control': 'no-store' } })
+    } catch (erro) {
+      if (erro instanceof SemAcessoError) return NextResponse.json({ erro: erro.message }, { status: 403 })
+      console.error('[exportar] total', erro)
+      return NextResponse.json({ erro: 'Não foi possível contar agora.' }, { status: 503 })
+    }
+  }
+
+  const select = COLUNAS.map(([, c]) => c).join(',')
+  const linhas: string[] = [COLUNAS.map(([n]) => celula(n)).join(';')]
+  let incompleto = false
   try {
-    for (let pagina = 1; (pagina - 1) * 1000 < LIMITE_EXPORTACAO; pagina++) {
-      const lote = (await buscarEmpresas(filtros, ordem, pagina, 1000, select)) as unknown as Record<string, unknown>[]
-      for (const r of lote) linhas.push(COLUNAS.map(([, c]) => celula(r[c], c)).join(';'))
-      if (lote.length < 1000) break
+    for (let pagina = 1; (pagina - 1) * LOTE < LIMITE_EXPORTACAO; pagina++) {
+      const lote = (await buscarEmpresas(filtros, ordem, pagina, LOTE, select)) as unknown as Record<string, unknown>[]
+      for (const r of lote) linhas.push(COLUNAS.map(([, c]) => celula(valor(r[c], c))).join(';'))
+      if (lote.length < LOTE) break
     }
   } catch (erro) {
     if (erro instanceof SemAcessoError) return NextResponse.json({ erro: erro.message }, { status: 403 })
-    throw erro
+    console.error('[exportar] lote', erro)
+    if (linhas.length === 1) {
+      return NextResponse.json({ erro: 'A base demorou para responder. Tente de novo em instantes ou use menos filtros de texto.' }, { status: 503 })
+    }
+    incompleto = true // devolve o que já veio, avisando no fim do arquivo
   }
 
-  const hoje = new Date().toISOString().slice(0, 10)
-  // BOM + ";" : o Excel em português abre direto, com acentos e colunas certas.
-  return new NextResponse('﻿' + linhas.join('\r\n'), {
-    headers: {
-      'Content-Type': 'text/csv; charset=utf-8',
-      'Content-Disposition': `attachment; filename="empresas_${hoje}.csv"`,
-      'Cache-Control': 'no-store'
-    }
-  })
+  const n = linhas.length - 1
+  if (incompleto) {
+    linhas.push(celula(`Arquivo incompleto: a base parou de responder depois de ${n.toLocaleString('pt-BR')} linhas — baixe de novo.`))
+  } else if (n >= LIMITE_EXPORTACAO) {
+    const total = await totalDe(filtros).catch(() => null)
+    if (total === null || total > n) linhas.push(avisoCorte(LIMITE_EXPORTACAO, total))
+  }
+
+  return respostaCsv(linhas, `empresas_${new Date().toISOString().slice(0, 10)}.csv`)
 }

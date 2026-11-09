@@ -35,6 +35,46 @@ export const TEMAS = [
 ] as const
 const MAX_DIAS = 5
 const NAVEGADOR = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130 Safari/537.36'
+// limites das buscas externas (SEC-11): ninguém segura a função com uma página gigante ou um redirect sem fim
+const MAX_RSS = 2_000_000 // bytes de cada RSS do Bing
+const MAX_HTML = 300_000 // bytes do começo de cada matéria (as metas ficam no <head>)
+const MAX_REDIRECTS = 3
+
+/** Só https em porta padrão e nome de domínio público (nada de IP, localhost ou rede interna). */
+function urlPublica(endereco: string): URL | null {
+  try {
+    const u = new URL(endereco)
+    const h = u.hostname.toLowerCase()
+    if (u.protocol !== 'https:' || (u.port && u.port !== '443') || u.username || u.password) return null
+    if (!h.includes('.') || h.startsWith('[') || /^[\d.]+$/.test(h)) return null
+    if (/(^|\.)(localhost|local|localdomain|internal|intranet|lan|home|corp)$/.test(h)) return null
+    return u
+  } catch {
+    return null
+  }
+}
+
+/** Lê no máximo `max` bytes do corpo (para antes se `basta` disser) e cancela o resto. */
+async function lerAte(r: Response, max: number, basta?: (texto: string) => boolean) {
+  if (!r.body) return ''
+  const leitor = r.body.getReader()
+  const dec = new TextDecoder()
+  let texto = ''
+  let bytes = 0
+  try {
+    while (bytes < max) {
+      const { done, value } = await leitor.read()
+      if (done) break
+      const pedaco = value.byteLength > max - bytes ? value.subarray(0, max - bytes) : value
+      bytes += pedaco.byteLength
+      texto += dec.decode(pedaco, { stream: true })
+      if (basta?.(texto)) break
+    }
+  } finally {
+    leitor.cancel().catch(() => {})
+  }
+  return texto + dec.decode()
+}
 
 // trava 2 — o título (sem acento, minúsculo) precisa de pelo menos um destes…
 const TEMA = new RegExp(
@@ -71,7 +111,8 @@ async function buscarBing(tema: string, q: string): Promise<Bruta[]> {
   const url = `https://www.bing.com/news/search?q=${encodeURIComponent(q)}&format=rss&setlang=pt-BR&cc=BR&mkt=pt-BR&qft=sortbydate%3d%221%22`
   const r = await fetch(url, { headers: { 'User-Agent': NAVEGADOR }, signal: AbortSignal.timeout(10000) })
   if (!r.ok) throw new Error(`Bing Notícias ${r.status}`)
-  const xml = await r.text()
+  if (Number(r.headers.get('content-length')) > MAX_RSS) throw new Error('Bing Notícias: RSS grande demais')
+  const xml = await lerAte(r, MAX_RSS)
   const limite = Date.now() - MAX_DIAS * 864e5
   return [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].flatMap(([, item]) => {
     const clique = campo(item, 'link')
@@ -83,7 +124,8 @@ async function buscarBing(tema: string, q: string): Promise<Bruta[]> {
     }
     const data = new Date(campo(item, 'pubDate'))
     if (isNaN(+data) || +data < limite) return []
-    const img = campo(item, 'News:Image').replace(/^http:/, 'https:')
+    const miniatura = campo(item, 'News:Image').replace(/^http:/, 'https:')
+    const img = urlPublica(miniatura) ? miniatura : ''
     return [{
       id: link.replace(/[^a-z0-9]/gi, '').slice(-32),
       titulo: campo(item, 'title'),
@@ -101,24 +143,32 @@ async function buscarBing(tema: string, q: string): Promise<Bruta[]> {
 /** og:image (ou twitter:image) da própria matéria; só https para não cair em conteúdo misto. */
 async function imagemDoPortal(link: string): Promise<string> {
   try {
-    const r = await fetch(link, { headers: { 'User-Agent': NAVEGADOR, Accept: 'text/html' }, redirect: 'follow', signal: AbortSignal.timeout(7000) })
-    if (!r.ok || !r.body) return ''
-    // lê só o começo da página (as metas ficam no <head>)
-    const leitor = r.body.getReader()
-    let html = ''
-    while (html.length < 250_000) {
-      const { done, value } = await leitor.read()
-      if (done) break
-      html += new TextDecoder().decode(value)
-      if (html.includes('</head>')) break
+    // redirects um a um, conferindo cada destino (o "follow" automático iria a qualquer endereço)
+    const prazo = AbortSignal.timeout(7000)
+    let alvo = urlPublica(link)
+    let r: Response | null = null
+    for (let i = 0; alvo && i <= MAX_REDIRECTS; i++) {
+      r = await fetch(alvo, { headers: { 'User-Agent': NAVEGADOR, Accept: 'text/html' }, redirect: 'manual', signal: prazo })
+      if (r.status < 300 || r.status >= 400) break
+      r.body?.cancel().catch(() => {})
+      const proximo = r.headers.get('location')
+      alvo = proximo ? urlPublica(new URL(proximo, alvo).toString()) : null
+      r = null
     }
-    leitor.cancel().catch(() => {})
+    if (!r?.ok || !r.body) return ''
+    const tipo = r.headers.get('content-type') ?? ''
+    if (tipo && !/html/i.test(tipo)) {
+      r.body.cancel().catch(() => {})
+      return ''
+    }
+    // lê só o começo da página (as metas ficam no <head>)
+    const html = await lerAte(r, MAX_HTML, t => t.includes('</head>'))
     const meta = (nome: string) =>
       html.match(new RegExp(`<meta[^>]+(?:property|name)=["']${nome}["'][^>]*content=["']([^"']+)["']`, 'i'))?.[1] ||
       html.match(new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]*(?:property|name)=["']${nome}["']`, 'i'))?.[1]
     const bruto = meta('og:image:secure_url') || meta('og:image') || meta('twitter:image') || meta('twitter:image:src')
     if (!bruto) return ''
-    const abs = new URL(decodificar(bruto), r.url || link).toString().replace(/^http:/, 'https:')
+    const abs = urlPublica(new URL(decodificar(bruto), r.url || link).toString().replace(/^http:/, 'https:'))?.toString() ?? ''
     return /logo|placeholder|default[-_]?(image|og)|favicon/i.test(abs) ? '' : abs
   } catch {
     return ''
@@ -127,7 +177,7 @@ async function imagemDoPortal(link: string): Promise<string> {
 
 function dentroDoTema(n: { titulo: string; link: string }) {
   const t = sem(n.titulo)
-  return TEMA.test(t) && !FORA.test(t) && n.link.startsWith('https://')
+  return TEMA.test(t) && !FORA.test(t) && !!urlPublica(n.link)
 }
 
 /** trava 3: o modelo devolve os números das manchetes que são de fato sobre tributação. */

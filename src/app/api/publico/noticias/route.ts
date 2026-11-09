@@ -21,7 +21,8 @@ export async function GET() {
       headers: { 'Cache-Control': 'public, max-age=300, s-maxage=3600, stale-while-revalidate=86400' }
     })
   } catch (e) {
+    console.error('[noticias]', e) // o detalhe fica no log do servidor, não vai para o público
     if (cache) return NextResponse.json(cache.dados, { headers: { 'Cache-Control': 'public, s-maxage=300' } })
-    return NextResponse.json({ erro: 'Não foi possível carregar as notícias agora.', detalhe: String(e) }, { status: 503 })
+    return NextResponse.json({ erro: 'Não foi possível carregar as notícias agora.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } })
   }
 }
