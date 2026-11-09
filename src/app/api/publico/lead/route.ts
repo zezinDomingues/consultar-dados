@@ -1,5 +1,4 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
 import { chaveDeLimite, ipDoCliente } from '@/lib/ip-cliente'
 import { interpretarRegistro, LeadSite, MAX_CORPO } from '@/lib/leads-site'
 import { supabaseAdmin, temChaveSecreta } from '@/lib/supabase/admin'
@@ -30,27 +29,23 @@ export async function POST(request: NextRequest) {
     return resposta(400, { erro, campos })
   }
 
-  // chave secreta quando houver (assim a Segurança pode tirar o execute do anon); senão, a pública de sempre
-  const db = temChaveSecreta()
-    ? supabaseAdmin()
-    : createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!, {
-        auth: { persistSession: false, autoRefreshToken: false }
-      })
-  const { data, error, status } = await db.rpc('registrar_lead_site', {
+  // só pela chave secreta: o execute do anon sai na 023 (depois do deploy)
+  if (!temChaveSecreta()) {
+    console.error('[lead do site] SUPABASE_SECRET_KEY ausente')
+    return resposta(503, { erro: 'Formulário indisponível no momento. Tente de novo mais tarde.' })
+  }
+  const { data, error, status } = await supabaseAdmin().rpc('registrar_lead_site', {
     dados: p.data,
     ip: chaveDeLimite(ipDoCliente(request.headers)),
     user_agent: request.headers.get('user-agent')?.slice(0, 300) ?? null
   })
   const r = interpretarRegistro(data, error, status)
-  if (r === 'ok') return resposta(200, { ok: true })
-  if (r === 'limite') {
-    return resposta(
-      429,
-      { erro: 'Recebemos muitos envios da sua conexão nos últimos minutos. Aguarde uns 10 minutos e envie de novo.' },
-      { 'Retry-After': '600' }
-    )
+  if (r.tipo === 'ok') return resposta(200, { ok: true })
+  if (r.tipo === 'limite') return resposta(429, { erro: r.erro }, { 'Retry-After': String(r.segundos) })
+  if (r.tipo === 'invalido') {
+    console.error('[lead do site] recusado pelo banco:', error?.message)
+    return resposta(400, { erro: 'Confira os dados e envie de novo.' })
   }
-  if (r === 'invalido') return resposta(400, { erro: 'Confira os dados e envie de novo.' })
   console.error('[lead do site]', status, error?.code, error?.message)
   return resposta(500, { erro: 'Não foi possível registrar agora. Tente de novo em instantes.' })
 }

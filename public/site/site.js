@@ -413,6 +413,9 @@
       primeiro.focus()
       return
     }
+    // tudo certo: deixa WhatsApp e CNPJ com a máscara (Enter envia sem passar pelo blur)
+    if (campos.whatsapp) campos.whatsapp.value = mascaraFone(foneBR(campos.whatsapp.value))
+    if (campos.cnpj && d.cnpj) campos.cnpj.value = mascaraCnpj(cnpjValido(d.cnpj))
 
     var url = WHATSAPP && tipo === 'contato' ? linkWhatsApp(d) : ''
     var aberto = !url
@@ -451,7 +454,8 @@
     var detalhe =
       res.status === 0 ? 'Sem conexão com o servidor: confira sua internet e tente de novo.'
         : res.status === 429 ? res.erro || 'Recebemos muitos envios da sua conexão nos últimos minutos. Aguarde uns 10 minutos e envie de novo.'
-          : res.erro || 'Tente de novo em instantes.'
+          : res.status === 413 || res.status === 400 || res.status === 503 ? res.erro || 'Confira os dados e envie de novo.'
+            : 'Pode ter sido uma falha passageira: tente de novo em instantes.'
     var saidas = []
     if (WHATSAPP) saidas.push(saidaLink(whatsAberto ? 'Reabrir o WhatsApp' : 'Falar pelo WhatsApp', linkWhatsApp(d)))
     if (EMAIL_CONTATO) saidas.push(saidaLink('Enviar por e-mail', linkEmail(d)))

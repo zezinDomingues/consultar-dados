@@ -6,12 +6,12 @@ import { isIP } from 'node:net'
 export const SEM_IP = 'sem-ip'
 
 /**
- * Na Vercel, x-vercel-forwarded-for e x-real-ip são gravados pela borda (o valor mandado pelo cliente é
- * descartado). O x-forwarded-for só entra em último caso, e só o PRIMEIRO valor (o resto é a cadeia de proxies).
+ * Na Vercel, x-real-ip e x-forwarded-for são regravados pela borda (o valor mandado pelo cliente é descartado).
+ * Usa o x-real-ip; na falta dele, só o PRIMEIRO valor do x-forwarded-for (o resto é a cadeia de proxies).
  * Nunca devolve vazio: sem IP válido, cai em SEM_IP.
  */
 export function ipDoCliente(h: Headers): string {
-  for (const nome of ['x-vercel-forwarded-for', 'x-real-ip', 'x-forwarded-for']) {
+  for (const nome of ['x-real-ip', 'x-forwarded-for']) {
     const ip = limpar(h.get(nome)?.split(',')[0])
     if (ip) return ip
   }
@@ -19,8 +19,9 @@ export function ipDoCliente(h: Headers): string {
 }
 
 /**
- * Chave do limite: o IPv4 inteiro; no IPv6, o prefixo /64 (a operadora entrega um /64 por cliente, então trocar
- * os últimos 64 bits não pode virar um balde novo a cada envio).
+ * Chave do limite: o IPv4 inteiro; no IPv6, o endereço de rede do /64 ("2804:14c:5b83:8f1a::" — a operadora entrega
+ * um /64 por cliente, então trocar os últimos 64 bits não pode virar um balde novo a cada envio). Continua sendo um
+ * IP válido: a registrar_lead_site manda IP inválido para o balde comum.
  */
 export function chaveDeLimite(ip: string): string {
   if (isIP(ip) !== 6) return ip
@@ -28,7 +29,7 @@ export function chaveDeLimite(ip: string): string {
   const a = esq ? esq.split(':') : []
   const b = ip.includes('::') && dir ? dir.split(':') : []
   const grupos = ip.includes('::') ? [...a, ...Array(8 - a.length - b.length).fill('0'), ...b] : a
-  return `${grupos.slice(0, 4).map(g => (parseInt(g, 16) || 0).toString(16)).join(':')}::/64`
+  return `${grupos.slice(0, 4).map(g => (parseInt(g, 16) || 0).toString(16)).join(':')}::`
 }
 
 function limpar(v: string | undefined) {

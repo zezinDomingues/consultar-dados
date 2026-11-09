@@ -88,3 +88,4 @@ form[data-tema="claro"] .oc-segmento strong { color: #1a2d5a; }
 form[aria-busy="true"] button[type="submit"] { cursor: progress; }
 /* o cabeçalho fixo não pode cobrir o campo com erro quando o foco vai até ele */
 form[data-tema] [data-campo], form[data-tema] [data-oc-aviso] { scroll-margin-top: 7.5rem; scroll-margin-bottom: 2rem; }
+.oc-noscript { margin: 0 0 .5rem; }

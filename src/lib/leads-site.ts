@@ -21,7 +21,7 @@ const semFormula = (v: string) => !comecaComFormula(v)
 
 export const LeadSite = z
   .object({
-    tipo: z.enum(['contato', 'parceiro']),
+    tipo: z.enum(['contato', 'parceiro'], { error: 'Tipo de formulário inválido.' }),
     origem: linha(60).transform(v => (/^[a-z_]{1,60}$/.test(v) ? v : '')),
     pagina: linha(200).transform(v => (/^\/[\w\-/]{0,199}$/.test(v) ? v : '')),
     nome: linha(120)
@@ -65,26 +65,36 @@ export const LeadSite = z
     d.tipo === 'contato' && !(SEGMENTOS_CONTATO as readonly string[]).includes(d.segmento) ? { ...d, segmento: '' } : d
   )
 
-export type Resultado = 'ok' | 'limite' | 'invalido' | 'falha'
+export type Resultado =
+  | { tipo: 'ok' }
+  | { tipo: 'invalido' }
+  | { tipo: 'falha' }
+  | { tipo: 'limite'; erro: string; segundos: number }
+
+/** Motivos do limite que a 019 manda em error.details, com a mensagem e o Retry-After de cada um. */
+const LIMITES: Record<string, { erro: string; segundos: number }> = {
+  ip_10min: {
+    erro: 'Recebemos muitos envios da sua conexão nos últimos minutos. Aguarde uns 10 minutos e envie de novo.',
+    segundos: 600
+  },
+  sem_ip_hora: { erro: 'Recebemos muitos envios agora. Aguarde até 1 hora e envie de novo.', segundos: 3600 },
+  ip_dia: { erro: 'Recebemos muitos envios da sua conexão hoje. Tente de novo amanhã.', segundos: 86400 },
+  global_dia: { erro: 'Recebemos um volume muito alto de contatos hoje. Tente de novo amanhã.', segundos: 86400 }
+}
 
 /**
- * Lê a resposta da registrar_lead_site de forma tolerante, porque o contrato está mudando (019, Segurança):
- * hoje devolve o id (bigint) e avisa o limite com `raise exception 'muitos envios…'` (P0001); o esperado é um
- * erro com SQLSTATE PT429 (o PostgREST responde HTTP 429). Também aceita um retorno { limite: true } / null.
+ * Lê a resposta da registrar_lead_site. Contrato da 019 (Segurança): sucesso = id (bigint); dado inválido =
+ * P0001 (HTTP 400); limite = PT429 (HTTP 429) com o motivo em details (ip_10min, ip_dia, sem_ip_hora, global_dia).
+ * Enquanto a 019 não está aplicada, a 002 avisa o limite com P0001 "muitos envios, tente mais tarde" — também é
+ * limite. Qualquer outra coisa (rede, permissão, tempo esgotado) é falha. Nunca trata "não gravou" como sucesso.
  */
 export function interpretarRegistro(data: unknown, error: PostgrestError | null, status: number): Resultado {
   if (error) {
-    const texto = `${error.message} ${error.details ?? ''} ${error.hint ?? ''}`
-    if (status === 429 || error.code === 'PT429' || /muitos envios|limite|too many|rate limit/i.test(texto)) return 'limite'
-    if (/^2[23]/.test(error.code ?? '') || /obrigat|muito long|inv[aá]lid/i.test(texto)) return 'invalido'
-    return 'falha'
+    if (error.code === 'PT429' || status === 429 || (error.code === 'P0001' && /muitos envios/i.test(error.message))) {
+      return { tipo: 'limite', ...(LIMITES[String(error.details ?? '').trim()] ?? LIMITES.ip_10min) }
+    }
+    return error.code === 'P0001' ? { tipo: 'invalido' } : { tipo: 'falha' }
   }
-  if (typeof data === 'number' || typeof data === 'string' || typeof data === 'bigint') return Number(data) > 0 ? 'ok' : 'limite'
-  if (data === true) return 'ok'
-  if (data && typeof data === 'object') {
-    const o = data as Record<string, unknown>
-    if (o.limite || o.limitado || o.bloqueado || /limite/i.test(String(o.motivo ?? o.erro ?? ''))) return 'limite'
-    return o.ok === true || Number(o.id) > 0 ? 'ok' : 'falha'
-  }
-  return 'limite' // null/false sem erro: a função não gravou — tratado como limite (nunca como sucesso)
+  const id = typeof data === 'number' || typeof data === 'string' || typeof data === 'bigint' ? Number(data) : NaN
+  return id > 0 ? { tipo: 'ok' } : { tipo: 'falha' }
 }
