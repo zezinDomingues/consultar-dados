@@ -1,5 +1,6 @@
 // Variáveis de ambiente e relógio dos disparos (só servidor).
 import 'server-only'
+import { tokenWebhookNumero } from './seguranca'
 import type { ConfigDisparo, Numero } from './tipos'
 
 /** Endereço público da plataforma (links do formulário e webhook). Runtime, não NEXT_PUBLIC_ (que é assado no build). */
@@ -8,19 +9,43 @@ export function urlApp() {
   return u || 'https://www.oficialcert.com'
 }
 
-/** Segredo do ciclo (Bearer do pg_cron) e chave do HMAC do webhook do WAHA. */
+const env = (nome: string) => process.env[nome]?.trim() || null
+
+/**
+ * Segredo antigo, único para tudo (ciclo, HMAC do WAHA e token na URL da Z-API). Continua valendo onde a variável
+ * própria de cada uso ainda não foi criada — com as variáveis de hoje nada muda.
+ */
 export function segredoDisparos() {
-  return process.env.DISPAROS_SEGREDO?.trim() || null
+  return env('DISPAROS_SEGREDO')
 }
+
+/** Bearer do pg_cron → /api/sistema/disparos/ciclo. O MESMO valor fica no Vault do Supabase (`disparos_segredo`). */
+export const segredoCiclo = () => env('DISPAROS_CICLO_SEGREDO') ?? segredoDisparos()
+
+/** Chave do HMAC que o WAHA assina em X-Webhook-Hmac (e base do token por número de quem configurar sem HMAC). */
+export const segredoWaha = () => env('WAHA_WEBHOOK_SEGREDO') ?? segredoDisparos()
+
+/** Base dos tokens do webhook da Z-API: cada número recebe o seu, derivado desta base (HMAC do id). */
+export const segredoZapi = () => env('ZAPI_WEBHOOK_SEGREDO') ?? segredoDisparos()
 
 export const linkFormulario = (token: string) => `${urlApp()}/consulta-gratuita/${token}`
 export const urlWebhook = (numeroId: number) => `${urlApp()}/api/sistema/whatsapp?n=${numeroId}`
+
+/**
+ * Webhook da Z-API de UM número. A Z-API não assina o webhook, então o token vai na URL (painel da Z-API, logs):
+ * por isso é próprio do número — o vazamento de um não abre os outros nem o ciclo.
+ */
+export function urlWebhookZapi(numeroId: number) {
+  const base = segredoZapi()
+  if (!base) throw new Error('ZAPI_WEBHOOK_SEGREDO (ou DISPAROS_SEGREDO) não configurado.')
+  return `${urlApp()}/api/sistema/zapi?n=${numeroId}&token=${tokenWebhookNumero(numeroId, base, 'zapi')}`
+}
 
 /** O que falta configurar no servidor para os disparos funcionarem. */
 export function pendenciasServidor() {
   const faltam: string[] = []
   if (!process.env.SUPABASE_SECRET_KEY) faltam.push('SUPABASE_SECRET_KEY')
-  if (!segredoDisparos()) faltam.push('DISPAROS_SEGREDO')
+  if (!segredoCiclo() || !segredoZapi() || !segredoWaha()) faltam.push('DISPAROS_SEGREDO')
   return faltam
 }
 

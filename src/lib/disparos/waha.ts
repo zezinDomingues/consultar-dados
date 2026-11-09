@@ -72,8 +72,8 @@ export type SessaoWaha = {
   detalhe?: string | null
 }
 
-export const lerSessao = (canal: Canal): Promise<SessaoWaha> =>
-  zapi(canal) ? Z.lerSessao(canal) : chamar<SessaoWaha>(canal, 'GET', `/api/sessions/${sessao(canal)}`, undefined, 10_000)
+export const lerSessao = (canal: Canal, opcoes: { dispositivo?: boolean } = {}): Promise<SessaoWaha> =>
+  zapi(canal) ? Z.lerSessao(canal, opcoes) : chamar<SessaoWaha>(canal, 'GET', `/api/sessions/${sessao(canal)}`, undefined, 10_000)
 
 /** Telefone (DDD + número, sem 55) → existe no WhatsApp? Devolve o chatId certo (com ou sem o 9). */
 export async function verificarNumero(canal: Canal, telefone: string) {
@@ -196,13 +196,15 @@ export async function telefoneDoLid(canal: Canal, lid: string) {
 export const EVENTOS_WEBHOOK = ['message', 'poll.vote', 'poll.vote.failed', 'message.ack', 'session.status'] as const
 
 /**
- * Aponta o webhook da sessão para a plataforma (com HMAC) e liga o store do NOWEB (tradução de LID).
+ * Aponta o webhook da sessão para a plataforma e liga o store do NOWEB (tradução de LID).
+ * WAHA: `url` + `hmac` (chave da assinatura). Z-API: não assina — `url` já leva o token do número (urlWebhookZapi).
  * Mantém outros webhooks que já existirem para outros destinos. ATENÇÃO: o WAHA reinicia a sessão ao trocar a
  * configuração — ela volta a WORKING em ~20 s, sem parear de novo.
  */
-export async function configurarWebhook(canal: Canal, url: string, segredo: string) {
-  // Z-API não assina o webhook: o segredo vai na URL, e a rota é a própria dela
-  if (zapi(canal)) return Z.configurarWebhook(canal, `${url.replace('/api/sistema/whatsapp', '/api/sistema/zapi')}&token=${encodeURIComponent(segredo)}`)
+export async function configurarWebhook(canal: Canal, url: string, hmac?: string) {
+  if (zapi(canal)) return Z.configurarWebhook(canal, url)
+  if (!hmac) throw new Error('chave do HMAC do webhook não configurada')
+  const segredo = hmac
   const atual = await lerSessao(canal)
   const config = { ...(atual?.config ?? {}) } as Record<string, unknown>
   const destino = new URL(url)

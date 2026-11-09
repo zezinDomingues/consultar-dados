@@ -6,6 +6,8 @@ import type { Filtros } from '@/lib/empresas/filtros'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { inicioDoDiaBrasilia } from './config'
+import { faltaNoBanco } from './erro'
+import { normalizarFiltros } from './filtros'
 import {
   GRUPOS,
   type Campanha,
@@ -120,7 +122,7 @@ export async function listarCampanhas() {
   ])
   if (error) throw new Error(`campanhas: ${error.message}`)
   const porId = new Map(((numeros ?? []) as NumerosCampanha[]).map(n => [n.campanha_id, n]))
-  return ((data ?? []) as Campanha[]).map(c => ({ ...c, numeros: porId.get(c.id) ?? null }))
+  return ((data ?? []) as Campanha[]).map(c => ({ ...c, filtros: normalizarFiltros(c.filtros), numeros: porId.get(c.id) ?? null }))
 }
 
 export async function obterCampanha(id: number) {
@@ -128,7 +130,8 @@ export async function obterCampanha(id: number) {
   const supabase = await createClient()
   const { data, error } = await supabase.from('disparo_campanhas').select('*').eq('id', id).maybeSingle()
   if (error) throw new Error(`campanha: ${error.message}`)
-  return data as Campanha | null
+  // filtro com o porte antigo ("Demais") vira Médio + Grande: a tela mostra e o salvar aceita
+  return data ? ({ ...data, filtros: normalizarFiltros((data as Campanha).filtros) } as Campanha) : null
 }
 
 /** Como a quantidade da campanha se divide: o que já saiu + os próximos da fila (nicho, estado, regime…). */
@@ -152,7 +155,8 @@ export async function listarNumeros() {
   const supabase = await createClient()
   const [{ data, error }, { data: hoje }] = await Promise.all([
     supabase.from('disparo_numeros').select(COLUNAS_NUMERO).order('id'),
-    supabase.from('disparos').select('numero_id').gte('enviado_em', inicioDoDiaBrasilia()).limit(20000)
+    // como o motor conta o limite diário: sem as conversas de teste
+    supabase.from('disparos').select('numero_id').eq('teste', false).gte('enviado_em', inicioDoDiaBrasilia()).limit(20000)
   ])
   if (error) throw new Error(`números: ${error.message}`)
   const contagem = new Map<number, number>()
@@ -239,11 +243,7 @@ export async function listarGrupos(): Promise<GrupoResumo[]> {
     supabase.from('disparo_campanhas').select('grupo_id, status'),
     supabase.from('grupo_membros').select('grupo_id')
   ])
-  const enviados = new Map<number, number>()
-  for (const g of (grupos ?? []) as GrupoDisparo[]) {
-    const { count } = await supabase.from('disparos').select('id', { count: 'exact', head: true }).eq('grupo_id', g.id).eq('teste', false).not('enviado_em', 'is', null)
-    enviados.set(g.id, count ?? 0)
-  }
+  const enviados = await enviadosPorGrupo(supabase, (grupos ?? []) as GrupoDisparo[])
   return ((grupos ?? []) as GrupoDisparo[]).map(g => ({
     ...g,
     numeros: ((numeros ?? []) as { grupo_id: number }[]).filter(n => n.grupo_id === g.id).length,
@@ -251,6 +251,24 @@ export async function listarGrupos(): Promise<GrupoResumo[]> {
     enviados: enviados.get(g.id) ?? 0,
     membros: ((membros ?? []) as { grupo_id: number }[]).filter(m => m.grupo_id === g.id).length
   }))
+}
+
+/** Enviados (sem teste) por grupo numa consulta só (migração 020); sem ela, uma contagem por grupo como antes. */
+async function enviadosPorGrupo(supabase: Awaited<ReturnType<typeof createClient>>, grupos: GrupoDisparo[]) {
+  const enviados = new Map<number, number>()
+  const { data, error } = await supabase.rpc('disparo_enviados_por_grupo')
+  if (!error) {
+    for (const l of (data ?? []) as { grupo_id: number; enviados: number }[]) enviados.set(Number(l.grupo_id), Number(l.enviados))
+    return enviados
+  }
+  if (!faltaNoBanco(error)) console.error('[disparos] enviados por grupo', error.message)
+  await Promise.all(
+    grupos.map(async g => {
+      const { count } = await supabase.from('disparos').select('id', { count: 'exact', head: true }).eq('grupo_id', g.id).eq('teste', false).not('enviado_em', 'is', null)
+      enviados.set(g.id, count ?? 0)
+    })
+  )
+  return enviados
 }
 
 export async function obterGrupo(id: number) {

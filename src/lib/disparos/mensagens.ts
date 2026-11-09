@@ -5,8 +5,9 @@ import type { Campanha } from './tipos'
 /**
  * Modelos padrão de uma campanha nova (todos editáveis na tela).
  *
- * Fluxo (05/11, desenho do usuário): 1ª mensagem com a logo + texto + UM botão → o robô pergunta nome completo e
- * CNPJ pela própria conversa → final com a logo + "em análise" + botão que abre o site.
+ * Fluxo (desenho do usuário): 1ª mensagem com a logo + texto + UM botão → quem toca/responde SIM recebe as perguntas
+ * pela própria conversa: nome completo → número de contato (1 = este, 2 = outro → qual) → final com a logo +
+ * "em análise" + botão que abre o site.
  * O texto fala em "perfil para valores a serem restituídos" em vez de afirmar um valor antes da análise: mensagem
  * fria prometendo dinheiro do governo é o formato dos golpes no WhatsApp, e denúncia derruba o número.
  */
@@ -19,7 +20,6 @@ export const MODELOS = {
   rodape: 'Responda SAIR para não receber mais mensagens.',
   botao_texto: '✅ Quero a consulta',
   pergunta_nome: '{Ótimo|Perfeito}! 🙌 Vamos começar a sua consulta.\n\nQual é o seu *nome completo*?',
-  pergunta_cnpj: 'Obrigado, {primeiro_nome}! Agora me informe o *CNPJ da empresa* que deseja consultar (só os números já servem).',
   pergunta_contato: 'Obrigado, {primeiro_nome}! Poderia nos informar um *número para entrarmos em contato*?',
   botao_mesmo_numero: 'Usar este número',
   botao_outro_numero: 'Informar outro',
@@ -105,7 +105,6 @@ export const RESPOSTAS = {
     'aqui. Se não tem interesse, pode ignorar esta mensagem.',
   sem_botao: 'Responda *SIM* para fazer a sua consulta.',
   nome_invalido: 'Pode me dizer o seu *nome completo*, por favor? (nome e sobrenome)',
-  cnpj_invalido: 'Esse CNPJ não parece válido 🤔 Confira e me envie os 14 números, por favor.',
   telefone_invalido: 'Não consegui entender o número 🤔 Me envie com DDD, por favor. Ex.: (11) 98765-4321',
   contato_sem_botao: (fone: string) => `Responda *1* para usar este número (${fone}) ou *2* para informar outro.`,
   desistiu_da_coleta: (marca: string) => `Sem problemas! Um especialista da ${marca} vai falar com você por aqui para confirmar os dados. 🙂`
@@ -124,33 +123,36 @@ export type Variaveis = Partial<
   Record<'marca' | 'empresa' | 'saudacao' | 'municipio' | 'link' | 'nome' | 'primeiro_nome' | 'cnpj' | 'telefone', string>
 >
 
-/** Dígitos verificadores do CNPJ. */
-export function cnpjValido(v: string) {
-  const d = v.replace(/\D/g, '')
-  if (d.length !== 14 || /^(\d)\1{13}$/.test(d)) return false
-  const dv = (n: number) => {
-    let soma = 0
-    let peso = n - 7
-    for (let i = 0; i < n; i++) {
-      soma += Number(d[i]) * peso--
-      if (peso < 2) peso = 9
-    }
-    const r = soma % 11
-    return r < 2 ? 0 : 11 - r
-  }
-  return dv(12) === Number(d[12]) && dv(13) === Number(d[13])
-}
-
 export const fmtCnpj = (c: string | null | undefined) =>
   !c ? '—' : c.length === 14 ? `${c.slice(0, 2)}.${c.slice(2, 5)}.${c.slice(5, 8)}/${c.slice(8, 12)}-${c.slice(12)}` : c
 
-/** "joão  DA silva" → "João da Silva"; null se não parecer nome completo (2+ palavras, só letras). */
+/** Começo de frase de quem responde por extenso: "Meu nome é João Silva" → "João Silva". */
+const PREFIXO_NOME =
+  /^(?:(?:o\s+)?meu\s+nome\s+(?:completo\s+)?(?:e|é)\s*:?|(?:eu\s+)?me\s+chamo|(?:eu\s+)?sou\s+(?:o\s+|a\s+)?|aqui\s+(?:e|é)\s+(?:o\s+|a\s+)?|nome(?:\s+completo)?\s*:)\s*/i
+
+/** Palavras que não fazem parte de nome: pergunta, recusa, cortesia, verbo, o assunto da conversa. */
+const NAO_E_NOME = new Set(
+  (
+    'nao sim sei quanto quanta quantos quantas custa custo preco valor como onde quando porque pq qual quais quem que ' +
+    'isso isto esse essa este esta voce voces vc vcs pode posso quero queria gostaria tenho tem temos preciso obrigado ' +
+    'obrigada obg ola oi bom boa dia tarde noite ok okay favor empresa consulta numero telefone whatsapp zap email cnpj ' +
+    'contato interesse agora depois talvez claro beleza certo tudo bem nada nenhum ninguem teste eu meu minha nome ' +
+    'completo mais muito entendi entender sair pare parar golpe spam o a os as um uma'
+  ).split(' ')
+)
+
+/**
+ * "joão  DA silva" → "João da Silva"; null se não parecer nome completo: 2+ palavras com letras, sem números,
+ * símbolos ou "?", e nenhuma palavra que não é de nome ("Quanto custa isso?", "Não sei", "Bom dia" → null).
+ */
 export function nomeCompleto(texto: string) {
-  const t = texto.replace(/\s+/g, ' ').trim()
-  if (t.length < 5 || t.length > 120 || /[\d@#$%&*=+<>{}[\]\\/|_]/.test(t)) return null
+  const t = texto.replace(/\s+/g, ' ').trim().replace(PREFIXO_NOME, '').trim()
+  if (t.length < 5 || t.length > 120 || /[\d@#$%&*=+<>{}[\]\\/|_?!:;"]/.test(t)) return null
   const partes = t.split(' ').filter(p => /\p{L}/u.test(p))
-  if (partes.length < 2) return null
   const pequenas = new Set(['da', 'de', 'do', 'das', 'dos', 'e'])
+  const fortes = partes.filter(p => !pequenas.has(p.toLowerCase()))
+  if (fortes.length < 2 || partes.length > 8) return null
+  if (partes.some(p => NAO_E_NOME.has(normalizar(p)))) return null
   return partes
     .map((p, i) => (i > 0 && pequenas.has(p.toLowerCase()) ? p.toLowerCase() : p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()))
     .join(' ')
@@ -206,15 +208,27 @@ export const primeiroNome = (nome: string) => {
   return p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()
 }
 
+/** DDDs que existem no Brasil (Anatel). "00", "20", "23"… não são telefone. */
+const DDDS = new Set(
+  (
+    '11 12 13 14 15 16 17 18 19 21 22 24 27 28 31 32 33 34 35 37 38 41 42 43 44 45 46 47 48 49 51 53 54 55 61 62 63 ' +
+    '64 65 66 67 68 69 71 73 74 75 77 79 81 82 83 84 85 86 87 88 89 91 92 93 94 95 96 97 98 99'
+  ).split(' ')
+)
+
 /**
  * Telefone ou JID (`5511…@c.us`) → DDD + número, sem o 55, celular antigo ganha o 9 (o formato de
- * empresas.whatsapp e da chave do livro). null se não parecer telefone brasileiro.
+ * empresas.whatsapp e da chave do livro). null se não parecer telefone brasileiro: DDD que não existe, celular de
+ * 11 dígitos sem o 9 na frente, fixo começando com 0 ou 1.
  */
 export function normalizarFone(v: string) {
   let x = v.replace(/@.*$/, '').replace(/\D/g, '')
   if ((x.length === 12 || x.length === 13) && x.startsWith('55')) x = x.slice(2)
   if (x.length === 10 && /[6-9]/.test(x[2])) x = `${x.slice(0, 2)}9${x.slice(2)}`
-  return x.length === 10 || x.length === 11 ? x : null
+  if (x.length !== 10 && x.length !== 11) return null
+  if (!DDDS.has(x.slice(0, 2))) return null
+  if (x.length === 11 ? x[2] !== '9' : !/[2-5]/.test(x[2])) return null
+  return x
 }
 
 /** (11) 98231-8575 */
