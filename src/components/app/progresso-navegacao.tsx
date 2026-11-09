@@ -32,7 +32,8 @@ export function ProgressoNavegacao() {
       if (a.target && a.target !== '_self') return
       if (a.hasAttribute('download') || a.dataset.navegacao === 'local') return
       const destino = new URL(a.href, location.href)
-      if (destino.origin !== location.origin) return
+      // /api/… são downloads (CSV): a página não muda e a barra ficaria presa
+      if (destino.origin !== location.origin || destino.pathname.startsWith('/api/')) return
       if (destino.pathname === location.pathname && destino.search === location.search) return
       setAtivo(true)
     }

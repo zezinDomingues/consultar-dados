@@ -150,8 +150,8 @@ export function PainelFiltros({ consulta, opcoes }: { consulta: Consulta; opcoes
         {...(folha ? { role: 'dialog', 'aria-modal': true } : {})}
         className={cn(
           'fixed inset-y-0 left-0 z-50 flex h-dvh w-[22rem] max-w-[calc(100vw-2.5rem)] flex-col border-r border-slate-200 bg-white shadow-2xl shadow-oc-950/30',
-          'transition-[transform,visibility] duration-200 ease-out motion-reduce:transition-none',
-          filtrosAbertos ? 'visible translate-x-0' : 'invisible -translate-x-full',
+          'duration-200 ease-out motion-reduce:transition-none',
+          filtrosAbertos ? 'visible translate-x-0 transition-[translate,transform]' : 'invisible -translate-x-full transition-[translate,transform,visibility]',
           'xl:visible xl:sticky xl:top-0 xl:z-auto xl:w-[264px] xl:max-w-none xl:shrink-0 xl:translate-x-0 xl:shadow-none xl:transition-none 2xl:w-[296px]'
         )}
       >

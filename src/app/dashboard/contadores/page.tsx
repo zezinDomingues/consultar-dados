@@ -95,7 +95,7 @@ export default async function ContadoresPage({ searchParams }: { searchParams: P
         </ul>
 
         <div className='hidden overflow-x-auto md:block'>
-          <table className='w-full min-w-[720px] table-fixed text-left text-sm'>
+          <table className='w-full min-w-[700px] table-fixed text-left text-sm'>
             <thead className='bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500'>
               <tr>
                 <th scope='col' className='w-[30%] px-4 py-2.5 font-medium'>

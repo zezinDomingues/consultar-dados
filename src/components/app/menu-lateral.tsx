@@ -121,8 +121,8 @@ export function MenuLateral({
         {...(gaveta ? { role: 'dialog', 'aria-modal': true } : {})}
         className={cn(
           'fundo-marinho fixed inset-y-0 left-0 z-50 flex h-dvh w-[17rem] max-w-[calc(100vw-3rem)] flex-col overflow-hidden text-areia shadow-2xl shadow-oc-950/40',
-          'transition-[transform,visibility] duration-200 ease-out motion-reduce:transition-none',
-          aberto ? 'visible translate-x-0' : 'invisible -translate-x-full',
+          'duration-200 ease-out motion-reduce:transition-none',
+          aberto ? 'visible translate-x-0 transition-[translate,transform]' : 'invisible -translate-x-full transition-[translate,transform,visibility]',
           'lg:visible lg:sticky lg:top-0 lg:z-auto lg:w-60 lg:max-w-none lg:shrink-0 lg:translate-x-0 lg:shadow-none lg:transition-none'
         )}
       >
