@@ -1,10 +1,12 @@
 import { after, NextResponse, type NextRequest } from 'next/server'
 import { z } from 'zod'
 import { linkFormulario } from '@/lib/disparos/config'
-import { fmtCnpj, fmtFone, montar, nomeEmpresa, normalizarFone, primeiroNome, saudacao } from '@/lib/disparos/mensagens'
+import { fmtCnpj, fmtFone, montar, nomeEmpresa, primeiroNome, saudacao } from '@/lib/disparos/mensagens'
 import { carregarCampanha, carregarNumeroDoGrupo, registrarEvento, responder } from '@/lib/disparos/motor'
 import type { Disparo } from '@/lib/disparos/tipos'
+import { ipDoCliente, SEM_IP } from '@/lib/ip-cliente'
 import { supabaseAdmin, temChaveSecreta } from '@/lib/supabase/admin'
+import { comecaComFormula, foneBR } from '@/lib/validar-contato'
 
 // Formulário da consulta gratuita (link enviado pelo WhatsApp). Público: o token de 10 caracteres do link é a
 // credencial — ele só existe para quem recebeu a mensagem.
@@ -17,14 +19,15 @@ const Pedido = z.discriminatedUnion('acao', [
   z.object({
     acao: z.literal('enviar'),
     token: Token,
-    nome: z.string().trim().min(3, 'Informe seu nome completo.').max(120),
-    empresa: z.string().trim().min(2, 'Informe a empresa.').max(160),
+    // começo de fórmula (= + - @) vira fórmula quando o lead é exportado para planilha
+    nome: z.string().trim().min(3, 'Informe seu nome completo.').max(120).refine(v => !comecaComFormula(v), 'Nome inválido.'),
+    empresa: z.string().trim().min(2, 'Informe a empresa.').max(160).refine(v => !comecaComFormula(v), 'Nome da empresa inválido.'),
     email: z.string().trim().toLowerCase().email('E-mail inválido.').max(160),
     whatsapp: z
       .string()
       .trim()
       .max(30)
-      .refine(v => !!normalizarFone(v), 'WhatsApp inválido (DDD + número).'),
+      .refine(v => !!foneBR(v), 'WhatsApp inválido (DDD + número).'),
     consentimento: z.literal(true, { error: 'É preciso autorizar o contato.' })
   })
 ])
@@ -62,8 +65,9 @@ export async function POST(request: NextRequest) {
   if ((count ?? 0) >= 10) return NextResponse.json({ erro: 'Recebemos seus dados. Aguarde nosso contato.' }, { status: 429 })
 
   const { nome, empresa, email, whatsapp } = p.data
-  const contato = normalizarFone(whatsapp)
-  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null
+  const contato = foneBR(whatsapp)
+  const ipVisto = ipDoCliente(request.headers)
+  const ip = ipVisto === SEM_IP ? null : ipVisto
 
   // Quem pediu SAIR (ou está bloqueado no grupo) continua fora do robô: os dados ficam guardados para alguém da
   // equipe decidir, mas nada sai pelo WhatsApp e o status não muda.
