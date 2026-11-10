@@ -1,7 +1,8 @@
 import { cn } from '@/lib/utils'
 
+// A: letra marinho no dourado (6:1); branco no dourado ficava em 3,1:1
 const COR_PRIORIDADE = {
-  A: 'bg-ouro-escuro text-white',
+  A: 'bg-ouro-escuro text-marca-950',
   B: 'bg-marca-800 text-white',
   C: 'bg-marca-100 text-marca-900',
   D: 'bg-slate-100 text-slate-500'
@@ -19,16 +20,17 @@ export function SeloPrioridade({ prioridade, score, grande = false }: { priorida
       >
         {prioridade}
       </span>
-      {score != null && <span className={cn('tabular-nums text-slate-400', grande ? 'text-sm' : 'text-xs')}>{score}</span>}
+      {score != null && <span className={cn('tabular-nums text-slate-500', grande ? 'text-sm' : 'text-xs')}>{score}</span>}
     </span>
   )
 }
 
+// paleta da marca: o mais recente em dourado, o ano anterior em marinho, o antigo neutro, Simples em âmbar (atenção)
 const COR_SITUACAO: Record<string, string> = {
-  'Recente (ECF 2024)': 'bg-emerald-50 text-emerald-700 ring-emerald-200',
-  'ECF 2023': 'bg-sky-50 text-sky-700 ring-sky-200',
+  'Recente (ECF 2024)': 'bg-ouro/15 text-ouro-texto ring-ouro/50',
+  'ECF 2023': 'bg-marca-50 text-marca-800 ring-marca-200',
   'Antigo (ECF ≤ 2022)': 'bg-slate-50 text-slate-600 ring-slate-200',
-  'Hoje no Simples': 'bg-amber-50 text-amber-700 ring-amber-200'
+  'Hoje no Simples': 'bg-amber-50 text-amber-800 ring-amber-200'
 }
 
 export function SeloSituacao({ situacao }: { situacao: string | null }) {

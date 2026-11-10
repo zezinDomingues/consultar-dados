@@ -1,7 +1,7 @@
 'use client'
 /* eslint-disable @next/next/no-img-element -- prévia da logo enviada (URL livre do Storage) */
 
-import { useActionState, useRef, useState } from 'react'
+import { startTransition, useActionState, useRef, useState } from 'react'
 import { ImageUp, LoaderCircle, Save } from 'lucide-react'
 import { toast } from 'sonner'
 import { salvarGrupo, type Retorno } from '@/app/dashboard/disparos/grupos/actions'
@@ -23,7 +23,37 @@ export function FormGrupo({ grupo }: { grupo?: GrupoDisparo }) {
   const arquivo = useRef<HTMLInputElement>(null)
   const base = (f: FluxoGrupo) => ({ ...MODELOS, ...(f === 'divulgacao' ? MODELO_DIVULGACAO : {}) }) as Textos
   const [t, setT] = useState<Textos>({ ...base(grupo?.fluxo ?? 'divulgacao'), ...(grupo?.modelo ?? {}) } as Textos)
-  const set = (k: keyof Textos) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setT(x => ({ ...x, [k]: e.target.value }))
+  const set = (k: keyof Textos) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    setT(x => ({ ...x, [k]: e.target.value }))
+    if (k === falta) setFalta(null)
+  }
+  // campo do modelo que ficou vazio (nome do campo): todo texto enviado é obrigatório, menos o rodapé (vazio = padrão)
+  const [falta, setFalta] = useState<string | null>(null)
+  const erro = (n: string) =>
+    falta !== n
+      ? undefined
+      : n === 'mensagem'
+        ? 'Escreva a 1ª mensagem: é ela que abre a conversa de toda campanha nova do grupo.'
+        : 'Preencha este texto: ele vai na conversa das campanhas do grupo.'
+
+  /**
+   * Envio pelo onSubmit: com `action` no form, o React 19 limpa os campos não controlados (site, observação,
+   * caixas) quando o servidor recusa. A 1ª mensagem é obrigatória — vazia, o grupo cairia no texto padrão calado.
+   */
+  function enviar(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    if (salvando || enviando) return
+    const vazio = [...e.currentTarget.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('[data-modelo][required]')].find(
+      c => !c.value.trim()
+    )
+    if (vazio) {
+      setFalta(vazio.name)
+      vazio.focus()
+      return
+    }
+    const fd = new FormData(e.currentTarget)
+    startTransition(() => acao(fd))
+  }
 
   async function subirLogo(f: File) {
     setEnviando(true)
@@ -47,7 +77,7 @@ export function FormGrupo({ grupo }: { grupo?: GrupoDisparo }) {
   const coleta = fluxo === 'coleta'
 
   return (
-    <form action={acao} className='grid gap-5 xl:grid-cols-[1.2fr_1fr]'>
+    <form onSubmit={enviar} noValidate aria-busy={salvando} className='grid gap-5 xl:grid-cols-[1.2fr_1fr]'>
       {grupo && <input type='hidden' name='id' value={grupo.id} />}
       <input type='hidden' name='fluxo' value={fluxo} />
       <input type='hidden' name='logo_url' value={logo} />
@@ -62,20 +92,20 @@ export function FormGrupo({ grupo }: { grupo?: GrupoDisparo }) {
             </label>
             <label className='block space-y-1.5'>
               <span className='text-xs font-semibold text-slate-600'>Site</span>
-              <input name='site_url' defaultValue={grupo?.site_url ?? ''} placeholder='https://www.cliente.com.br' className={ENTRADA} />
+              <input name='site_url' type='url' defaultValue={grupo?.site_url ?? ''} placeholder='https://www.cliente.com.br' className={ENTRADA} />
             </label>
           </div>
           <div className='flex flex-wrap items-center gap-3'>
             {logo ? (
               <img src={logo} alt='' className='h-16 w-[122px] rounded-lg border border-slate-200 object-cover' />
             ) : (
-              <span className='grid h-16 w-[122px] place-items-center rounded-lg border border-dashed border-slate-300 text-[11px] text-slate-400'>sem logo</span>
+              <span className='grid h-16 w-[122px] place-items-center rounded-lg border border-dashed border-slate-300 text-[11px] text-slate-500'>sem logo</span>
             )}
             <input ref={arquivo} type='file' accept='image/jpeg,image/png' className='hidden' onChange={e => e.target.files?.[0] && subirLogo(e.target.files[0])} />
             <button type='button' onClick={() => arquivo.current?.click()} disabled={enviando} className='inline-flex h-9 items-center gap-2 rounded-lg border border-slate-300 px-3 text-xs font-semibold text-slate-700 hover:border-marca-400 disabled:opacity-60'>
               {enviando ? <LoaderCircle className='size-4 animate-spin' /> : <ImageUp className='size-4' />} Enviar logo (JPG/PNG)
             </button>
-            <span className='text-[11px] text-slate-400'>Formato largo (1200×628) fica melhor no topo da mensagem.</span>
+            <span className='text-[11px] text-slate-500'>Formato largo (1200×628) fica melhor no topo da mensagem.</span>
           </div>
         </section>
 
@@ -91,6 +121,7 @@ export function FormGrupo({ grupo }: { grupo?: GrupoDisparo }) {
               <button
                 key={v}
                 type='button'
+                aria-pressed={fluxo === v}
                 onClick={() => {
                   setFluxo(v)
                   if (!grupo) setT(base(v))
@@ -110,25 +141,33 @@ export function FormGrupo({ grupo }: { grupo?: GrupoDisparo }) {
               </span>
             ))}
           </p>
-          <Campo rotulo='1ª mensagem' nome='mensagem' valor={t.mensagem} onChange={set('mensagem')} linhas={6} max={1024} />
+          <Campo
+            rotulo='1ª mensagem (obrigatória)'
+            nome='mensagem'
+            valor={t.mensagem}
+            onChange={set('mensagem')}
+            linhas={6}
+            max={1024}
+            erro={erro('mensagem')}
+          />
           <div className='grid gap-3 sm:grid-cols-[1fr_200px]'>
-            <Linha rotulo='Rodapé (até 60)' nome='rodape' valor={t.rodape} onChange={set('rodape')} max={60} />
+            <Linha rotulo='Rodapé (até 60)' nome='rodape' valor={t.rodape} onChange={set('rodape')} max={60} erro={erro('rodape')} />
             {coleta ? (
-              <Linha rotulo='Botão (até 20)' nome='botao_texto' valor={t.botao_texto} onChange={set('botao_texto')} max={20} />
+              <Linha rotulo='Botão (até 20)' nome='botao_texto' valor={t.botao_texto} onChange={set('botao_texto')} max={20} erro={erro('botao_texto')} />
             ) : (
-              <Linha rotulo='Botão do link (até 20)' nome='botao_site_texto' valor={t.botao_site_texto} onChange={set('botao_site_texto')} max={20} />
+              <Linha rotulo='Botão do link (até 20)' nome='botao_site_texto' valor={t.botao_site_texto} onChange={set('botao_site_texto')} max={20} erro={erro('botao_site_texto')} />
             )}
           </div>
           {coleta && (
             <>
-              <Campo rotulo='Pergunta do nome' nome='pergunta_nome' valor={t.pergunta_nome} onChange={set('pergunta_nome')} linhas={2} max={1000} />
-              <Campo rotulo='Pergunta do número de contato' nome='pergunta_contato' valor={t.pergunta_contato} onChange={set('pergunta_contato')} linhas={2} max={1000} />
-              <Campo rotulo='Se escolher outro número' nome='pergunta_telefone' valor={t.pergunta_telefone} onChange={set('pergunta_telefone')} linhas={2} max={1000} />
-              <Campo rotulo='Mensagem final' nome='mensagem_obrigado' valor={t.mensagem_obrigado} onChange={set('mensagem_obrigado')} linhas={4} max={1024} />
-              <Linha rotulo='Botão do site na mensagem final (até 20)' nome='botao_site_texto' valor={t.botao_site_texto} onChange={set('botao_site_texto')} max={20} />
+              <Campo rotulo='Pergunta do nome' nome='pergunta_nome' valor={t.pergunta_nome} onChange={set('pergunta_nome')} linhas={2} max={1000} erro={erro('pergunta_nome')} />
+              <Campo rotulo='Pergunta do número de contato' nome='pergunta_contato' valor={t.pergunta_contato} onChange={set('pergunta_contato')} linhas={2} max={1000} erro={erro('pergunta_contato')} />
+              <Campo rotulo='Se escolher outro número' nome='pergunta_telefone' valor={t.pergunta_telefone} onChange={set('pergunta_telefone')} linhas={2} max={1000} erro={erro('pergunta_telefone')} />
+              <Campo rotulo='Mensagem final' nome='mensagem_obrigado' valor={t.mensagem_obrigado} onChange={set('mensagem_obrigado')} linhas={4} max={1024} erro={erro('mensagem_obrigado')} />
+              <Linha rotulo='Botão do site na mensagem final (até 20)' nome='botao_site_texto' valor={t.botao_site_texto} onChange={set('botao_site_texto')} max={20} erro={erro('botao_site_texto')} />
             </>
           )}
-          <Campo rotulo='Se responder “não”' nome='mensagem_nao' valor={t.mensagem_nao} onChange={set('mensagem_nao')} linhas={2} max={1000} />
+          <Campo rotulo='Se responder “não”' nome='mensagem_nao' valor={t.mensagem_nao} onChange={set('mensagem_nao')} linhas={2} max={1000} erro={erro('mensagem_nao')} />
         </section>
 
         <section className='space-y-3 rounded-2xl border border-slate-200 bg-white p-5'>
@@ -151,9 +190,14 @@ export function FormGrupo({ grupo }: { grupo?: GrupoDisparo }) {
           </label>
         </section>
 
-        {estado.erro && <p className='rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700'>{estado.erro}</p>}
-        <button type='submit' disabled={salvando} className='inline-flex h-11 items-center gap-2 rounded-full bg-marca-800 px-6 text-sm font-bold text-creme hover:bg-marca-950 disabled:opacity-60'>
-          {salvando ? <LoaderCircle className='size-4 animate-spin' /> : <Save className='size-4' />} {grupo ? 'Salvar grupo' : 'Criar grupo'}
+        {estado.erro && (
+          <p role='alert' className='rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700'>
+            {estado.erro}
+          </p>
+        )}
+        <button type='submit' disabled={salvando || enviando} className='inline-flex h-11 items-center gap-2 rounded-full bg-marca-800 px-6 text-sm font-bold text-creme hover:bg-marca-950 disabled:opacity-60'>
+          {salvando ? <LoaderCircle className='size-4 animate-spin' aria-hidden /> : <Save className='size-4' aria-hidden />}{' '}
+          {salvando ? 'Salvando…' : grupo ? 'Salvar grupo' : 'Criar grupo'}
         </button>
       </div>
 
@@ -180,26 +224,75 @@ export function FormGrupo({ grupo }: { grupo?: GrupoDisparo }) {
             )}
           </div>
         </div>
-        <p className='mt-2 text-[11px] text-slate-400'>Pela Z-API os botões aparecem no celular. Se a campanha estiver em “Responder por texto”, o link vai escrito escrito.</p>
+        <p className='mt-2 text-[11px] text-slate-500'>Pela Z-API os botões aparecem no celular. Se a campanha estiver em “Responder por texto”, o link vai escrito no texto.</p>
       </aside>
     </form>
   )
 }
 
-function Campo({ rotulo, nome, valor, onChange, linhas, max }: { rotulo: string; nome: string; valor: string; onChange: React.ChangeEventHandler<HTMLTextAreaElement>; linhas: number; max: number }) {
+function Campo({
+  rotulo,
+  nome,
+  valor,
+  onChange,
+  linhas,
+  max,
+  erro
+}: {
+  rotulo: string
+  nome: string
+  valor: string
+  onChange: React.ChangeEventHandler<HTMLTextAreaElement>
+  linhas: number
+  max: number
+  erro?: string
+}) {
   return (
     <label className='block space-y-1.5'>
       <span className='text-xs font-semibold text-slate-600'>{rotulo}</span>
-      <textarea name={nome} value={valor} onChange={onChange} rows={linhas} maxLength={max} className={cn(ENTRADA, 'resize-y leading-relaxed')} />
+      <textarea
+        data-modelo
+        name={nome}
+        value={valor}
+        onChange={onChange}
+        rows={linhas}
+        maxLength={max}
+        required
+        aria-invalid={!!erro}
+        aria-describedby={erro ? `${nome}-erro` : undefined}
+        className={cn(ENTRADA, 'resize-y leading-relaxed', erro && 'border-red-400')}
+      />
+      {erro && (
+        <span id={`${nome}-erro`} role='alert' className='block text-xs font-semibold text-red-700'>
+          {erro}
+        </span>
+      )}
     </label>
   )
 }
 
-function Linha({ rotulo, nome, valor, onChange, max }: { rotulo: string; nome: string; valor: string; onChange: React.ChangeEventHandler<HTMLInputElement>; max: number }) {
+/** Rodapé vazio = usar o padrão; os outros textos do modelo são obrigatórios. */
+function Linha({ rotulo, nome, valor, onChange, max, erro }: { rotulo: string; nome: string; valor: string; onChange: React.ChangeEventHandler<HTMLInputElement>; max: number; erro?: string }) {
+  const obrigatorio = nome !== 'rodape'
   return (
     <label className='block space-y-1.5'>
-      <span className='text-xs font-semibold text-slate-600'>{rotulo}</span>
-      <input name={nome} value={valor} onChange={onChange} maxLength={max} className={ENTRADA} />
+      <span className='text-xs font-semibold text-slate-600'>{obrigatorio ? rotulo : `${rotulo} · vazio = padrão`}</span>
+      <input
+        data-modelo
+        name={nome}
+        value={valor}
+        onChange={onChange}
+        maxLength={max}
+        required={obrigatorio}
+        aria-invalid={!!erro}
+        aria-describedby={erro ? `${nome}-erro` : undefined}
+        className={cn(ENTRADA, erro && 'border-red-400')}
+      />
+      {erro && (
+        <span id={`${nome}-erro`} role='alert' className='block text-xs font-semibold text-red-700'>
+          {erro}
+        </span>
+      )}
     </label>
   )
 }

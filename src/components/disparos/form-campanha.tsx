@@ -1,17 +1,19 @@
 'use client'
 /* eslint-disable @next/next/no-img-element -- prévia da imagem que vai no WhatsApp (URL livre) */
 
-import { useActionState, useMemo, useState } from 'react'
+import { startTransition, useActionState, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import {
   CheckCircle2,
   ExternalLink,
   FlaskConical,
   LoaderCircle,
+  Gauge,
   Play,
   Reply,
   Save,
-  SlidersHorizontal
+  SlidersHorizontal,
+  TriangleAlert
 } from 'lucide-react'
 import { enviarTeste, salvarCampanha, type Retorno } from '@/app/dashboard/disparos/actions'
 import { DivisaoDisparos, LOTE_SEM_LIMITE } from '@/components/disparos/divisao-disparos'
@@ -25,6 +27,10 @@ import { cn } from '@/lib/utils'
 type Inicial = CampanhaEditavel
 
 const QUANTIDADES = [100, 300, 500, 1000, 2000] as const
+/** Campanha nova nasce com 100: "Sem limite" (a base inteira) só por escolha explícita — volume alto derruba número. */
+export const QUANTIDADE_PADRAO = 100
+
+type Envio = 'ativar' | 'pausada' | 'salvar' | 'teste'
 
 const ENTRADA =
   'w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none transition focus:border-marca-400 focus:ring-4 focus:ring-marca-50'
@@ -56,13 +62,21 @@ export function FormCampanha({
   ritmo: { porDia: number; numeros: number }
 }) {
   const divulgacao = grupo.fluxo === 'divulgacao'
+  const editando = !!inicial.id
   const [v, setV] = useState<Inicial>({
     ...inicial,
-    formato: inicial.formato === 'enquete' ? 'botao' : inicial.formato
+    formato: inicial.formato === 'enquete' ? 'botao' : inicial.formato,
+    limite_total: editando ? inicial.limite_total : (inicial.limite_total ?? QUANTIDADE_PADRAO)
   })
+  // "Sem limite" só quando a pessoa clicou nele (campo de quantidade apagado NÃO vira sem limite)
+  const [semLimite, setSemLimite] = useState(editando && inicial.limite_total === null)
   const [estado, salvar, salvando] = useActionState<Retorno, FormData>(salvarCampanha, {})
   const [teste, testar, testando] = useActionState<Retorno, FormData>(enviarTeste, {})
-  const editando = !!inicial.id
+  // salvar e testar nunca rodam juntos: um envio por vez, com o indicador no botão que foi clicado
+  const ocupado = salvando || testando
+  const [envio, setEnvio] = useState<Envio | null>(null)
+  const [aviso, setAviso] = useState<string | null>(null)
+  const quantidade = useRef<HTMLInputElement>(null)
   const set =
     <K extends keyof Inicial>(k: K) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
@@ -102,9 +116,47 @@ export function FormCampanha({
       ? elegiveis.elegiveis
       : elegiveis.elegiveis_sem_excluir
     : null
+  const escolherQuantidade = (q: number | null) => {
+    setV(x => ({ ...x, limite_total: q }))
+    setSemLimite(false)
+    setAviso(null)
+  }
+
+  /**
+   * Envio pelo onSubmit (não pelo `action` do form): o React 19 limpa os campos não controlados depois de uma
+   * action de formulário, e aqui a pessoa perderia o telefone de teste quando o servidor recusa. Também é aqui que
+   * fica a trava de um envio por vez e a confirmação antes de ativar.
+   */
+  function enviar(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    if (ocupado) return
+    const botao = (e.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null
+    const tipo = (botao?.dataset.envio as Envio | undefined) ?? (editando ? 'salvar' : 'pausada')
+    if (tipo !== 'teste' && v.limite_total === null && !semLimite) {
+      setAviso('Escolha quantos disparos (ou “Sem limite”).')
+      quantidade.current?.focus()
+      return
+    }
+    if (tipo === 'ativar') {
+      const dias = ritmo.porDia ? Math.ceil((v.limite_total ?? LOTE_SEM_LIMITE) / ritmo.porDia) : null
+      const quanto = v.limite_total
+        ? `até ${fmtInt(v.limite_total)} mensagens`
+        : `SEM LIMITE — até acabar a base (${fmtInt(disponiveis)} empresas)`
+      const ok = window.confirm(
+        `Criar e ativar agora? A campanha começa a enviar ${quanto} no próximo horário de envio` +
+          (dias ? ` (cerca de ${fmtInt(dias)} ${dias === 1 ? 'dia' : 'dias'}${v.limite_total ? '' : ' para cada 1.000'}).` : '.')
+      )
+      if (!ok) return
+    }
+    const fd = new FormData(e.currentTarget, botao)
+    setAviso(null)
+    setEnvio(tipo)
+    startTransition(() => (tipo === 'teste' ? testar(fd) : salvar(fd)))
+  }
+  const girando = (tipo: Envio) => ocupado && envio === tipo
 
   return (
-    <form action={salvar} className='grid gap-5 xl:grid-cols-[1.2fr_1fr]'>
+    <form onSubmit={enviar} aria-busy={ocupado} className='grid gap-5 xl:grid-cols-[1.2fr_1fr]'>
       {inicial.id && <input type='hidden' name='id' value={inicial.id} />}
       <input type='hidden' name='filtros' value={JSON.stringify(filtros)} />
       <input type='hidden' name='grupo_id' value={grupo.id} />
@@ -138,9 +190,9 @@ export function FormCampanha({
           </div>
           {elegiveis && (
             <p className='mt-3 text-sm text-slate-600'>
-              <strong className='font-serif text-xl text-marca-800'>{fmtInt(disponiveis)}</strong> empresas podem
-              receber agora
-              <span className='text-slate-400'>
+              <strong className='font-serif text-xl text-marca-800'>{fmtInt(disponiveis)}</strong>{' '}
+              {disponiveis === 1 ? 'empresa pode' : 'empresas podem'} receber agora
+              <span className='text-slate-500'>
                 {' '}
                 · {fmtInt(elegiveis.com_whatsapp)} têm celular nos filtros; quem já foi contatado nunca entra de novo
               </span>
@@ -153,14 +205,17 @@ export function FormCampanha({
             </label>
 
             {/* ---------- quantidade ---------- */}
-            <div className='space-y-2 sm:col-span-2'>
-              <span className='block text-xs font-semibold text-slate-600'>Quantos disparos</span>
+            <fieldset className='space-y-2 sm:col-span-2'>
+              <legend className='mb-2 block text-xs font-semibold text-slate-600'>
+                Quantos disparos <span className='font-normal text-slate-500'>· comece pequeno: o padrão é 100</span>
+              </legend>
               <div className='flex flex-wrap items-center gap-1.5'>
                 {QUANTIDADES.map(q => (
                   <button
                     key={q}
                     type='button'
-                    onClick={() => setV(x => ({ ...x, limite_total: q }))}
+                    aria-pressed={v.limite_total === q}
+                    onClick={() => escolherQuantidade(q)}
                     className={cn(
                       'h-9 rounded-full border px-3.5 text-sm font-semibold tabular-nums transition',
                       v.limite_total === q
@@ -171,39 +226,66 @@ export function FormCampanha({
                     {fmtInt(q)}
                   </button>
                 ))}
-                <button
-                  type='button'
-                  onClick={() => setV(x => ({ ...x, limite_total: null }))}
-                  className={cn(
-                    'h-9 rounded-full border px-3.5 text-sm font-semibold transition',
-                    v.limite_total === null
-                      ? 'border-marca-800 bg-marca-800 text-creme'
-                      : 'border-slate-200 bg-white text-slate-700 hover:border-marca-300'
-                  )}
-                >
-                  Sem limite
-                </button>
                 <input
+                  ref={quantidade}
                   name='limite_total'
                   type='number'
                   min={1}
                   value={v.limite_total ?? ''}
-                  onChange={e => setV(x => ({ ...x, limite_total: e.target.value ? Number(e.target.value) : null }))}
-                  placeholder='outro'
-                  aria-label='Quantidade de disparos'
-                  className={cn(ENTRADA, 'h-9 w-28 py-0 tabular-nums')}
+                  onChange={e => {
+                    setV(x => ({ ...x, limite_total: e.target.value ? Number(e.target.value) : null }))
+                    setSemLimite(false)
+                    setAviso(null)
+                  }}
+                  placeholder='outra'
+                  aria-label='Outra quantidade de disparos'
+                  aria-invalid={!!aviso}
+                  className={cn(ENTRADA, 'h-9 w-28 py-0 tabular-nums', aviso && 'border-red-400')}
                 />
+                <button
+                  type='button'
+                  aria-pressed={semLimite}
+                  onClick={() => {
+                    setV(x => ({ ...x, limite_total: null }))
+                    setSemLimite(true)
+                    setAviso(null)
+                  }}
+                  className={cn(
+                    'h-9 rounded-full border border-dashed px-3.5 text-sm font-semibold transition',
+                    semLimite
+                      ? 'border-amber-500 bg-amber-50 text-amber-900'
+                      : 'border-slate-300 bg-white text-slate-600 hover:border-amber-400'
+                  )}
+                >
+                  Sem limite…
+                </button>
               </div>
-              <p className='text-xs text-slate-500'>
-                {v.limite_total
-                  ? `Conta só as mensagens que saíram (celular sem WhatsApp não conta). Ao chegar em ${fmtInt(v.limite_total)}, a campanha encerra sozinha.`
-                  : 'Sem limite: vai até acabar a base dos filtros, em lotes divididos de 1.000.'}
-                {disponiveis !== null && v.limite_total && v.limite_total > disponiveis && (
-                  <span className='text-amber-700'> Há só {fmtInt(disponiveis)} empresas disponíveis.</span>
-                )}
-              </p>
+              {aviso && (
+                <p role='alert' className='text-xs font-semibold text-red-700'>
+                  {aviso}
+                </p>
+              )}
+              {semLimite ? (
+                <div role='alert' className='flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-xs text-amber-900'>
+                  <TriangleAlert className='mt-px size-4 shrink-0' aria-hidden />
+                  <p>
+                    <strong>Sem limite manda para a base inteira dos filtros</strong>
+                    {disponiveis !== null && <> ({fmtInt(disponiveis)} empresas)</>}, em lotes de 1.000, até acabar.
+                    Volume alto de uma vez é o que mais derruba número de WhatsApp: para começar, prefira uma quantidade.
+                  </p>
+                </div>
+              ) : (
+                <p className='text-xs text-slate-500'>
+                  {v.limite_total
+                    ? `Conta só as mensagens que saíram (celular sem WhatsApp não conta). Ao chegar em ${fmtInt(v.limite_total)}, a campanha encerra sozinha.`
+                    : 'Escolha uma quantidade.'}
+                  {disponiveis !== null && v.limite_total && v.limite_total > disponiveis && (
+                    <span className='text-amber-800'> Há só {fmtInt(disponiveis)} empresas disponíveis.</span>
+                  )}
+                </p>
+              )}
               <Ritmo quantidade={v.limite_total} ritmo={ritmo} />
-            </div>
+            </fieldset>
 
             <label className='block space-y-1.5'>
               <span className='text-xs font-semibold text-slate-600'>Dentro de cada nicho, começar por</span>
@@ -274,6 +356,7 @@ export function FormCampanha({
               <button
                 key={f}
                 type='button'
+                aria-pressed={v.formato === f}
                 onClick={() => setV(x => ({ ...x, formato: f }))}
                 className={cn(
                   'rounded-xl border px-3.5 py-2.5 text-left transition',
@@ -455,35 +538,41 @@ export function FormCampanha({
           </p>
         </section>
 
-        {estado.erro && <p className='rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700'>{estado.erro}</p>}
+        {estado.erro && (
+          <p role='alert' className='rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700'>
+            {estado.erro}
+          </p>
+        )}
         <div className='flex flex-wrap gap-2'>
           {editando ? (
             <button
               type='submit'
-              disabled={salvando}
+              data-envio='salvar'
+              disabled={ocupado}
               className='inline-flex h-11 items-center gap-2 rounded-full bg-marca-800 px-6 text-sm font-bold text-creme hover:bg-marca-950 disabled:opacity-60'
             >
-              {salvando ? <LoaderCircle className='size-4 animate-spin' /> : <Save className='size-4' />} Salvar
-              alterações
+              {girando('salvar') ? <LoaderCircle className='size-4 animate-spin' aria-hidden /> : <Save className='size-4' aria-hidden />}{' '}
+              {girando('salvar') ? 'Salvando…' : 'Salvar alterações'}
             </button>
           ) : (
             <>
               <button
                 type='submit'
-                name='ativar'
-                value='true'
-                disabled={salvando}
+                data-envio='ativar'
+                disabled={ocupado}
                 className='inline-flex h-11 items-center gap-2 rounded-full bg-marca-800 px-6 text-sm font-bold text-creme hover:bg-marca-950 disabled:opacity-60'
               >
-                {salvando ? <LoaderCircle className='size-4 animate-spin' /> : <Play className='size-4' />} Criar e
-                ativar
+                {girando('ativar') ? <LoaderCircle className='size-4 animate-spin' aria-hidden /> : <Play className='size-4' aria-hidden />}{' '}
+                {girando('ativar') ? 'Criando…' : 'Criar e ativar'}
               </button>
               <button
                 type='submit'
-                disabled={salvando}
+                data-envio='pausada'
+                disabled={ocupado}
                 className='inline-flex h-11 items-center gap-2 rounded-full border border-slate-300 bg-white px-6 text-sm font-bold text-slate-700 hover:border-marca-400 disabled:opacity-60'
               >
-                <Save className='size-4' /> Criar pausada (para testar)
+                {girando('pausada') ? <LoaderCircle className='size-4 animate-spin' aria-hidden /> : <Save className='size-4' aria-hidden />}{' '}
+                {girando('pausada') ? 'Criando…' : 'Criar pausada (para testar)'}
               </button>
             </>
           )}
@@ -540,13 +629,18 @@ export function FormCampanha({
           </p>
           {editando ? (
             <>
-              <p className='mt-1 text-xs text-slate-400'>
+              <p className='mt-1 text-xs text-slate-500'>
                 Salva os textos e manda a 1ª mensagem de verdade. Responda no celular como um cliente (SIM, nome,
                 número). Fica fora do funil.
               </p>
               {numeros.length ? (
                 <div className='mt-3 flex flex-wrap gap-2'>
-                  <select name='teste_numero' defaultValue={numeros[0]?.id} className={cn(ENTRADA, 'h-10 w-auto py-0')}>
+                  <select
+                    name='teste_numero'
+                    defaultValue={numeros[0]?.id}
+                    aria-label='Número que envia o teste'
+                    className={cn(ENTRADA, 'h-10 w-auto max-w-full py-0')}
+                  >
                     {numeros.map(n => (
                       <option key={n.id} value={n.id}>
                         {n.rotulo}
@@ -556,17 +650,19 @@ export function FormCampanha({
                   </select>
                   <input
                     name='teste_telefone'
+                    type='tel'
                     placeholder='(11) 99999-9999'
+                    aria-label='Seu WhatsApp para o teste'
                     className={cn(ENTRADA, 'h-10 w-44 py-0')}
                   />
                   <button
                     type='submit'
-                    formAction={testar}
-                    disabled={testando}
+                    data-envio='teste'
+                    disabled={ocupado}
                     className='inline-flex h-10 items-center gap-2 rounded-xl border border-slate-300 px-4 text-sm font-semibold text-slate-700 hover:border-marca-400 disabled:opacity-60'
                   >
-                    {testando ? <LoaderCircle className='size-4 animate-spin' /> : <FlaskConical className='size-4' />}{' '}
-                    Enviar teste
+                    {girando('teste') ? <LoaderCircle className='size-4 animate-spin' aria-hidden /> : <FlaskConical className='size-4' aria-hidden />}{' '}
+                    {girando('teste') ? 'Enviando…' : 'Enviar teste'}
                   </button>
                 </div>
               ) : (
@@ -578,10 +674,14 @@ export function FormCampanha({
               Clique em “Criar pausada” e teste na tela da campanha — o teste usa os textos salvos.
             </p>
           )}
-          {teste.erro && <p className='mt-2 text-xs text-red-600'>{teste.erro}</p>}
+          {teste.erro && (
+            <p role='alert' className='mt-2 text-xs text-red-700'>
+              {teste.erro}
+            </p>
+          )}
           {teste.mensagem && (
-            <p className='mt-2 flex items-start gap-1.5 text-xs text-emerald-700'>
-              <CheckCircle2 className='mt-px size-3.5 shrink-0' /> {teste.mensagem}
+            <p role='status' className='mt-2 flex items-start gap-1.5 text-xs text-marca-800'>
+              <CheckCircle2 className='mt-px size-3.5 shrink-0 text-ouro-escuro' aria-hidden /> {teste.mensagem}
             </p>
           )}
         </div>
@@ -609,7 +709,7 @@ function Texto({
     <label className='block space-y-1.5'>
       <span className='flex justify-between text-xs font-semibold text-slate-600'>
         {rotulo}
-        <span className={cn('font-normal', valor.length > max * 0.9 ? 'text-amber-600' : 'text-slate-300')}>
+        <span className={cn('font-normal', valor.length > max * 0.9 ? 'text-amber-700' : 'text-slate-400')}>
           {valor.length}/{max}
         </span>
       </span>
@@ -719,11 +819,12 @@ export function BolhaCliente({ texto }: { texto: string }) {
   )
 }
 
-/** Quanto tempo a quantidade leva no ritmo dos números do grupo. */
+/** Quanto tempo a quantidade leva no ritmo dos números do grupo (em destaque: é o que protege o número). */
 function Ritmo({ quantidade, ritmo }: { quantidade: number | null; ritmo: { porDia: number; numeros: number } }) {
   if (!ritmo.porDia) {
     return (
-      <p className='text-xs text-amber-700'>
+      <p className='flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-900'>
+        <Gauge className='mt-px size-4 shrink-0' aria-hidden />
         Nenhum número ativo neste grupo: a campanha só envia depois de cadastrar um.
       </p>
     )
@@ -731,20 +832,30 @@ function Ritmo({ quantidade, ritmo }: { quantidade: number | null; ritmo: { porD
   const alvo = quantidade ?? LOTE_SEM_LIMITE
   const dias = Math.ceil(alvo / ritmo.porDia)
   return (
-    <p className={cn('text-xs', dias > 1 ? 'text-amber-700' : 'text-slate-500')}>
-      Ritmo atual: até <strong>{fmtInt(ritmo.porDia)}/dia</strong> com {ritmo.numeros}{' '}
-      {ritmo.numeros === 1 ? 'número' : 'números'} →{' '}
-      {dias <= 1 ? 'cabe em 1 dia de envio.' : `~${fmtInt(dias)} dias de envio${quantidade ? '' : ' para cada 1.000'}.`}
-      {dias > 1 && (
-        <>
-          {' '}
-          Para ir mais rápido, aumente o limite diário ou acrescente números em{' '}
-          <Link href={ROTAS.numeros} className='font-semibold underline'>
-            Números e regras
-          </Link>
-          .
-        </>
-      )}
-    </p>
+    <div className='flex items-start gap-2.5 rounded-xl border border-marca-100 bg-marca-50/60 px-3 py-2.5 text-xs text-slate-700'>
+      <Gauge className='mt-px size-4 shrink-0 text-ouro-escuro' aria-hidden />
+      <p>
+        <strong className='text-marca-800'>
+          Ritmo: até {fmtInt(ritmo.porDia)}/dia
+        </strong>{' '}
+        com {ritmo.numeros} {ritmo.numeros === 1 ? 'número' : 'números'} →{' '}
+        <strong className='text-marca-800'>
+          {dias <= 1
+            ? 'cabe em 1 dia de envio'
+            : `~${fmtInt(dias)} dias de envio${quantidade ? '' : ' para cada 1.000'}`}
+        </strong>
+        .
+        {dias > 1 && (
+          <>
+            {' '}
+            Para ir mais rápido, aumente aos poucos o limite diário ou acrescente números em{' '}
+            <Link href={ROTAS.numeros} className='font-semibold text-marca-700 underline'>
+              Números e regras
+            </Link>
+            .
+          </>
+        )}
+      </p>
+    </div>
   )
 }

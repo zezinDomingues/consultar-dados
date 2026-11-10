@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { ArrowLeft } from 'lucide-react'
 import { FormCampanha } from '@/components/disparos/form-campanha'
 import { capacidadeDiaria, urlApp } from '@/lib/disparos/config'
 import { contarElegiveis, lerConfig, listarGrupos, listarNumeros } from '@/lib/disparos/dados'
@@ -8,7 +9,6 @@ import { campanhaPadrao, MODELO_DIVULGACAO, nomeEmpresa } from '@/lib/disparos/m
 import { buscarEmpresas, opcoesFiltros, usuarioAtual } from '@/lib/empresas/consulta'
 import { hrefConsulta, lerDeSearchParams, paraQuery } from '@/lib/empresas/filtros'
 import { rotulosFiltros } from '@/lib/empresas/rotulos'
-import { fmtData } from '@/lib/formatar'
 import { ROTAS } from '@/lib/rotas'
 import { cn } from '@/lib/utils'
 
@@ -34,7 +34,9 @@ export default async function NovaCampanhaPage({ searchParams }: { searchParams:
     lerConfig()
   ])
   const rotulos = rotulosFiltros(filtros, opcoes).map(r => r.rotulo)
-  const hoje = fmtData(new Date().toISOString())
+  // dia/mês de Brasília (com toISOString, depois das 21h saía a data de amanhã)
+  const hoje = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit' })
+    .format(new Date())
   const nome = `${grupo.nome} · ${rotulos.slice(0, 2).join(' · ') || 'base inteira'} — ${hoje.slice(0, 5)}`.slice(0, 120)
   const padrao = campanhaPadrao(nome, urlApp())
   const inicial = {
@@ -50,6 +52,12 @@ export default async function NovaCampanhaPage({ searchParams }: { searchParams:
 
   return (
     <div className='space-y-4'>
+      <div className='flex flex-wrap items-center gap-x-3 gap-y-1'>
+        <Link href={ROTAS.campanhas} className='inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-marca-700'>
+          <ArrowLeft className='size-3.5' aria-hidden /> Campanhas
+        </Link>
+        <h2 className='font-serif text-xl font-bold text-marca-800'>Nova campanha</h2>
+      </div>
       {grupos.length > 1 && (
         <div className='flex flex-wrap items-center gap-2'>
           <span className='text-xs font-semibold text-slate-500'>Grupo:</span>

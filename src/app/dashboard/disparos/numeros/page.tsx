@@ -25,9 +25,9 @@ export default async function NumerosPage() {
 
   return (
     <div className='grid gap-5 xl:grid-cols-[1.6fr_1fr]'>
-      <section className='space-y-3'>
+      <section className='min-w-0 space-y-3'>
         <div className='flex flex-wrap items-center justify-between gap-3'>
-          <div>
+          <div className='min-w-0'>
             <h2 className='font-serif text-xl font-bold text-marca-800'>Números de WhatsApp</h2>
             <p className='text-xs text-slate-500'>Cada número é uma instância da Z-API (conectada por QR code), ligada a um grupo.</p>
           </div>
@@ -36,40 +36,40 @@ export default async function NumerosPage() {
 
         {numeros.length === 0 && (
           <div className='rounded-2xl border border-dashed border-slate-300 bg-white/60 px-6 py-10 text-center text-sm text-slate-500'>
-            <Smartphone className='mx-auto mb-2 size-8 text-ouro-escuro' strokeWidth={1.5} />
+            <Smartphone className='mx-auto mb-2 size-8 text-ouro-escuro' strokeWidth={1.5} aria-hidden />
             Nenhum número ainda. Veja ao lado como criar a instância na Z-API e depois clique em <strong>Adicionar número</strong>.
           </div>
         )}
 
         {numeros.map(n => (
-          <article key={n.id} className={cn('rounded-2xl border bg-white p-4 shadow-sm shadow-marca-900/[0.03]', n.ativo ? 'border-slate-200' : 'border-slate-200 opacity-70')}>
+          <article key={n.id} className={cn('min-w-0 rounded-2xl border bg-white p-4 shadow-sm shadow-marca-900/[0.03]', n.ativo ? 'border-slate-200' : 'border-dashed border-slate-300')}>
             <div className='flex flex-wrap items-start justify-between gap-3'>
               <div className='min-w-0'>
                 <div className='flex flex-wrap items-center gap-2'>
-                  <h3 className='font-semibold text-slate-800'>{n.rotulo}</h3>
+                  <h3 className='break-words font-semibold text-slate-800'>{n.rotulo}</h3>
                   <span className='rounded-full bg-marca-50 px-2 py-0.5 text-[11px] font-semibold text-marca-800'>{nomeGrupo.get(n.grupo_id) ?? 'grupo ?'}</span>
-                  <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-semibold', n.provedor === 'zapi' ? 'bg-emerald-50 text-emerald-800' : 'bg-slate-100 text-slate-600')}>
+                  <span className='rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600'>
                     {n.provedor === 'zapi' ? 'Z-API · botões' : 'WAHA · texto'}
                   </span>
                   <SeloSessao status={n.status} />
                   {!n.ativo && <span className='rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500'>Pausado</span>}
                 </div>
-                <p className='mt-0.5 text-xs text-slate-500'>
+                <p className='mt-0.5 text-xs text-slate-500 [overflow-wrap:anywhere]'>
                   {n.telefone ? fmtFone(n.telefone) : 'telefone aparece após o teste'}
                   {n.nome_perfil ? ` · ${n.nome_perfil}` : ''} · <span className='font-mono'>{n.provedor === 'zapi' ? `instância ${n.waha_sessao}` : `${n.waha_url} (${n.waha_sessao})`}</span>
                 </p>
-                {n.status_detalhe && <p className='mt-1 text-xs text-red-600'>{n.status_detalhe}</p>}
+                {n.status_detalhe && <p className='mt-1 text-xs text-red-700 [overflow-wrap:anywhere]'>{n.status_detalhe}</p>}
               </div>
               <div className='flex flex-wrap gap-1.5'>
                 <BotaoAcao acao={testarNumero.bind(null, n.id)}>
-                  <RefreshCw className='size-3.5' /> Testar
+                  <RefreshCw className='size-3.5' aria-hidden /> Testar
                 </BotaoAcao>
                 <BotaoAcao
                   acao={conectarWebhook.bind(null, n.id)}
                   variante={n.webhook_em ? 'secundario' : 'primario'}
                   confirmar={n.provedor === 'zapi' ? undefined : 'Configurar o webhook reinicia a sessão no WAHA (volta sozinha em ~20 s). Continuar?'}
                 >
-                  <Webhook className='size-3.5' /> {n.webhook_em ? 'Reconfigurar webhook' : 'Conectar webhook'}
+                  <Webhook className='size-3.5' aria-hidden /> {n.webhook_em ? 'Reconfigurar webhook' : 'Conectar webhook'}
                 </BotaoAcao>
                 <BotaoAcao acao={alternarNumero.bind(null, n.id, !n.ativo)}>
                   {n.ativo ? <PauseCircle className='size-3.5' /> : <PlayCircle className='size-3.5' />} {n.ativo ? 'Pausar' : 'Ativar'}
@@ -88,7 +88,7 @@ export default async function NumerosPage() {
               <Dado rotulo='Próximo envio' valor={new Date(n.proximo_envio_em) > new Date() ? fmtRelativo(n.proximo_envio_em) : 'pronto'} />
               <Dado rotulo='Último webhook' valor={n.ultimo_evento_em ? fmtRelativo(n.ultimo_evento_em) : n.webhook_em ? 'nenhum ainda' : 'não configurado'} />
             </dl>
-            <p className='mt-2 truncate text-[11px] text-slate-400'>
+            <p className='mt-2 text-[11px] text-slate-500 [overflow-wrap:anywhere]'>
               Webhook: <span className='font-mono'>{n.provedor === 'zapi' ? urlWebhook(n.id).replace('/whatsapp', '/zapi') + '&token=…' : urlWebhook(n.id)}</span>
               {n.webhook_em ? ` · configurado ${fmtDataHora(n.webhook_em)}` : ''}
             </p>
@@ -96,12 +96,12 @@ export default async function NumerosPage() {
         ))}
       </section>
 
-      <aside className='space-y-4'>
+      <aside className='min-w-0 space-y-4'>
         <div className={cn('rounded-2xl border p-4', cfg.pausado ? 'border-red-200 bg-red-50' : 'border-slate-200 bg-white')}>
           <div className='flex items-center justify-between gap-2'>
-            <p className='flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500'>
-              <Clock className='size-3.5 text-ouro-escuro' /> Regras gerais
-            </p>
+            <h3 className='flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500'>
+              <Clock className='size-3.5 text-ouro-escuro' aria-hidden /> Regras gerais
+            </h3>
             {cfg.pausado ? (
               <BotaoAcao acao={pausarTudo.bind(null, false)} variante='primario'>
                 <PlayCircle className='size-3.5' /> Liberar disparos
@@ -119,9 +119,9 @@ export default async function NumerosPage() {
         </div>
 
         <div className='rounded-2xl border border-slate-200 bg-white p-4'>
-          <p className='flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500'>
-            <Plug className='size-3.5 text-ouro-escuro' /> Como ligar um número novo
-          </p>
+          <h3 className='flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500'>
+            <Plug className='size-3.5 text-ouro-escuro' aria-hidden /> Como ligar um número novo
+          </h3>
           <ol className='mt-3 list-decimal space-y-2 pl-4 text-[13px] leading-relaxed text-slate-600'>
             <li>
               Na <strong>Z-API</strong>, crie uma instância para o número e conecte pelo <strong>QR code</strong> (WhatsApp → Dispositivos
@@ -132,7 +132,8 @@ export default async function NumerosPage() {
               “Conectado”.
             </li>
             <li>
-              Clique em <strong>Conectar webhook</strong>: a plataforma aponta os avisos da Z-API (mensagens, leitura, conexão) para cá.
+              No cartão do número, clique em <strong>Conectar webhook</strong> (se ele já foi configurado, o botão se chama{' '}
+              <strong>Reconfigurar webhook</strong>): a plataforma aponta os avisos da Z-API (mensagens, leitura, conexão) para cá.
             </li>
             <li>
               Número novo: comece com <strong>20–30 por dia</strong> e suba aos poucos. Denúncias derrubam o número — mensagem honesta e “SAIR” respeitado
@@ -142,10 +143,10 @@ export default async function NumerosPage() {
         </div>
 
         <div className='rounded-2xl border border-slate-200 bg-white p-4'>
-          <p className='flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500'>
-            <Ban className='size-3.5 text-ouro-escuro' /> Nunca contatar
-          </p>
-          <p className='mt-1 text-xs text-slate-400'>Clientes, parceiros, números da equipe. Quem pede para sair entra aqui sozinho.</p>
+          <h3 className='flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500'>
+            <Ban className='size-3.5 text-ouro-escuro' aria-hidden /> Nunca contatar
+          </h3>
+          <p className='mt-1 text-xs text-slate-500'>Clientes, parceiros, números da equipe. Quem pede para sair entra aqui sozinho.</p>
           <div className='mt-3'>
             <FormBloqueio grupos={opcoesGrupo} />
           </div>
@@ -154,7 +155,7 @@ export default async function NumerosPage() {
               {bloqueios.map(b => (
                 <li key={b.id} className='flex items-center gap-2 py-2'>
                   <span className='font-medium tabular-nums text-slate-700'>{fmtFone(b.telefone)}</span>
-                  <span className='min-w-0 flex-1 truncate text-slate-400'>
+                  <span className='min-w-0 flex-1 truncate text-slate-500'>
                     {b.motivo === 'manual' ? b.observacao || 'manual' : b.motivo} · {b.grupo_id ? nomeGrupo.get(b.grupo_id) : 'todos os grupos'}
                   </span>
                   {b.motivo === 'manual' && (
@@ -175,7 +176,7 @@ export default async function NumerosPage() {
 function Dado({ rotulo, valor }: { rotulo: string; valor: string }) {
   return (
     <div className='rounded-lg bg-slate-50 px-2.5 py-1.5'>
-      <dt className='text-[10px] font-bold uppercase tracking-[0.08em] text-slate-400'>{rotulo}</dt>
+      <dt className='text-[10px] font-bold uppercase tracking-[0.08em] text-slate-500'>{rotulo}</dt>
       <dd className='mt-0.5 font-semibold tabular-nums text-slate-700'>{valor}</dd>
     </div>
   )

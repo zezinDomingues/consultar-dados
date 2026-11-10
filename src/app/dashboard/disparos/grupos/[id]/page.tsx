@@ -19,13 +19,13 @@ export default async function GrupoPage({ params }: { params: Promise<{ id: stri
   if (!novo && !grupo) notFound()
   return (
     <div className='space-y-4'>
-      <div className='flex flex-wrap items-center gap-3'>
+      <div className='flex flex-wrap items-center gap-x-3 gap-y-2'>
         <Link href={ROTAS.grupos} className='inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-marca-700'>
-          <ArrowLeft className='size-3.5' /> Grupos
+          <ArrowLeft className='size-3.5' aria-hidden /> Grupos
         </Link>
-        <h2 className='font-serif text-xl font-bold text-marca-800'>{novo ? 'Novo grupo' : grupo!.nome}</h2>
+        <h2 className='min-w-0 break-words font-serif text-xl font-bold text-marca-800'>{novo ? 'Novo grupo' : grupo!.nome}</h2>
         {!novo && (
-          <span className='ml-auto flex flex-wrap gap-2 text-xs'>
+          <span className='flex flex-wrap gap-2 text-xs sm:ml-auto'>
             <Link href={`${ROTAS.novaCampanha}?grupo=${grupo!.id}`} className='inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 font-semibold text-slate-700 hover:border-marca-300'>
               <Megaphone className='size-3.5' /> Nova campanha deste grupo
             </Link>

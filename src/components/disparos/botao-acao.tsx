@@ -6,7 +6,10 @@ import { toast } from 'sonner'
 import type { Retorno } from '@/app/dashboard/disparos/actions'
 import { cn } from '@/lib/utils'
 
-/** Botão que chama uma server action já com os argumentos (bind) e mostra o resultado num toast. */
+/**
+ * Botão que chama uma server action já com os argumentos (bind) e mostra o resultado num toast.
+ * `titulo` também é o nome acessível (botões só com ícone: Excluir, Remover bloqueio).
+ */
 export function BotaoAcao({
   acao,
   children,
@@ -33,6 +36,8 @@ export function BotaoAcao({
     <button
       type='button'
       title={titulo}
+      aria-label={titulo}
+      aria-busy={pendente}
       disabled={pendente}
       onClick={() => {
         if (confirmar && !window.confirm(confirmar)) return
@@ -52,7 +57,7 @@ export function BotaoAcao({
         className
       )}
     >
-      {pendente && <LoaderCircle className='size-3.5 animate-spin' />}
+      {pendente && <LoaderCircle className='size-3.5 animate-spin' aria-hidden />}
       {children}
     </button>
   )

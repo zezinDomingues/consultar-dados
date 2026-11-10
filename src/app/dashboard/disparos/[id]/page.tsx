@@ -1,10 +1,25 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { ArrowLeft, BellRing, Building2, CalendarPlus, ClipboardCheck, ExternalLink, MessageCircle } from 'lucide-react'
+import {
+  ArrowLeft,
+  BellRing,
+  Building2,
+  CalendarPlus,
+  CircleDot,
+  ClipboardCheck,
+  ExternalLink,
+  Link2,
+  MessageCircle,
+  StickyNote,
+  TriangleAlert,
+  Vote,
+  type LucideIcon
+} from 'lucide-react'
+import { AoVivo } from '@/components/disparos/ao-vivo'
 import { BotaoAcao } from '@/components/disparos/botao-acao'
 import { Responder } from '@/components/disparos/responder'
-import { SeloStatus } from '@/components/disparos/selos'
+import { SeloStatus, SeloTeste } from '@/components/disparos/selos'
 import { marcarComoVisto } from '@/app/dashboard/disparos/actions'
 import { linkFormulario } from '@/lib/disparos/config'
 import { obterDisparo } from '@/lib/disparos/dados'
@@ -33,7 +48,7 @@ export default async function DisparoPage({ params }: { params: Promise<{ id: st
     { rotulo: 'Lido', em: d.lido_em },
     { rotulo: 'Respondeu', em: d.respondido_em },
     { rotulo: 'Quis a consulta', em: d.interessado_em },
-    { rotulo: 'Enviou nome e contato', em: d.preenchido_em }
+    { rotulo: 'Enviou os dados', em: d.preenchido_em }
   ]
 
   const ETAPAS: Record<string, string> = {
@@ -66,20 +81,16 @@ export default async function DisparoPage({ params }: { params: Promise<{ id: st
           <div className='rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-marca-900/[0.03]'>
             <div className='flex flex-wrap items-start justify-between gap-3'>
               <div className='min-w-0'>
-                <h2 className='font-serif text-2xl font-bold leading-tight text-marca-800'>
+                <h2 className='break-words font-serif text-2xl font-bold leading-tight text-marca-800'>
                   {d.nome_fantasia || d.razao_social}
                 </h2>
-                {d.nome_fantasia && <p className='text-sm text-slate-500'>{d.razao_social}</p>}
-                <p className='mt-1 text-xs text-slate-400'>
+                {d.nome_fantasia && <p className='break-words text-sm text-slate-500'>{d.razao_social}</p>}
+                <p className='mt-1 text-xs text-slate-500'>
                   CNPJ {fmtCnpj(d.cnpj)} · {d.municipio}
                 </p>
               </div>
               <div className='flex items-center gap-1.5'>
-                {d.teste && (
-                  <span className='rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-semibold text-violet-800'>
-                    teste
-                  </span>
-                )}
+                {d.teste && <SeloTeste className='px-2 py-0.5 text-[11px]' />}
                 <SeloStatus status={d.status} className='text-xs' />
               </div>
             </div>
@@ -90,7 +101,7 @@ export default async function DisparoPage({ params }: { params: Promise<{ id: st
               </div>
               <div>
                 <dt className='text-[11px] uppercase tracking-wide text-slate-400'>Campanha</dt>
-                <dd className='truncate font-medium text-slate-700'>
+                <dd className='break-words font-medium text-slate-700'>
                   {campanha ? (
                     <Link href={ROTAS.campanha(campanha.id)} className='hover:text-marca-700 hover:underline'>
                       {campanha.nome}
@@ -102,7 +113,7 @@ export default async function DisparoPage({ params }: { params: Promise<{ id: st
               </div>
               <div>
                 <dt className='text-[11px] uppercase tracking-wide text-slate-400'>Enviado por</dt>
-                <dd className='font-medium text-slate-700'>
+                <dd className='break-words font-medium text-slate-700'>
                   {numero ? `${numero.rotulo}${numero.telefone ? ` · ${fmtFone(numero.telefone)}` : ''}` : '—'}
                 </dd>
               </div>
@@ -115,7 +126,8 @@ export default async function DisparoPage({ params }: { params: Promise<{ id: st
                     rel='noreferrer'
                     className='inline-flex items-center gap-1 font-medium text-marca-700 hover:underline'
                   >
-                    abrir <ExternalLink className='size-3' />
+                    abrir <ExternalLink className='size-3' aria-hidden />
+                    <span className='sr-only'>(em nova aba)</span>
                   </a>
                 </dd>
               </div>
@@ -144,17 +156,19 @@ export default async function DisparoPage({ params }: { params: Promise<{ id: st
               )}
             </div>
             {etapaAberta && (
-              <p className='mt-4 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800'>
+              <p className='mt-4 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-900'>
                 Robô: {etapaAberta.toLowerCase()}…
               </p>
             )}
-            {d.erro && <p className='mt-4 rounded-xl bg-red-50 px-3 py-2 text-xs text-red-700'>{d.erro}</p>}
+            {d.erro && (
+              <p className='mt-4 break-words rounded-xl bg-red-50 px-3 py-2 text-xs text-red-700'>{d.erro}</p>
+            )}
           </div>
 
           {d.preenchido_em && (
             <div className='rounded-2xl border border-ouro/60 bg-white p-5 ring-1 ring-ouro/30'>
-              <p className='flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-ouro-escuro'>
-                <ClipboardCheck className='size-4' /> Dados enviados
+              <p className='flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-ouro-texto'>
+                <ClipboardCheck className='size-4' aria-hidden /> Dados enviados
               </p>
               <dl className='mt-3 grid gap-3 text-sm sm:grid-cols-2'>
                 <Campo rotulo='Nome completo' valor={d.lead_nome} />
@@ -178,7 +192,7 @@ export default async function DisparoPage({ params }: { params: Promise<{ id: st
                 {d.lead_email && <Campo rotulo='E-mail' valor={d.lead_email} link={`mailto:${d.lead_email}`} />}
                 {d.lead_empresa && <Campo rotulo='Empresa (formulário)' valor={d.lead_empresa} />}
               </dl>
-              <p className='mt-3 text-xs text-slate-400'>Enviado em {fmtDataHora(d.preenchido_em)}</p>
+              <p className='mt-3 text-xs text-slate-500'>Enviado em {fmtDataHora(d.preenchido_em)}</p>
             </div>
           )}
 
@@ -199,7 +213,13 @@ export default async function DisparoPage({ params }: { params: Promise<{ id: st
               ))}
               {d.encerrado_em && (
                 <li className='flex items-center gap-3 text-sm'>
-                  <span className='size-2.5 shrink-0 rounded-full bg-rose-500' />
+                  <span
+                    className={cn(
+                      'size-2.5 shrink-0 rounded-full',
+                      d.status === 'descadastrado' ? 'bg-red-600' : 'bg-slate-500'
+                    )}
+                    aria-hidden
+                  />
                   <span className='flex-1 text-slate-700'>
                     {d.status === 'descadastrado' ? 'Pediu para sair' : 'Sem interesse'}
                   </span>
@@ -211,14 +231,19 @@ export default async function DisparoPage({ params }: { params: Promise<{ id: st
         </section>
 
         {/* ---------- conversa ---------- */}
-        <section className='flex min-h-[520px] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm shadow-marca-900/[0.03]'>
-          <header className='flex items-center gap-2 border-b border-slate-100 px-5 py-3'>
-            <MessageCircle className='size-4 text-ouro-escuro' />
+        <section className='flex min-h-[420px] flex-col overflow-hidden sm:min-h-[520px] rounded-2xl border border-slate-200 bg-white shadow-sm shadow-marca-900/[0.03]'>
+          <header className='flex flex-wrap items-center gap-2 border-b border-slate-100 px-4 py-3 sm:px-5'>
+            <MessageCircle className='size-4 text-ouro-escuro' aria-hidden />
             <h3 className='text-sm font-semibold text-slate-700'>Conversa</h3>
-            <span className='ml-auto text-xs text-slate-400'>{eventos.length} registros</span>
+            <span className='text-xs text-slate-500'>
+              · {eventos.length} {eventos.length === 1 ? 'registro' : 'registros'}
+            </span>
+            <span className='ml-auto'>
+              <AoVivo />
+            </span>
           </header>
-          <div className='flex-1 space-y-2.5 overflow-y-auto bg-[#f7f4ec] px-4 py-5'>
-            {eventos.length === 0 && <p className='py-10 text-center text-sm text-slate-400'>Nada registrado ainda.</p>}
+          <div className='flex-1 space-y-2.5 overflow-y-auto bg-[#f7f4ec] px-3 py-5 sm:px-4'>
+            {eventos.length === 0 && <p className='py-10 text-center text-sm text-slate-500'>Nada registrado ainda.</p>}
             {eventos.map(e => (
               <Balao key={e.id} e={e} />
             ))}
@@ -246,7 +271,7 @@ function Campo({
   return (
     <div className='min-w-0'>
       <dt className='text-[11px] uppercase tracking-wide text-slate-400'>{rotulo}</dt>
-      <dd className='truncate font-medium text-slate-800'>
+      <dd className='font-medium text-slate-800 [overflow-wrap:anywhere]'>
         {link && interno ? (
           <Link href={link} className='text-marca-700 hover:underline' title='Ver a empresa na base'>
             {valor}
@@ -276,7 +301,7 @@ function Balao({ e }: { e: EventoDisparo }) {
           )}
         >
           <p className='whitespace-pre-wrap break-words'>{e.texto}</p>
-          <p className={cn('mt-1 text-right text-[10.5px]', nossa ? 'text-areia/70' : 'text-slate-400')}>
+          <p className={cn('mt-1 text-right text-[10.5px]', nossa ? 'text-areia' : 'text-slate-500')}>
             {e.autor ? `${e.autor} · ` : ''}
             {hora}
           </p>
@@ -288,23 +313,32 @@ function Balao({ e }: { e: EventoDisparo }) {
     e.tipo === 'voto'
       ? 'bg-amber-50 text-amber-900'
       : e.tipo === 'formulario'
-        ? 'bg-emerald-50 text-emerald-900'
+        ? 'bg-ouro/20 text-marca-900 ring-1 ring-inset ring-ouro/50'
         : e.tipo === 'erro'
           ? 'bg-red-50 text-red-800'
-          : 'bg-white/70 text-slate-500'
-  const titulo =
-    {
-      voto: '📊 Votou na enquete',
-      formulario: '📝 Preencheu o formulário',
-      link: '🔗',
-      status: '•',
-      erro: '⚠️',
-      nota: '•'
-    }[e.tipo] ?? '•'
+          : 'bg-white/70 text-slate-600'
+  // ícones de linha (lucide), como no resto do painel — nada de emoji
+  const evento: Record<string, { icone: LucideIcon; titulo?: string }> = {
+    voto: { icone: Vote, titulo: 'Votou na enquete' },
+    formulario: { icone: ClipboardCheck, titulo: 'Preencheu o formulário' },
+    link: { icone: Link2 },
+    status: { icone: CircleDot },
+    erro: { icone: TriangleAlert },
+    nota: { icone: StickyNote }
+  }
+  const { icone: Icone, titulo } = evento[e.tipo] ?? { icone: CircleDot }
   return (
     <div className='flex justify-center'>
-      <p className={cn('max-w-[90%] rounded-full px-3 py-1 text-center text-[11.5px]', cor)}>
-        {titulo} {e.texto} · <span className='opacity-70'>{hora}</span>
+      <p
+        className={cn(
+          'inline-flex max-w-[90%] items-start gap-1.5 rounded-2xl px-3 py-1 text-left text-[11.5px] [overflow-wrap:anywhere]',
+          cor
+        )}
+      >
+        <Icone className='mt-0.5 size-3.5 shrink-0' aria-hidden />
+        <span>
+          {titulo && <strong className='font-semibold'>{titulo}</strong>} {e.texto} · <span>{hora}</span>
+        </span>
       </p>
     </div>
   )
