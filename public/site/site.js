@@ -166,7 +166,10 @@
       if (v.length > MAXIMO.empresa) return 'Use no máximo ' + MAXIMO.empresa + ' caracteres.'
       return formula(v) ? 'O nome da empresa não pode começar com = + - @.' : ''
     },
-    cnpj: function (v) { return !v || cnpjValido(v) ? '' : 'CNPJ inválido: confira os 14 caracteres.' },
+    cnpj: function (v, el) {
+      if (!v) return el.required ? 'Informe o CNPJ da empresa.' : ''
+      return cnpjValido(v) ? '' : 'CNPJ inválido: confira os 14 caracteres.'
+    },
     email: function (v) {
       if (!v) return 'Informe seu e-mail.'
       return v.length <= MAXIMO.email && EMAIL.test(v) && !formula(v) ? '' : 'E-mail inválido. Exemplo: nome@empresa.com.br'

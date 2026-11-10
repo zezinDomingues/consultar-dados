@@ -53,6 +53,11 @@ export const LeadSite = z
     segmento: linha(40)
   })
   .superRefine((d, ctx) => {
+    // "Fale com um especialista" (/diagnostico): o CNPJ é obrigatório; a empresa é opcional.
+    // O formulário da página inicial (site_contato_home) não tem o campo de CNPJ.
+    if (d.tipo === 'contato' && d.origem.startsWith('site_contato') && !d.origem.startsWith('site_contato_home') && !d.cnpj) {
+      ctx.addIssue({ code: 'custom', path: ['cnpj'], message: 'Informe o CNPJ da empresa.' })
+    }
     if (d.tipo === 'parceiro') {
       if (!d.empresa) ctx.addIssue({ code: 'custom', path: ['empresa'], message: 'Informe a empresa ou o escritório.' })
       if (!(SEGMENTOS_PARCEIRO as readonly string[]).includes(d.segmento)) {
