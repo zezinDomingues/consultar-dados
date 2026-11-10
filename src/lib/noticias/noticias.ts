@@ -182,6 +182,13 @@ async function imagemDoPortal(link: string): Promise<string> {
  * Bing. HEAD (ou GET de 1 byte, se o HEAD for recusado) com 3 s e as mesmas travas de URL a cada redirect.
  */
 async function imagemCarrega(url: string): Promise<boolean> {
+  // teto duro: mesmo que o fetch não respeite o sinal, em 3,5 s a resposta é "não" (fica a miniatura do Bing)
+  let relogio: ReturnType<typeof setTimeout> | undefined
+  const teto = new Promise<boolean>(ok => (relogio = setTimeout(() => ok(false), 3500)))
+  return Promise.race([conferirImagem(url), teto]).finally(() => clearTimeout(relogio))
+}
+
+async function conferirImagem(url: string): Promise<boolean> {
   const prazo = AbortSignal.timeout(3000)
   const pedir = async (metodo: 'HEAD' | 'GET') => {
     let alvo = urlPublica(url)
@@ -190,6 +197,7 @@ async function imagemCarrega(url: string): Promise<boolean> {
         method: metodo,
         headers: { 'User-Agent': NAVEGADOR, Accept: 'image/*', ...(metodo === 'GET' ? { Range: 'bytes=0-0' } : {}) },
         redirect: 'manual',
+        cache: 'no-store',
         signal: prazo
       })
       r.body?.cancel().catch(() => {})
