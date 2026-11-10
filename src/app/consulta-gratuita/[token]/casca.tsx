@@ -49,7 +49,7 @@ export function CascaConsulta({ children, largo = false }: { children: React.Rea
         </div>
       </header>
 
-      <div className={cn('mx-auto -mt-8 grid max-w-5xl gap-6 px-5 pb-16 sm:px-8', !largo && 'lg:grid-cols-[1.35fr_1fr] lg:items-start')}>
+      <div className={cn('relative mx-auto -mt-8 grid max-w-5xl gap-6 px-5 pb-16 sm:px-8', !largo && 'lg:grid-cols-[1.35fr_1fr] lg:items-start')}>
         <section className='min-w-0 rounded-3xl border border-oc-700/10 bg-[#faf8f3] p-6 shadow-xl shadow-oc-900/[0.07] sm:p-8'>
           {children}
         </section>
