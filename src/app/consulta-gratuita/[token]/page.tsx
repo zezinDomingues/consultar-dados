@@ -1,11 +1,12 @@
 /* eslint-disable @next/next/no-img-element -- SVGs estáticos da marca (public/site/marca) */
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { BadgeCheck, Clock3, LockKeyhole, SearchCheck } from 'lucide-react'
+import { BadgeCheck, Clock3, LinkIcon, LockKeyhole, SearchCheck } from 'lucide-react'
 import { fmtFone, nomeEmpresa } from '@/lib/disparos/mensagens'
 import type { Disparo } from '@/lib/disparos/tipos'
 import { supabaseAdmin, temChaveSecreta } from '@/lib/supabase/admin'
 import { ROTAS } from '@/lib/rotas'
+import { cn } from '@/lib/utils'
 import { FormularioConsulta } from './formulario'
 
 // Página que o contato abre pelo link do WhatsApp. Pública, fora do índice dos buscadores. O token do link é
@@ -58,7 +59,7 @@ export default async function ConsultaGratuitaPage({ params }: { params: Promise
   return (
     <main className='min-h-dvh bg-creme'>
       {/* faixa da marca, como o cabeçalho do site */}
-      <header className='relative isolate overflow-hidden text-white' style={{ background: DEGRADE }}>
+      <header className='tema-escuro relative isolate overflow-hidden text-white' style={{ background: DEGRADE }}>
         <div
           className='pointer-events-none absolute -top-40 left-1/4 -z-10 size-[560px] rounded-full opacity-[0.22] blur-3xl'
           style={{ background: 'radial-gradient(circle, #365db9 0%, #213870 50%, transparent 70%)' }}
@@ -87,22 +88,28 @@ export default async function ConsultaGratuitaPage({ params }: { params: Promise
         </div>
       </header>
 
-      <div className='mx-auto -mt-8 grid max-w-5xl gap-6 px-5 pb-16 sm:px-8 lg:grid-cols-[1.35fr_1fr]'>
-        <section className='rounded-3xl border border-oc-700/10 bg-[#faf8f3] p-6 shadow-xl shadow-oc-900/[0.07] sm:p-8'>
+      {/* link inválido: cartão na largura toda e os 3 passos numa fileira embaixo (sem coluna vazia ao lado) */}
+      <div
+        className={cn(
+          'mx-auto -mt-8 grid max-w-5xl gap-6 px-5 pb-16 sm:px-8',
+          d && 'lg:grid-cols-[1.35fr_1fr] lg:items-start'
+        )}
+      >
+        <section className='min-w-0 rounded-3xl border border-oc-700/10 bg-[#faf8f3] p-6 shadow-xl shadow-oc-900/[0.07] sm:p-8'>
           {d ? (
             <>
               <div className='flex items-start gap-3 rounded-2xl border border-oc-700/10 bg-white px-4 py-3.5'>
                 <BadgeCheck className='mt-0.5 size-5 shrink-0 text-ouro-escuro' />
                 <div className='min-w-0'>
-                  <p className='truncate text-[15px] font-semibold text-oc-700'>{d.razao_social}</p>
-                  <p className='text-xs text-oc-700/60'>
+                  <p className='break-words text-[15px] font-semibold text-oc-700'>{d.razao_social}</p>
+                  <p className='text-xs text-oc-700/75'>
                     CNPJ {fmtCnpj(d.cnpj)}
                     {d.municipio ? ` · ${d.municipio}` : ''}
                   </p>
                 </div>
               </div>
               <h2 className='mt-6 font-serif text-2xl font-bold tracking-[-0.01em] text-oc-700'>Preencha para iniciar</h2>
-              <p className='mt-1 text-sm text-oc-700/65'>Leva menos de 1 minuto. Um especialista retorna com o resultado.</p>
+              <p className='mt-1 text-sm text-oc-700/80'>Leva menos de 1 minuto. Um especialista retorna com o resultado.</p>
               <div className='mt-6'>
                 <FormularioConsulta
                   token={token}
@@ -117,34 +124,40 @@ export default async function ConsultaGratuitaPage({ params }: { params: Promise
               </div>
             </>
           ) : (
-            <div className='py-10 text-center'>
-              <h2 className='font-serif text-2xl font-bold text-oc-700'>Link inválido</h2>
-              <p className='mx-auto mt-2 max-w-sm text-sm text-oc-700/65'>
-                Confira se o endereço chegou completo na mensagem. Se preferir, fale com a gente pelo site.
-              </p>
-              <Link
-                href={ROTAS.inicio}
-                className='mt-6 inline-flex h-11 items-center rounded-full bg-oc-700 px-6 text-sm font-bold text-creme transition hover:bg-oc-900'
-              >
-                Ir para o site da OficialCert
-              </Link>
+            <div className='flex flex-col items-start gap-4 sm:flex-row sm:items-start sm:gap-5'>
+              <span className='grid size-12 shrink-0 place-items-center rounded-full border border-ouro/40 bg-oc-700 text-ouro'>
+                <LinkIcon className='size-5' strokeWidth={1.75} aria-hidden />
+              </span>
+              <div className='min-w-0'>
+                <h2 className='font-serif text-2xl font-bold tracking-[-0.01em] text-oc-700'>Link inválido</h2>
+                <p className='mt-1.5 max-w-md text-sm leading-relaxed text-oc-700/80'>
+                  Este endereço não abre nenhuma consulta. Confira se ele chegou completo na mensagem do WhatsApp — às vezes
+                  o fim do link fica de fora ao copiar. Se preferir, fale com a gente pelo site.
+                </p>
+                <Link
+                  href={ROTAS.inicio}
+                  className='mt-5 inline-flex h-11 items-center rounded-full bg-oc-700 px-6 text-sm font-bold text-creme transition hover:bg-oc-900'
+                >
+                  Ir para o site da OficialCert
+                </Link>
+              </div>
             </div>
           )}
         </section>
 
-        <aside className='space-y-4 lg:pt-14'>
+        <aside className={d ? 'space-y-4 lg:pt-14' : 'grid gap-4 sm:grid-cols-3'}>
           {PASSOS.map(({ icone: Icone, titulo, texto }) => (
-            <div key={titulo} className='flex items-start gap-4 rounded-2xl border border-oc-700/10 bg-white/70 p-4'>
+            <div key={titulo} className='flex items-start gap-4 rounded-2xl border border-oc-700/10 bg-white p-4'>
               <span className='grid size-10 shrink-0 place-items-center rounded-full border border-ouro/40 bg-oc-700 text-ouro'>
-                <Icone className='size-[18px]' strokeWidth={1.75} />
+                <Icone className='size-[18px]' strokeWidth={1.75} aria-hidden />
               </span>
               <span>
                 <span className='block text-[15px] font-semibold text-oc-700'>{titulo}</span>
-                <span className='mt-0.5 block text-[13px] leading-relaxed text-oc-700/65'>{texto}</span>
+                <span className='mt-0.5 block text-[13px] leading-relaxed text-oc-700/80'>{texto}</span>
               </span>
             </div>
           ))}
-          <p className='px-1 text-[11px] leading-relaxed text-oc-700/50'>
+          <p className={cn('px-1 text-[11px] leading-relaxed text-oc-700/75', !d && 'sm:col-span-3')}>
             OficialCert · Afiliada GWT Solution. Seus dados são usados apenas para a consulta, conforme a nossa{' '}
             <Link href='/politica-de-privacidade' className='underline underline-offset-2 hover:text-oc-700'>
               política de privacidade

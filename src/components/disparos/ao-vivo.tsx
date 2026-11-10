@@ -11,7 +11,8 @@ const A_CADA_MS = 10_000
  * Painel "ao vivo" sem recarregar a página: a cada 10 s pergunta ao servidor uma assinatura barata dos disparos
  * (último atualizado_em + total). Só quando ela muda faz router.refresh() — o Next troca os dados no lugar, sem
  * reload, mantendo rolagem e o que foi digitado. Linhas novas ([data-disparo-id] que não existiam) piscam.
- * Com a aba escondida não consulta; ao voltar, confere na hora.
+ * Com a aba escondida não consulta; ao voltar, confere na hora. Fica sempre na tela (no Painel, mesmo sem ramos,
+ * e no detalhe do contato, onde a conversa nova aparece sozinha).
  */
 export function AoVivo() {
   const router = useRouter()
@@ -59,13 +60,17 @@ export function AoVivo() {
 
   return (
     <span
-      className='inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold normal-case tracking-normal text-emerald-800'
+      role='status'
+      className='inline-flex items-center gap-1.5 rounded-full border border-marca-200 bg-white px-2.5 py-1 text-[11px] font-semibold normal-case tracking-normal text-marca-800'
       title='Novidades aparecem sozinhas, sem recarregar a página'
     >
-      <span className={cn('size-2 rounded-full bg-emerald-500', pendente ? 'animate-ping' : 'animate-pulse')} />
+      <span className='relative flex size-2' aria-hidden>
+        <span className={cn('absolute inline-flex size-full rounded-full bg-ouro-escuro/60', pendente ? 'animate-ping' : 'animate-pulse')} />
+        <span className='relative inline-flex size-2 rounded-full bg-ouro-escuro' />
+      </span>
       Ao vivo
       {quando && (
-        <span className='font-normal text-emerald-700/80'>
+        <span className='font-normal text-slate-500'>
           · atualizado {quando.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
         </span>
       )}

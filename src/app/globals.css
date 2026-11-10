@@ -17,13 +17,16 @@
   --color-marca-900: #142347;
   --color-marca-950: #0b1225;
 
-  /* Neutros da landing: creme nos fundos e bordas, tinta marinho nos textos (substitui o slate frio) */
+  /* Neutros da landing: creme nos fundos e bordas, tinta marinho nos textos (substitui o slate frio).
+     Contraste (WCAG AA ≥ 4,5:1 para texto): 400 e 500 são cores de TEXTO e passam em branco, creme, slate-50/100 e
+     marca-50 (400: era #9a968c, 2,6–2,95:1 → 4,6–5,2:1; 500: era #6b6e7d, 4,4–5,1:1 → 5,5–6,3:1).
+     50–300 são fundos e bordas: slate-300 NÃO serve para texto (1,4–1,6:1) — use slate-400 ou mais escuro. */
   --color-slate-50: #faf8f3;
   --color-slate-100: #f3efe6;
   --color-slate-200: #e7e1d4;
   --color-slate-300: #d5cdbb;
-  --color-slate-400: #9a968c;
-  --color-slate-500: #6b6e7d;
+  --color-slate-400: #706c63;
+  --color-slate-500: #5c5f6e;
   --color-slate-600: #50566a;
   --color-slate-700: #3a4157;
   --color-slate-800: #262d44;
@@ -39,13 +42,30 @@
   --color-oc-600: #213870;
   --color-oc-brilho: #365db9;
   --color-ouro: #c4b99a;
+  /* dourado da marca: fundos, filetes e ícones (3,1:1 no branco — não é cor de texto pequeno) */
   --color-ouro-escuro: #b08d4a;
+  /* dourado para TEXTO em fundo claro (4,6–5,3:1); sobre ouro-escuro, escreva em marca-950 (6:1), não em branco */
+  --color-ouro-texto: #86672b;
   --color-areia: #d5cdba;
   --color-creme: #f5f1e8;
 }
 
 body {
   @apply bg-creme text-slate-900 antialiased;
+}
+
+/* Foco visível em todo controle (teclado). Azul-brilho da marca no creme/branco (5:1 no creme); dourado sobre o
+   marinho (menu, faixas e cartões escuros). Fica na camada base: quem tem estilo de foco próprio (focus:ring dos
+   campos, outline-none) continua mandando. */
+@layer base {
+  :where(a, button, input, select, textarea, summary, [tabindex]:not([tabindex='-1'])):focus-visible {
+    outline: 2px solid var(--color-oc-brilho);
+    outline-offset: 2px;
+  }
+  :where(.fundo-marinho, .tema-escuro, .bg-marca-800, .bg-marca-900, .bg-marca-950, .bg-oc-700, .bg-oc-800, .bg-oc-900)
+    :where(a, button, input, select, textarea, summary, [tabindex]:not([tabindex='-1'])):focus-visible {
+    outline-color: var(--color-ouro);
+  }
 }
 
 /* Peças de identidade do painel (iguais às do site) */
@@ -118,3 +138,4 @@ summary {
 /* Painel de disparos ao vivo: linha que acabou de chegar pisca dourado e volta ao normal */
 @keyframes linha-nova { 0% { background-color: rgb(196 185 154 / 0.55); } 100% { background-color: transparent; } }
 .linha-nova { animation: linha-nova 3.5s ease-out; }
+@media (prefers-reduced-motion: reduce) { .linha-nova { animation: none; } }

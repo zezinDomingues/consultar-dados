@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState, useEffect, useState } from 'react'
+import { startTransition, useActionState, useEffect, useState } from 'react'
 import { LoaderCircle, Plus, Save, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { salvarNumero, type Retorno } from '@/app/dashboard/disparos/actions'
@@ -40,8 +40,19 @@ export function FormNumero({ numero, rotuloBotao, grupos }: { numero?: Numero; r
     )
   }
 
+  // onSubmit em vez de `action`: o React 19 limpa os campos não controlados depois da action, e quem digitou o
+  // ID/tokens perderia tudo quando o servidor recusa (ex.: intervalo máximo menor que o mínimo)
   return (
-    <form action={acao} className={cn('w-full space-y-3 rounded-2xl border border-marca-200 bg-marca-50/40 p-4', numero && 'mt-3')}>
+    <form
+      onSubmit={e => {
+        e.preventDefault()
+        if (salvando) return
+        const fd = new FormData(e.currentTarget)
+        startTransition(() => acao(fd))
+      }}
+      aria-busy={salvando}
+      className={cn('w-full space-y-3 rounded-2xl border border-marca-200 bg-marca-50/40 p-4', numero && 'mt-3')}
+    >
       {numero && <input type='hidden' name='id' value={numero.id} />}
       <input type='hidden' name='provedor' value={provedor} />
       <div className='grid gap-3 sm:grid-cols-2 lg:grid-cols-4'>
@@ -72,7 +83,7 @@ export function FormNumero({ numero, rotuloBotao, grupos }: { numero?: Numero; r
           </>
         ) : (
           <>
-            <Campo rotulo='URL do WAHA' dica='HTTPS público (a Vercel precisa alcançar)' largo>
+            <Campo rotulo='URL do WAHA' dica='endereço público (https://), acessível pela internet' largo>
               <input name='waha_url' defaultValue={numero?.provedor === 'waha' ? numero.waha_url : ''} required placeholder='https://waha3.mindloop.com.br' className={ENTRADA} />
             </Campo>
             <Campo rotulo='Sessão' dica='no CORE é sempre default'>
@@ -89,7 +100,9 @@ export function FormNumero({ numero, rotuloBotao, grupos }: { numero?: Numero; r
         <Campo rotulo='Intervalo (segundos)' dica='sorteado entre mín. e máx.'>
           <div className='flex items-center gap-1.5'>
             <input name='intervalo_min_s' type='number' min={20} defaultValue={numero?.intervalo_min_s ?? 120} required className={ENTRADA} />
-            <span className='text-slate-400'>–</span>
+            <span className='text-slate-500' aria-hidden>
+              –
+            </span>
             <input name='intervalo_max_s' type='number' min={20} defaultValue={numero?.intervalo_max_s ?? 300} required className={ENTRADA} />
           </div>
         </Campo>
@@ -97,13 +110,18 @@ export function FormNumero({ numero, rotuloBotao, grupos }: { numero?: Numero; r
       <label className='flex items-center gap-2 text-sm text-slate-700'>
         <input type='checkbox' name='ativo' defaultChecked={numero?.ativo ?? true} className='size-4 accent-[#1a2d5a]' /> Ativo (participa do envio)
       </label>
-      {estado.erro && <p className='rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700'>{estado.erro}</p>}
+      {estado.erro && (
+        <p role='alert' className='rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700'>
+          {estado.erro}
+        </p>
+      )}
       <div className='flex gap-2'>
         <button type='submit' disabled={salvando} className='inline-flex h-9 items-center gap-2 rounded-lg bg-marca-800 px-4 text-sm font-semibold text-creme hover:bg-marca-950 disabled:opacity-60'>
-          {salvando ? <LoaderCircle className='size-4 animate-spin' /> : <Save className='size-4' />} Salvar e testar
+          {salvando ? <LoaderCircle className='size-4 animate-spin' aria-hidden /> : <Save className='size-4' aria-hidden />}{' '}
+          {salvando ? 'Salvando…' : 'Salvar e testar'}
         </button>
         <button type='button' onClick={() => setAberto(false)} className='inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-sm text-slate-500 hover:text-slate-800'>
-          <X className='size-4' /> Cancelar
+          <X className='size-4' aria-hidden /> Cancelar
         </button>
       </div>
     </form>
@@ -115,7 +133,7 @@ function Campo({ rotulo, dica, largo, children }: { rotulo: string; dica?: strin
     <label className={cn('block space-y-1', largo && 'lg:col-span-2')}>
       <span className='text-xs font-semibold text-slate-600'>{rotulo}</span>
       {children}
-      {dica && <span className='block text-[11px] text-slate-400'>{dica}</span>}
+      {dica && <span className='block text-[11px] text-slate-500'>{dica}</span>}
     </label>
   )
 }

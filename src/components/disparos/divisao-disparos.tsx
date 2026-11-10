@@ -57,7 +57,7 @@ export function DivisaoDisparos({
     <div className='mt-4 rounded-xl border border-marca-100 bg-marca-50/40 p-4'>
       <div className='flex items-center justify-between gap-2'>
         <p className='flex items-center gap-2 text-sm font-semibold text-marca-900'>
-          <Shuffle className='size-4 text-ouro-escuro' />
+          <Shuffle className='size-4 shrink-0 text-ouro-escuro' aria-hidden />
           {quantidade ? `Como os ${fmtInt(alvo)} disparos se dividem` : `Como se dividem (lotes de ${fmtInt(alvo)})`}
         </p>
         {carregando && <LoaderCircle className='size-4 animate-spin text-marca-400' />}
@@ -68,7 +68,11 @@ export function DivisaoDisparos({
         que tem, e a sobra vai para os outros. Os envios saem intercalados (um de cada nicho por vez).
       </p>
 
-      {erro && <p className='mt-3 text-xs text-red-600'>Não deu para calcular a divisão: {erro}</p>}
+      {erro && (
+        <p role='alert' className='mt-3 text-xs text-red-700'>
+          Não deu para calcular a divisão: {erro}
+        </p>
+      )}
 
       {d && (
         <div className={cn('mt-3 space-y-2 transition-opacity', carregando && 'opacity-50')}>
@@ -76,7 +80,7 @@ export function DivisaoDisparos({
             <p className='text-xs text-slate-600'>
               Já saíram <strong>{fmtInt(d.enviados ?? 0)}</strong> · na fila <strong>{fmtInt(d.na_fila ?? 0)}</strong>
               {alterada && (
-                <span className='ml-1 text-amber-700'>· ao salvar, a fila é refeita com a nova quantidade/ordem</span>
+                <span className='ml-1 text-amber-800'>· ao salvar, a fila é refeita com a nova quantidade/ordem</span>
               )}
             </p>
           )}
@@ -97,7 +101,7 @@ export function DivisaoDisparos({
           </p>
         </div>
       )}
-      {!d && !erro && carregando && <p className='mt-3 text-xs text-slate-400'>Calculando a divisão…</p>}
+      {!d && !erro && carregando && <p className='mt-3 text-xs text-slate-500'>Calculando a divisão…</p>}
     </div>
   )
 }
@@ -135,7 +139,7 @@ function Nichos({ itens }: { itens: ItemDivisao[] }) {
         {itens.map(i => (
           <li key={i.v ?? '?'} className='flex justify-between gap-2 text-slate-600'>
             <span className='truncate' title={i.nome}>
-              <span className='font-mono text-slate-400'>{i.v ?? '??'}</span> {i.nome}
+              <span className='font-mono text-slate-500'>{i.v ?? '??'}</span> {i.nome}
             </span>
             <strong className='tabular-nums text-marca-800'>{fmtInt(i.n)}</strong>
           </li>

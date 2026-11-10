@@ -36,12 +36,13 @@ export default async function CampanhaPage({ params }: { params: Promise<{ id: s
 
   return (
     <div className='space-y-4'>
-      <div className='flex flex-wrap items-center gap-3'>
+      <div className='flex flex-wrap items-center gap-x-3 gap-y-1'>
         <Link href={ROTAS.campanhas} className='inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-marca-700'>
-          <ArrowLeft className='size-3.5' /> Campanhas
+          <ArrowLeft className='size-3.5' aria-hidden /> Campanhas
         </Link>
+        <h2 className='min-w-0 break-words font-serif text-xl font-bold text-marca-800'>{c.nome}</h2>
         <SeloCampanha status={c.status} />
-        {c.motivo_status && <span className='text-xs text-slate-400'>{c.motivo_status}</span>}
+        {c.motivo_status && <span className='text-xs text-slate-500'>{c.motivo_status}</span>}
       </div>
       <FormCampanha
         inicial={c}
