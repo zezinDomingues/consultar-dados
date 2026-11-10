@@ -6,7 +6,7 @@
 --    ASCII; 489 linhas com letra minúscula), então LIKE com o termo em maiúsculas dá o mesmo resultado comparando
 --    bytes: 0,37 s. As 489 linhas fora do padrão ficam num índice parcial de 32 kB e seguem com ILIKE.
 --    Medido em rollback: resumo com texto 2,1–4,4 s → 0,38–0,49 s; lista com termo raro 3,7–4,3 s → 0,8–1,0 s;
---    mesmo conjunto de CNPJs nos 9 termos testados. De brinde: termo com acento ("farmácia", "São Paulo") passa
+--    mesmo conjunto de CNPJs nos 11 termos sem acento testados (incl. %, _, \\, apóstrofo). De brinde: termo com acento ("farmácia", "São Paulo") passa
 --    a achar (antes dava 0, porque a base não tem acento). Um índice de trigramas não cabe (≈60 MB, banco 455/500).
 --    Ainda no filtro: capital/idade mínimos maiores que os máximos são trocados (QA-09; a tela já troca, isto cobre o
 --    agente) e o resumo roda sem laço aninhado (capital entre X e Y passava de 40 s — ver a 016, item 3).
