@@ -18,8 +18,9 @@ import { cn } from '@/lib/utils'
 export const metadata: Metadata = { title: 'Contato' }
 
 export default async function DisparoPage({ params }: { params: Promise<{ id: string }> }) {
-  const id = Number((await params).id)
-  if (!Number.isInteger(id) || id <= 0) notFound()
+  const bruto = (await params).id
+  if (!/^[1-9]\d{0,14}$/.test(bruto)) notFound() // só inteiro positivo ("1e3", "0x10", " 7" nem chegam ao banco)
+  const id = Number(bruto)
   const r = await obterDisparo(id)
   if (!r) notFound()
   const { disparo: d, eventos, campanha, numero } = r

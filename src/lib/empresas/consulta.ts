@@ -6,7 +6,7 @@ import { cache } from 'react'
 import { redirect } from 'next/navigation'
 import { ROTAS } from '@/lib/rotas'
 import { createClient } from '@/lib/supabase/server'
-import type { Filtros, Ordem } from './filtros'
+import { normalizarFaixas, type Filtros, type Ordem } from './filtros'
 import type { ContadorGrupo, Empresa, EmpresaLista, Opcoes, Resumo } from './tipos'
 
 export const COLUNAS_LISTA =
@@ -95,7 +95,7 @@ export const resumoEmpresas = cache(async (filtrosJson: string): Promise<Resumo>
   await exigirAcesso()
   return lembrar(`resumo:${filtrosJson}`, 15 * 60_000, async () => {
     const supabase = await createClient()
-    const { data, error } = await supabase.rpc('resumo_empresas', { f: JSON.parse(filtrosJson) })
+    const { data, error } = await supabase.rpc('resumo_empresas', { f: normalizarFaixas(JSON.parse(filtrosJson)) })
     if (error) throw new Error(`resumo_empresas: ${error.message}`)
     return data as Resumo
   })
@@ -111,7 +111,7 @@ export async function buscarEmpresas(
   await exigirAcesso()
   const supabase = await createClient()
   const { data, error } = await supabase
-    .rpc('buscar_empresas', { f: filtros, ordem, limite: porPagina, pagina })
+    .rpc('buscar_empresas', { f: normalizarFaixas({ ...filtros }), ordem, limite: porPagina, pagina })
     .select(colunas)
   if (error) throw new Error(`buscar_empresas: ${error.message}`)
   return (data ?? []) as unknown as EmpresaLista[]
@@ -141,14 +141,27 @@ export async function obterEmpresa(cnpj: string) {
 export async function listarContadores(q: string | undefined, pagina: number, porPagina = 50) {
   await exigirAcesso()
   const supabase = await createClient()
-  let consulta = supabase.from('contadores_grupos').select('*', { count: 'exact' })
   const termo = q?.replace(/[,()%*\\]/g, ' ').trim()
-  if (termo) consulta = consulta.or(`email.ilike.*${termo}*,exemplos.ilike.*${termo}*`)
-  const de = (pagina - 1) * porPagina
-  const { data, error, count } = await consulta
-    .order('empresas', { ascending: false })
-    .order('email')
-    .range(de, de + porPagina - 1)
+  pagina = Math.min(1_000_000, Math.max(1, Math.trunc(pagina) || 1))
+  const filtrar = <T extends { or: (f: string) => T }>(c: T) =>
+    termo ? c.or(`email.ilike.*${termo}*,exemplos.ilike.*${termo}*`) : c
+  const ler = (p: number) => {
+    const de = (p - 1) * porPagina
+    return filtrar(supabase.from('contadores_grupos').select('*', { count: 'exact' }))
+      .order('empresas', { ascending: false })
+      .order('email')
+      .range(de, de + porPagina - 1)
+  }
+  let { data, error, count } = await ler(pagina)
+  // Página além do fim (link antigo, URL digitada): o PostgREST responde 416 "Requested range not satisfiable".
+  // Como na Consulta, mostra a última página que existe.
+  if (error?.code === 'PGRST103' || (!error && pagina > 1 && !data?.length)) {
+    const total = error
+      ? ((await filtrar(supabase.from('contadores_grupos').select('email', { count: 'exact', head: true }))).count ?? 0)
+      : (count ?? 0)
+    pagina = Math.max(1, Math.ceil(total / porPagina))
+    ;({ data, error, count } = await ler(pagina))
+  }
   if (error) throw new Error(`contadores: ${error.message}`)
-  return { itens: (data ?? []) as ContadorGrupo[], total: count ?? 0 }
+  return { itens: (data ?? []) as ContadorGrupo[], total: count ?? 0, pagina }
 }

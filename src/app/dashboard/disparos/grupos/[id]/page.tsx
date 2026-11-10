@@ -13,6 +13,8 @@ export default async function GrupoPage({ params }: { params: Promise<{ id: stri
   if (!(await usuarioAtual())?.admin) redirect(ROTAS.disparos)
   const { id } = await params
   const novo = id === 'novo'
+  // só "novo" ou um id inteiro positivo; o resto nem chega ao banco (QA-03)
+  if (!novo && !/^[1-9]\d{0,14}$/.test(id)) notFound()
   const grupo = novo ? undefined : await obterGrupo(Number(id))
   if (!novo && !grupo) notFound()
   return (
