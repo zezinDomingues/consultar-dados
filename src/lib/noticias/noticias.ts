@@ -169,9 +169,52 @@ async function imagemDoPortal(link: string): Promise<string> {
     const bruto = meta('og:image:secure_url') || meta('og:image') || meta('twitter:image') || meta('twitter:image:src')
     if (!bruto) return ''
     const abs = urlPublica(new URL(decodificar(bruto), r.url || link).toString().replace(/^http:/, 'https:'))?.toString() ?? ''
-    return /logo|placeholder|default[-_]?(image|og)|favicon/i.test(abs) ? '' : abs
+    if (!abs || /logo|placeholder|default[-_]?(image|og)|favicon/i.test(abs)) return ''
+    return (await imagemCarrega(abs)) ? abs : ''
   } catch {
     return ''
+  }
+}
+
+/**
+ * A imagem do portal carrega no NOSSO site? Portais com cross-origin-resource-policy same-origin/same-site
+ * (ex.: forbes.com.br) fazem o navegador bloquear (ERR_BLOCKED_BY_RESPONSE.NotSameOrigin): aí vale a miniatura do
+ * Bing. HEAD (ou GET de 1 byte, se o HEAD for recusado) com 3 s e as mesmas travas de URL a cada redirect.
+ */
+async function imagemCarrega(url: string): Promise<boolean> {
+  // teto duro: mesmo que o fetch não respeite o sinal, em 3,5 s a resposta é "não" (fica a miniatura do Bing)
+  let relogio: ReturnType<typeof setTimeout> | undefined
+  const teto = new Promise<boolean>(ok => (relogio = setTimeout(() => ok(false), 3500)))
+  return Promise.race([conferirImagem(url), teto]).finally(() => clearTimeout(relogio))
+}
+
+async function conferirImagem(url: string): Promise<boolean> {
+  const prazo = AbortSignal.timeout(3000)
+  const pedir = async (metodo: 'HEAD' | 'GET') => {
+    let alvo = urlPublica(url)
+    for (let i = 0; alvo && i <= MAX_REDIRECTS; i++) {
+      const r = await fetch(alvo, {
+        method: metodo,
+        headers: { 'User-Agent': NAVEGADOR, Accept: 'image/*', ...(metodo === 'GET' ? { Range: 'bytes=0-0' } : {}) },
+        redirect: 'manual',
+        cache: 'no-store',
+        signal: prazo
+      })
+      r.body?.cancel().catch(() => {})
+      if (r.status < 300 || r.status >= 400) return r
+      const proximo = r.headers.get('location')
+      alvo = proximo ? urlPublica(new URL(proximo, alvo).toString()) : null
+    }
+    return null
+  }
+  try {
+    let r = await pedir('HEAD')
+    if (r && (r.status === 405 || r.status === 501)) r = await pedir('GET')
+    if (!r || r.status < 200 || r.status >= 300) return false
+    if (/^\s*same-(origin|site)\s*$/i.test(r.headers.get('cross-origin-resource-policy') ?? '')) return false
+    return /^image\//i.test(r.headers.get('content-type') ?? '')
+  } catch {
+    return false
   }
 }
 

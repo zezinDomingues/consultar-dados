@@ -143,7 +143,7 @@ begin
   values (
     case when dados->>'tipo' = 'parceiro' then 'parceiro' else 'contato' end,
     nullif(btrim(dados->>'origem'), ''), nullif(btrim(dados->>'pagina'), ''),
-    btrim(dados->>'nome'), nullif(btrim(dados->>'empresa'), ''), nullif(regexp_replace(coalesce(dados->>'cnpj', ''), '\D', '', 'g'), ''),
+    btrim(dados->>'nome'), nullif(btrim(dados->>'empresa'), ''), nullif(upper(regexp_replace(coalesce(dados->>'cnpj', ''), '[^0-9A-Za-z]', '', 'g')), ''),
     nullif(lower(btrim(dados->>'email')), ''), nullif(btrim(dados->>'whatsapp'), ''), nullif(btrim(dados->>'mensagem'), ''),
     nullif(btrim(dados->>'segmento'), ''), v_ip, left(user_agent, 300)
   )
