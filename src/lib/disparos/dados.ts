@@ -105,32 +105,57 @@ export async function resumoDisparos(campanha?: number, ramo?: string, grupo?: n
   return data as ResumoDisparos
 }
 
+/** O que os filtros do painel usam do query builder (a mesma função filtra a lista e a contagem). */
+type Filtravel = {
+  eq: (c: string, v: unknown) => Filtravel
+  in: (c: string, v: readonly unknown[]) => Filtravel
+  not: (c: string, op: string, v: unknown) => Filtravel
+  or: (f: string) => Filtravel
+}
+
 export type ConsultaDisparos = { grupo: Grupo; campanha?: number; ramo?: string; grupoId?: number; q?: string; pagina: number; por: number }
 
 export async function listarDisparos(c: ConsultaDisparos) {
   await exigirAtendimento()
   const supabase = await createClient()
-  let consulta = supabase.from('disparos').select('*', { count: 'exact' })
   const g = GRUPOS[c.grupo]
-  if (c.grupo === 'atencao') consulta = consulta.eq('atencao', true)
-  else if (c.grupo === 'leads') consulta = consulta.not('preenchido_em', 'is', null)
-  else if (g.status) consulta = consulta.in('status', [...g.status])
-  if (c.campanha) consulta = consulta.eq('campanha_id', c.campanha)
-  if (c.ramo) consulta = consulta.eq('ramo', c.ramo)
-  if (c.grupoId) consulta = consulta.eq('grupo_id', c.grupoId)
   const termo = c.q?.replace(/[,()%*\\]/g, ' ').trim()
-  if (termo) {
-    const dig = termo.replace(/\D/g, '')
-    consulta =
-      dig.length >= 6
-        ? consulta.or(`cnpj.like.${dig}*,telefone.like.*${dig.slice(-9)}*`)
-        : consulta.or(`razao_social.ilike.*${termo}*,nome_fantasia.ilike.*${termo}*,lead_nome.ilike.*${termo}*,lead_email.ilike.*${termo}*`)
-  }
-  const de = (c.pagina - 1) * c.por
   const ordem = c.grupo === 'leads' ? 'preenchido_em' : c.grupo === 'atencao' || c.grupo === 'responderam' ? 'atualizado_em' : 'criado_em'
-  const { data, error, count } = await consulta.order(ordem, { ascending: false, nullsFirst: false }).order('id', { ascending: false }).range(de, de + c.por - 1)
+  const filtrar = <T,>(entrada: T): T => {
+    let consulta = entrada as unknown as Filtravel
+    if (c.grupo === 'atencao') consulta = consulta.eq('atencao', true)
+    else if (c.grupo === 'leads') consulta = consulta.not('preenchido_em', 'is', null)
+    else if (g.status) consulta = consulta.in('status', [...g.status])
+    if (c.campanha) consulta = consulta.eq('campanha_id', c.campanha)
+    if (c.ramo) consulta = consulta.eq('ramo', c.ramo)
+    if (c.grupoId) consulta = consulta.eq('grupo_id', c.grupoId)
+    if (termo) {
+      const dig = termo.replace(/\D/g, '')
+      consulta =
+        dig.length >= 6
+          ? consulta.or(`cnpj.like.${dig}*,telefone.like.*${dig.slice(-9)}*`)
+          : consulta.or(`razao_social.ilike.*${termo}*,nome_fantasia.ilike.*${termo}*,lead_nome.ilike.*${termo}*,lead_email.ilike.*${termo}*`)
+    }
+    return consulta as unknown as T
+  }
+  // página absurda (1e20, abc, -3) vira um número possível; além do fim, a última página que existe
+  let pagina = Math.min(1_000_000, Math.max(1, Math.trunc(Number(c.pagina)) || 1))
+  const ler = (p: number) => {
+    const de = (p - 1) * c.por
+    return filtrar(supabase.from('disparos').select('*', { count: 'exact' }))
+      .order(ordem, { ascending: false, nullsFirst: false })
+      .order('id', { ascending: false })
+      .range(de, de + c.por - 1)
+  }
+  let { data, error, count } = await ler(pagina)
+  // O PostgREST responde 416 (PGRST103, "Requested range not satisfiable") para página além do fim
+  if (error?.code === 'PGRST103' || (!error && pagina > 1 && !data?.length)) {
+    const total = error ? ((await filtrar(supabase.from('disparos').select('id', { count: 'exact', head: true }))).count ?? 0) : (count ?? 0)
+    pagina = Math.max(1, Math.ceil(total / c.por))
+    ;({ data, error, count } = await ler(pagina))
+  }
   if (error) throw new Error(`disparos: ${error.message}`)
-  return { itens: (data ?? []) as Disparo[], total: count ?? 0 }
+  return { itens: (data ?? []) as Disparo[], total: count ?? 0, pagina }
 }
 
 export async function obterDisparo(id: number) {

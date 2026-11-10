@@ -81,6 +81,7 @@ export default async function PainelDisparos({
     usuarioAtual(),
     listarGrupos()
   ])
+  c.pagina = lista.pagina // página além do fim: a lista devolve a última que existe
   // com um grupo escolhido, avisos, números e campanhas são só dele
   const campanhas = c.grupoId ? campanhasTodas.filter(x => x.grupo_id === c.grupoId) : campanhasTodas
   const numeros = c.grupoId ? numerosTodos.filter(n => n.grupo_id === c.grupoId) : numerosTodos
