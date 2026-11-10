@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils'
 
 /**
  * Cor do selo de cada situação, na paleta da marca: positivo = marinho/dourado, atenção = âmbar, erro = vermelho,
- * neutro = creme/tinta. (Substitui o COR_STATUS de lib/disparos/tipos.ts, que ainda tinha verde, azul-céu e rosa.)
+ * neutro = creme/tinta.
  */
 const COR_SELO: Record<StatusDisparo, string> = {
   reservado: 'bg-slate-100 text-slate-600',

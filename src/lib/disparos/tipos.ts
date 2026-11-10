@@ -26,19 +26,6 @@ export const ROTULO_STATUS: Record<StatusDisparo, string> = {
   descadastrado: 'Pediu para sair'
 }
 
-/** Cor do selo de cada status (classes Tailwind). */
-export const COR_STATUS: Record<StatusDisparo, string> = {
-  reservado: 'bg-slate-100 text-slate-600',
-  enviado: 'bg-marca-50 text-marca-800',
-  sem_whatsapp: 'bg-slate-100 text-slate-500',
-  falhou: 'bg-red-50 text-red-700',
-  interessado: 'bg-amber-50 text-amber-800',
-  preencheu: 'bg-emerald-50 text-emerald-800',
-  sem_interesse: 'bg-slate-100 text-slate-600',
-  respondeu: 'bg-sky-50 text-sky-800',
-  descadastrado: 'bg-rose-50 text-rose-700'
-}
-
 /** Abas da lista do painel. */
 export const GRUPOS = {
   todos: { rotulo: 'Todos', status: null },
