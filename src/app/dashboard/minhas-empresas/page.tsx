@@ -80,8 +80,15 @@ export default async function MinhasEmpresasPage({ searchParams }: { searchParam
     )
   }
 
-  const { itens, total } = await buscarCliente(f, aba === 'liberadas' ? 'liberadas' : consulta.ordem, consulta.pagina, POR_PAGINA, aba === 'liberadas')
+  // ?pagina= já chega inteiro entre 1 e 10.000 (abc e 1e20 viram 1); além do fim, recarrega na última página
+  const buscar = (p: number) => buscarCliente(f, aba === 'liberadas' ? 'liberadas' : consulta.ordem, p, POR_PAGINA, aba === 'liberadas')
+  let pagina = consulta.pagina
+  let { itens, total } = await buscar(pagina)
   const paginas = Math.max(1, Math.ceil(total / POR_PAGINA))
+  if (pagina > paginas) {
+    pagina = paginas
+    ;({ itens, total } = await buscar(pagina))
+  }
   const href = (mudar: { aba?: string; pagina?: number }) => {
     const q = new URLSearchParams(paraQuery({ filtros: f, ordem: consulta.ordem, pagina: mudar.pagina ?? 1 }))
     const a = mudar.aba ?? aba
@@ -308,16 +315,16 @@ export default async function MinhasEmpresasPage({ searchParams }: { searchParam
         </div>
         <nav aria-label='Páginas' className='flex items-center justify-between gap-2 border-t border-slate-100 px-4 py-3 text-sm text-slate-600'>
           <span>
-            {fmtInt(total)} {total === 1 ? 'empresa' : 'empresas'} · página {fmtInt(consulta.pagina)} de {fmtInt(paginas)}
+            {fmtInt(total)} {total === 1 ? 'empresa' : 'empresas'} · página {fmtInt(pagina)} de {fmtInt(paginas)}
           </span>
           <div className='flex gap-1'>
-            {consulta.pagina > 1 && (
-              <Link href={href({ pagina: consulta.pagina - 1 })} aria-label='Página anterior' className={cn('grid size-9 place-items-center rounded-md hover:bg-slate-100', FOCO)}>
+            {pagina > 1 && (
+              <Link href={href({ pagina: pagina - 1 })} aria-label='Página anterior' className={cn('grid size-9 place-items-center rounded-md hover:bg-slate-100', FOCO)}>
                 <ChevronLeft aria-hidden className='size-4' />
               </Link>
             )}
-            {consulta.pagina < paginas && (
-              <Link href={href({ pagina: consulta.pagina + 1 })} aria-label='Próxima página' className={cn('grid size-9 place-items-center rounded-md hover:bg-slate-100', FOCO)}>
+            {pagina < paginas && (
+              <Link href={href({ pagina: pagina + 1 })} aria-label='Próxima página' className={cn('grid size-9 place-items-center rounded-md hover:bg-slate-100', FOCO)}>
                 <ChevronRight aria-hidden className='size-4' />
               </Link>
             )}
