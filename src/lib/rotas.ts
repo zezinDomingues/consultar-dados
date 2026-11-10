@@ -15,6 +15,8 @@ export const ROTAS = {
   numeros: '/dashboard/disparos/numeros',
   grupos: '/dashboard/disparos/grupos',
   grupo: (id: number | 'novo') => `/dashboard/disparos/grupos/${id}`,
+  /** Contatos dos formulários do site (Fale com um especialista, parceiro) */
+  leads: '/dashboard/leads',
   calendario: '/dashboard/calendario',
   usuarios: '/dashboard/usuarios',
   usuario: (id: string) => `/dashboard/usuarios/${id}`,

@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import type { LucideIcon } from 'lucide-react'
-import { Building2, CalendarDays, LogOut, Menu, MessagesSquare, Search, Send, UsersRound, X } from 'lucide-react'
+import { Building2, CalendarDays, Inbox, LogOut, Menu, MessagesSquare, Search, Send, UsersRound, X } from 'lucide-react'
 import { sair } from '@/app/login/actions'
 import { FOCO_ESCURO } from '@/components/ui/foco'
 import { useGaveta, useMidia } from '@/components/ui/gaveta'
@@ -25,6 +25,7 @@ type Papel = 'admin' | 'equipe' | 'consulta' | 'cliente' | null
 // Seção "Administrativo" (só equipe interna; o cliente nunca vê este rótulo): cada item diz quem o vê
 const ITENS_ADMIN: (Item & { papeis: Papel[] })[] = [
   { href: ROTAS.disparos, rotulo: 'Disparos', icone: Send, ativo: (p: string) => p.startsWith(ROTAS.disparos), papeis: ['admin', 'equipe'] },
+  { href: ROTAS.leads, rotulo: 'Leads do site', icone: Inbox, ativo: (p: string) => p.startsWith(ROTAS.leads), papeis: ['admin'] },
   { href: ROTAS.calendario, rotulo: 'Calendário', icone: CalendarDays, ativo: (p: string) => p.startsWith(ROTAS.calendario), papeis: ['admin', 'equipe', 'consulta'] },
   { href: ROTAS.usuarios, rotulo: 'Usuários', icone: UsersRound, ativo: (p: string) => p.startsWith(ROTAS.usuarios), papeis: ['admin'] }
 ]

@@ -6,10 +6,10 @@
   'use strict'
 
   // ================= CONFIGURAÇÃO — troque pelos seus dados =================
-  // WhatsApp da OficialCert (só dígitos, com 55 + DDD). VAZIO por enquanto (04/11/2026): os formulários
-  // só gravam o contato em leads_site e mostram "entraremos em contato". Preenchido, o fluxo do
-  // WhatsApp (abrir conversa + botão "Reabrir WhatsApp") volta sozinho e vira a saída quando o envio falha.
-  var WHATSAPP = ''
+  // WhatsApp de contato da OficialCert (só dígitos, com 55 + DDD): (11) 5196-7114 desde 09/11/2026.
+  // O formulário "Fale com um especialista" grava o contato em leads_site (tela Leads do site, na plataforma)
+  // E abre a conversa com este número já com os dados; se o registro falhar, vira a saída "Falar pelo WhatsApp".
+  var WHATSAPP = '551151967114'
   // E-mail de contato da OficialCert. VAZIO por enquanto; preenchido, aparece como saída quando o envio falha
   // (abre o e-mail já com os dados digitados).
   var EMAIL_CONTATO = ''
