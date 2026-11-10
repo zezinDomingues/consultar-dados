@@ -17,6 +17,8 @@ export const ROTAS = {
   grupo: (id: number | 'novo') => `/dashboard/disparos/grupos/${id}`,
   /** Contatos dos formulários do site (Fale com um especialista, parceiro) */
   leads: '/dashboard/leads',
+  /** Agenda de publicação da @oficialcert */
+  instagram: '/dashboard/instagram',
   calendario: '/dashboard/calendario',
   usuarios: '/dashboard/usuarios',
   usuario: (id: string) => `/dashboard/usuarios/${id}`,
