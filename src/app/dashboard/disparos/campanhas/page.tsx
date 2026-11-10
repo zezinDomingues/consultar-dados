@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { usuarioAtual } from '@/lib/empresas/consulta'
 import Link from 'next/link'
-import { CircleCheck, Megaphone, Pause, Pencil, Play, Square } from 'lucide-react'
+import { CircleCheck, Megaphone, Pause, Pencil, Play, Square, TriangleAlert } from 'lucide-react'
 import { BotaoAcao } from '@/components/disparos/botao-acao'
 import { SeloCampanha } from '@/components/disparos/selos'
 import { mudarStatusCampanha } from '@/app/dashboard/disparos/actions'
@@ -14,9 +14,9 @@ import { ROTAS } from '@/lib/rotas'
 
 export const metadata: Metadata = { title: 'Campanhas' }
 
-export default async function CampanhasPage({ searchParams }: { searchParams: Promise<{ salva?: string }> }) {
+export default async function CampanhasPage({ searchParams }: { searchParams: Promise<{ salva?: string; fila?: string }> }) {
   if (!(await usuarioAtual())?.admin) redirect(ROTAS.disparos)
-  const { salva } = await searchParams
+  const { salva, fila } = await searchParams
   const [campanhas, opcoes] = await Promise.all([listarCampanhas(), opcoesFiltros()])
 
   if (!campanhas.length) {
@@ -41,6 +41,12 @@ export default async function CampanhasPage({ searchParams }: { searchParams: Pr
 
   return (
     <div className='space-y-3'>
+      {fila === 'pendente' && (
+        <p role='status' className='flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-900'>
+          <TriangleAlert className='mt-0.5 size-4 shrink-0' aria-hidden />
+          Campanha criada; a fila será montada pelo próximo ciclo.
+        </p>
+      )}
       {campanhas.map(c => {
         const n = c.numeros
         const enviados = n?.enviados ?? 0

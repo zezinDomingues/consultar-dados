@@ -78,7 +78,14 @@ export function DivisaoDisparos({
         <div className={cn('mt-3 space-y-2 transition-opacity', carregando && 'opacity-50')}>
           {salva && !consulta && (
             <p className='text-xs text-slate-600'>
-              Já saíram <strong>{fmtInt(d.enviados ?? 0)}</strong> · na fila <strong>{fmtInt(d.na_fila ?? 0)}</strong>
+              Já saíram <strong>{fmtInt(d.enviados ?? 0)}</strong> ·{' '}
+              {d.na_fila ? (
+                <>
+                  na fila <strong>{fmtInt(d.na_fila)}</strong>
+                </>
+              ) : (
+                'a fila é montada pelo ciclo de envio quando a campanha estiver ativa'
+              )}
               {alterada && (
                 <span className='ml-1 text-amber-800'>· ao salvar, a fila é refeita com a nova quantidade/ordem</span>
               )}

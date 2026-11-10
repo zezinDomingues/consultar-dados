@@ -25,10 +25,16 @@ export function FormGrupo({ grupo }: { grupo?: GrupoDisparo }) {
   const [t, setT] = useState<Textos>({ ...base(grupo?.fluxo ?? 'divulgacao'), ...(grupo?.modelo ?? {}) } as Textos)
   const set = (k: keyof Textos) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setT(x => ({ ...x, [k]: e.target.value }))
-    if (k === 'mensagem') setFalta(false)
+    if (k === falta) setFalta(null)
   }
-  const [falta, setFalta] = useState(false)
-  const primeira = useRef<HTMLTextAreaElement>(null)
+  // campo do modelo que ficou vazio (nome do campo): todo texto enviado é obrigatório, menos o rodapé (vazio = padrão)
+  const [falta, setFalta] = useState<string | null>(null)
+  const erro = (n: string) =>
+    falta !== n
+      ? undefined
+      : n === 'mensagem'
+        ? 'Escreva a 1ª mensagem: é ela que abre a conversa de toda campanha nova do grupo.'
+        : 'Preencha este texto: ele vai na conversa das campanhas do grupo.'
 
   /**
    * Envio pelo onSubmit: com `action` no form, o React 19 limpa os campos não controlados (site, observação,
@@ -37,9 +43,12 @@ export function FormGrupo({ grupo }: { grupo?: GrupoDisparo }) {
   function enviar(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     if (salvando || enviando) return
-    if (!t.mensagem.trim()) {
-      setFalta(true)
-      primeira.current?.focus()
+    const vazio = [...e.currentTarget.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('[data-modelo][required]')].find(
+      c => !c.value.trim()
+    )
+    if (vazio) {
+      setFalta(vazio.name)
+      vazio.focus()
       return
     }
     const fd = new FormData(e.currentTarget)
@@ -139,28 +148,26 @@ export function FormGrupo({ grupo }: { grupo?: GrupoDisparo }) {
             onChange={set('mensagem')}
             linhas={6}
             max={1024}
-            obrigatorio
-            erro={falta ? 'Escreva a 1ª mensagem: é ela que abre a conversa de toda campanha nova do grupo.' : undefined}
-            refCampo={primeira}
+            erro={erro('mensagem')}
           />
           <div className='grid gap-3 sm:grid-cols-[1fr_200px]'>
-            <Linha rotulo='Rodapé (até 60)' nome='rodape' valor={t.rodape} onChange={set('rodape')} max={60} />
+            <Linha rotulo='Rodapé (até 60)' nome='rodape' valor={t.rodape} onChange={set('rodape')} max={60} erro={erro('rodape')} />
             {coleta ? (
-              <Linha rotulo='Botão (até 20)' nome='botao_texto' valor={t.botao_texto} onChange={set('botao_texto')} max={20} />
+              <Linha rotulo='Botão (até 20)' nome='botao_texto' valor={t.botao_texto} onChange={set('botao_texto')} max={20} erro={erro('botao_texto')} />
             ) : (
-              <Linha rotulo='Botão do link (até 20)' nome='botao_site_texto' valor={t.botao_site_texto} onChange={set('botao_site_texto')} max={20} />
+              <Linha rotulo='Botão do link (até 20)' nome='botao_site_texto' valor={t.botao_site_texto} onChange={set('botao_site_texto')} max={20} erro={erro('botao_site_texto')} />
             )}
           </div>
           {coleta && (
             <>
-              <Campo rotulo='Pergunta do nome' nome='pergunta_nome' valor={t.pergunta_nome} onChange={set('pergunta_nome')} linhas={2} max={1000} />
-              <Campo rotulo='Pergunta do número de contato' nome='pergunta_contato' valor={t.pergunta_contato} onChange={set('pergunta_contato')} linhas={2} max={1000} />
-              <Campo rotulo='Se escolher outro número' nome='pergunta_telefone' valor={t.pergunta_telefone} onChange={set('pergunta_telefone')} linhas={2} max={1000} />
-              <Campo rotulo='Mensagem final' nome='mensagem_obrigado' valor={t.mensagem_obrigado} onChange={set('mensagem_obrigado')} linhas={4} max={1024} />
-              <Linha rotulo='Botão do site na mensagem final (até 20)' nome='botao_site_texto' valor={t.botao_site_texto} onChange={set('botao_site_texto')} max={20} />
+              <Campo rotulo='Pergunta do nome' nome='pergunta_nome' valor={t.pergunta_nome} onChange={set('pergunta_nome')} linhas={2} max={1000} erro={erro('pergunta_nome')} />
+              <Campo rotulo='Pergunta do número de contato' nome='pergunta_contato' valor={t.pergunta_contato} onChange={set('pergunta_contato')} linhas={2} max={1000} erro={erro('pergunta_contato')} />
+              <Campo rotulo='Se escolher outro número' nome='pergunta_telefone' valor={t.pergunta_telefone} onChange={set('pergunta_telefone')} linhas={2} max={1000} erro={erro('pergunta_telefone')} />
+              <Campo rotulo='Mensagem final' nome='mensagem_obrigado' valor={t.mensagem_obrigado} onChange={set('mensagem_obrigado')} linhas={4} max={1024} erro={erro('mensagem_obrigado')} />
+              <Linha rotulo='Botão do site na mensagem final (até 20)' nome='botao_site_texto' valor={t.botao_site_texto} onChange={set('botao_site_texto')} max={20} erro={erro('botao_site_texto')} />
             </>
           )}
-          <Campo rotulo='Se responder “não”' nome='mensagem_nao' valor={t.mensagem_nao} onChange={set('mensagem_nao')} linhas={2} max={1000} />
+          <Campo rotulo='Se responder “não”' nome='mensagem_nao' valor={t.mensagem_nao} onChange={set('mensagem_nao')} linhas={2} max={1000} erro={erro('mensagem_nao')} />
         </section>
 
         <section className='space-y-3 rounded-2xl border border-slate-200 bg-white p-5'>
@@ -230,9 +237,7 @@ function Campo({
   onChange,
   linhas,
   max,
-  obrigatorio,
-  erro,
-  refCampo
+  erro
 }: {
   rotulo: string
   nome: string
@@ -240,21 +245,19 @@ function Campo({
   onChange: React.ChangeEventHandler<HTMLTextAreaElement>
   linhas: number
   max: number
-  obrigatorio?: boolean
   erro?: string
-  refCampo?: React.Ref<HTMLTextAreaElement>
 }) {
   return (
     <label className='block space-y-1.5'>
       <span className='text-xs font-semibold text-slate-600'>{rotulo}</span>
       <textarea
-        ref={refCampo}
+        data-modelo
         name={nome}
         value={valor}
         onChange={onChange}
         rows={linhas}
         maxLength={max}
-        required={obrigatorio}
+        required
         aria-invalid={!!erro}
         aria-describedby={erro ? `${nome}-erro` : undefined}
         className={cn(ENTRADA, 'resize-y leading-relaxed', erro && 'border-red-400')}
@@ -268,11 +271,28 @@ function Campo({
   )
 }
 
-function Linha({ rotulo, nome, valor, onChange, max }: { rotulo: string; nome: string; valor: string; onChange: React.ChangeEventHandler<HTMLInputElement>; max: number }) {
+/** Rodapé vazio = usar o padrão; os outros textos do modelo são obrigatórios. */
+function Linha({ rotulo, nome, valor, onChange, max, erro }: { rotulo: string; nome: string; valor: string; onChange: React.ChangeEventHandler<HTMLInputElement>; max: number; erro?: string }) {
+  const obrigatorio = nome !== 'rodape'
   return (
     <label className='block space-y-1.5'>
-      <span className='text-xs font-semibold text-slate-600'>{rotulo}</span>
-      <input name={nome} value={valor} onChange={onChange} maxLength={max} className={ENTRADA} />
+      <span className='text-xs font-semibold text-slate-600'>{obrigatorio ? rotulo : `${rotulo} · vazio = padrão`}</span>
+      <input
+        data-modelo
+        name={nome}
+        value={valor}
+        onChange={onChange}
+        maxLength={max}
+        required={obrigatorio}
+        aria-invalid={!!erro}
+        aria-describedby={erro ? `${nome}-erro` : undefined}
+        className={cn(ENTRADA, erro && 'border-red-400')}
+      />
+      {erro && (
+        <span id={`${nome}-erro`} role='alert' className='block text-xs font-semibold text-red-700'>
+          {erro}
+        </span>
+      )}
     </label>
   )
 }
