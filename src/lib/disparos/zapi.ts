@@ -54,11 +54,14 @@ async function enviar(c: CanalZapi, caminho: string, corpo: Record<string, unkno
   return String(id)
 }
 
-/** Estado da instância no formato do WAHA: WORKING quando o celular está conectado. */
-export async function lerSessao(c: CanalZapi) {
+/**
+ * Estado da instância no formato do WAHA: WORKING quando o celular está conectado. `dispositivo: false` pula a 2ª
+ * chamada (telefone/nome do aparelho), que o ciclo não usa — são até 10 s a menos no orçamento de 60 s.
+ */
+export async function lerSessao(c: CanalZapi, opcoes: { dispositivo?: boolean } = {}) {
   const s = await chamar<{ connected?: boolean; error?: string; smartphoneConnected?: boolean }>(c, 'GET', 'status', undefined, 10_000)
   let me: { id?: string; pushName?: string } | null = null
-  if (s?.connected) {
+  if (s?.connected && opcoes.dispositivo !== false) {
     try {
       const d = await chamar<{ phone?: string; name?: string }>(c, 'GET', 'device', undefined, 10_000)
       if (d?.phone) me = { id: d.phone, pushName: d.name }
@@ -101,7 +104,7 @@ export function enviarBotoes(c: CanalZapi, chatId: string, m: { imagem?: string 
   })
 }
 
-/** Aponta os webhooks da instância para a plataforma (a Z-API não assina: o segredo vai na URL). */
+/** Aponta os webhooks da instância para a plataforma (a Z-API não assina: o token do número vai na URL). */
 export async function configurarWebhook(c: CanalZapi, url: string) {
   for (const rota of ['update-webhook-received', 'update-webhook-message-status', 'update-webhook-connected', 'update-webhook-disconnected']) {
     await chamar(c, 'PUT', rota, { value: url }, 15_000)

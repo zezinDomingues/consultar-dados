@@ -1,4 +1,7 @@
-// Leituras da área de Disparos (só servidor). Tudo passa pelo usuário logado: o RLS só libera administradores.
+// Leituras da área de Disparos (só servidor). Tudo passa pelo usuário logado e o RLS decide o que cada papel vê:
+// admin tudo; equipe só os grupos de que é membro e os seus ramos; cliente só o(s) grupo(s) dele. Números
+// (disparo_numeros): só o admin lê a tabela — equipe e cliente leem pela função disparo_numeros_visiveis() (019),
+// sem as colunas secretas e só dos seus grupos.
 import 'server-only'
 import { cache } from 'react'
 import { usuarioAtual } from '@/lib/empresas/consulta'
@@ -6,6 +9,8 @@ import type { Filtros } from '@/lib/empresas/filtros'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { inicioDoDiaBrasilia } from './config'
+import { faltaNoBanco } from './erro'
+import { normalizarFiltros } from './filtros'
 import {
   GRUPOS,
   type Campanha,
@@ -32,8 +37,10 @@ export async function exigirAdmin() {
   return u
 }
 
-/** A migração 005 já rodou neste banco? (a tela explica o que fazer se não) */
-/** Painel e conversas: admin vê tudo; a equipe só os ramos dela (o RLS do banco garante, aqui é a porta da tela). */
+/**
+ * Painel e conversas: admin vê tudo; a equipe só os grupos e ramos dela; o cliente só o grupo dele (o RLS do banco
+ * garante a leitura, aqui é a porta da tela; responder ainda confere grupo/ramo no servidor).
+ */
 export async function exigirAtendimento() {
   const u = await usuarioAtual()
   const clienteDeDisparo = u?.papel === 'cliente' && !!u.produtos?.disparos
@@ -41,11 +48,50 @@ export async function exigirAtendimento() {
   return u
 }
 
+/** A migração 005 já rodou neste banco? (a tela explica o que fazer se não) */
 export const migracaoAplicada = cache(async () => {
   const supabase = await createClient()
   const { error } = await supabase.from('disparo_config').select('id').limit(1)
   return !error || !/does not exist|schema cache|Could not find/i.test(error.message)
 })
+
+type Sessao = Awaited<ReturnType<typeof createClient>>
+type NumeroVisivel = Pick<Numero, 'id' | 'grupo_id' | 'rotulo' | 'telefone' | 'status' | 'ativo' | 'limite_diario' | 'webhook_em'>
+
+/** O que a função da 019 devolve, no formato de `Numero` (o resto não é da conta de quem não é admin). */
+const deVisivel = (n: NumeroVisivel): Numero => ({
+  provedor: 'zapi',
+  waha_url: '',
+  waha_sessao: '',
+  nome_perfil: null,
+  intervalo_min_s: 120,
+  intervalo_max_s: 300,
+  status_detalhe: null,
+  status_em: null,
+  ultimo_evento_em: null,
+  proximo_envio_em: '',
+  ultimo_envio_em: null,
+  criado_em: '',
+  ...n
+})
+
+/**
+ * Números visíveis para quem chama. Admin: a tabela. Equipe/cliente: disparo_numeros_visiveis() — depois da 019 a
+ * tabela devolve 0 linhas para eles; sem a 019 (função não existe) cai na consulta de antes, sem erro.
+ */
+async function numerosVisiveis(supabase: Sessao, admin: boolean, id?: number) {
+  if (!admin) {
+    let q = supabase.rpc('disparo_numeros_visiveis')
+    if (id) q = q.eq('id', id)
+    const { data, error } = await q
+    if (!error) return { data: ((data ?? []) as NumeroVisivel[]).map(deVisivel), error: null }
+    if (!faltaNoBanco(error)) return { data: null, error }
+  }
+  let q = supabase.from('disparo_numeros').select(COLUNAS_NUMERO).order('id')
+  if (id) q = q.eq('id', id)
+  const { data, error } = await q
+  return { data: (data ?? []) as unknown as Numero[], error }
+}
 
 const COLUNAS_NUMERO =
   'id,rotulo,provedor,grupo_id,waha_url,waha_sessao,telefone,nome_perfil,ativo,limite_diario,intervalo_min_s,intervalo_max_s,status,' +
@@ -88,7 +134,7 @@ export async function listarDisparos(c: ConsultaDisparos) {
 }
 
 export async function obterDisparo(id: number) {
-  await exigirAtendimento()
+  const u = await exigirAtendimento()
   const supabase = await createClient()
   const [{ data: d, error }, { data: eventos }] = await Promise.all([
     supabase.from('disparos').select('*').eq('id', id).maybeSingle(),
@@ -97,17 +143,16 @@ export async function obterDisparo(id: number) {
   if (error) throw new Error(`disparo: ${error.message}`)
   if (!d) return null
   const disparo = d as Disparo
-  const [{ data: campanha }, { data: numero }] = await Promise.all([
+  const [{ data: campanha }, numeros] = await Promise.all([
     supabase.from('disparo_campanhas').select('id,nome,status').eq('id', disparo.campanha_id).maybeSingle(),
-    disparo.numero_id
-      ? supabase.from('disparo_numeros').select('id,rotulo,telefone,status').eq('id', disparo.numero_id).maybeSingle()
-      : Promise.resolve({ data: null })
+    disparo.numero_id ? numerosVisiveis(supabase, u.admin, disparo.numero_id) : Promise.resolve({ data: [] as Numero[], error: null })
   ])
+  const n = numeros.data?.[0]
   return {
     disparo,
     eventos: (eventos ?? []) as EventoDisparo[],
     campanha: campanha as Pick<Campanha, 'id' | 'nome' | 'status'> | null,
-    numero: numero as Pick<Numero, 'id' | 'rotulo' | 'telefone' | 'status'> | null
+    numero: n ? { id: n.id, rotulo: n.rotulo, telefone: n.telefone, status: n.status } : null
   }
 }
 
@@ -120,7 +165,7 @@ export async function listarCampanhas() {
   ])
   if (error) throw new Error(`campanhas: ${error.message}`)
   const porId = new Map(((numeros ?? []) as NumerosCampanha[]).map(n => [n.campanha_id, n]))
-  return ((data ?? []) as Campanha[]).map(c => ({ ...c, numeros: porId.get(c.id) ?? null }))
+  return ((data ?? []) as Campanha[]).map(c => ({ ...c, filtros: normalizarFiltros(c.filtros), numeros: porId.get(c.id) ?? null }))
 }
 
 export async function obterCampanha(id: number) {
@@ -128,7 +173,8 @@ export async function obterCampanha(id: number) {
   const supabase = await createClient()
   const { data, error } = await supabase.from('disparo_campanhas').select('*').eq('id', id).maybeSingle()
   if (error) throw new Error(`campanha: ${error.message}`)
-  return data as Campanha | null
+  // filtro com o porte antigo ("Demais") vira Médio + Grande: a tela mostra e o salvar aceita
+  return data ? ({ ...data, filtros: normalizarFiltros((data as Campanha).filtros) } as Campanha) : null
 }
 
 /** Como a quantidade da campanha se divide: o que já saiu + os próximos da fila (nicho, estado, regime…). */
@@ -148,18 +194,19 @@ export async function nomesCampanhas() {
 }
 
 export async function listarNumeros() {
-  await exigirAtendimento()
+  const u = await exigirAtendimento()
   const supabase = await createClient()
   const [{ data, error }, { data: hoje }] = await Promise.all([
-    supabase.from('disparo_numeros').select(COLUNAS_NUMERO).order('id'),
-    supabase.from('disparos').select('numero_id').gte('enviado_em', inicioDoDiaBrasilia()).limit(20000)
+    numerosVisiveis(supabase, u.admin),
+    // como o motor conta o limite diário: sem as conversas de teste
+    supabase.from('disparos').select('numero_id').eq('teste', false).gte('enviado_em', inicioDoDiaBrasilia()).limit(20000)
   ])
   if (error) throw new Error(`números: ${error.message}`)
   const contagem = new Map<number, number>()
   for (const h of (hoje ?? []) as { numero_id: number | null }[]) {
     if (h.numero_id) contagem.set(h.numero_id, (contagem.get(h.numero_id) ?? 0) + 1)
   }
-  return ((data ?? []) as unknown as Numero[]).map(n => ({ ...n, enviados_hoje: contagem.get(n.id) ?? 0 }))
+  return (data ?? []).map(n => ({ ...n, enviados_hoje: contagem.get(n.id) ?? 0 }))
 }
 
 export async function lerConfig() {
@@ -239,11 +286,7 @@ export async function listarGrupos(): Promise<GrupoResumo[]> {
     supabase.from('disparo_campanhas').select('grupo_id, status'),
     supabase.from('grupo_membros').select('grupo_id')
   ])
-  const enviados = new Map<number, number>()
-  for (const g of (grupos ?? []) as GrupoDisparo[]) {
-    const { count } = await supabase.from('disparos').select('id', { count: 'exact', head: true }).eq('grupo_id', g.id).eq('teste', false).not('enviado_em', 'is', null)
-    enviados.set(g.id, count ?? 0)
-  }
+  const enviados = await enviadosPorGrupo(supabase, (grupos ?? []) as GrupoDisparo[])
   return ((grupos ?? []) as GrupoDisparo[]).map(g => ({
     ...g,
     numeros: ((numeros ?? []) as { grupo_id: number }[]).filter(n => n.grupo_id === g.id).length,
@@ -251,6 +294,24 @@ export async function listarGrupos(): Promise<GrupoResumo[]> {
     enviados: enviados.get(g.id) ?? 0,
     membros: ((membros ?? []) as { grupo_id: number }[]).filter(m => m.grupo_id === g.id).length
   }))
+}
+
+/** Enviados (sem teste) por grupo numa consulta só (migração 020); sem ela, uma contagem por grupo como antes. */
+async function enviadosPorGrupo(supabase: Awaited<ReturnType<typeof createClient>>, grupos: GrupoDisparo[]) {
+  const enviados = new Map<number, number>()
+  const { data, error } = await supabase.rpc('disparo_enviados_por_grupo')
+  if (!error) {
+    for (const l of (data ?? []) as { grupo_id: number; enviados: number }[]) enviados.set(Number(l.grupo_id), Number(l.enviados))
+    return enviados
+  }
+  if (!faltaNoBanco(error)) console.error('[disparos] enviados por grupo', error.message)
+  await Promise.all(
+    grupos.map(async g => {
+      const { count } = await supabase.from('disparos').select('id', { count: 'exact', head: true }).eq('grupo_id', g.id).eq('teste', false).not('enviado_em', 'is', null)
+      enviados.set(g.id, count ?? 0)
+    })
+  )
+  return enviados
 }
 
 export async function obterGrupo(id: number) {

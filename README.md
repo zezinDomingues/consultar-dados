@@ -1,7 +1,8 @@
 # Consultar Dados
 
-Consulta das 628 mil empresas de SP (Lucro Real/Presumido) por setor, ramo, segmento, atividade, porte, capital,
-idade, regime, região, município, contato e prioridade. A base fica no Supabase (projeto `ogaomwdjzhwdgxzponwc`).
+Consulta das empresas do Lucro Real/Presumido (SP e os estados já carregados, uma carga por UF) por setor, ramo,
+segmento, atividade, porte, capital, idade, regime, região, município, contato e prioridade. A base fica no Supabase
+(projeto `ogaomwdjzhwdgxzponwc`).
 
 Stack igual aos outros projetos: Next.js 16 (App Router, `proxy.ts`), React 19, Tailwind 4, `@supabase/ssr`, zod.
 
@@ -35,9 +36,9 @@ SUPABASE_SECRET_KEY=sb_secret_... npm run criar-usuario -- pessoa@empresa.com 's
 | `/dashboard/contadores` | E-mails presentes em 5+ empresas (escritórios contábeis e grupos) |
 | `/dashboard/agente` | Agente de IA |
 | `/api/exportar`, `/api/empresas`, `/api/agente` | CSV, paginação do agente e o agente (exigem login; sem login: 401) |
-| `/dashboard/disparos` (+ `/campanhas`, `/numeros`, `/[id]`) | **Disparos de WhatsApp** — só administradores (ver seção abaixo) |
+| `/dashboard/disparos` (+ `/campanhas`, `/numeros`, `/grupos`, `/[id]`) | **Disparos de WhatsApp** — campanhas, números e grupos só para administradores; painel e conversas também para a equipe (seus grupos e ramos) e para o cliente do grupo (ver seções abaixo) |
 | `/consulta-gratuita/[token]` | Formulário público que o contato abre pelo link do WhatsApp |
-| `/api/sistema/disparos/ciclo`, `/api/sistema/whatsapp` | Ciclo de envio (pg_cron) e webhook do WAHA — públicas para o proxy, protegidas por segredo/HMAC |
+| `/api/sistema/disparos/ciclo`, `/api/sistema/zapi`, `/api/sistema/whatsapp` | Ciclo de envio (pg_cron) e webhooks da Z-API e do WAHA — públicas para o proxy, protegidas por segredo/token por número/HMAC |
 
 Rotas centralizadas em `src/lib/rotas.ts`; o `src/proxy.ts` protege `/dashboard` e `/api` e deixa o resto público
 (sem nem consultar o Supabase), então páginas novas da landing não precisam mexer no proxy.
@@ -60,6 +61,21 @@ src/app/(app)/                                 páginas logadas
 
 ## Banco
 
+### Ordem das migrações novas (QA rodada 1) — ANTES do deploy
+
+Aplicar com `~/banco-clientes-sp/aplicar_sql.py`, nesta ordem, e só depois fazer o deploy (cada uma é compatível com
+o código que já está no ar e é idempotente — pode rodar de novo):
+
+1. `016_desempenho_resumo_elegiveis.sql` — `resumo_cache` + contagem de elegíveis mais rápida
+2. `019_seguranca_qa1.sql` — RLS/grants (a sessão só altera `disparos.atencao`, equipe por grupo + ramo…)
+3. `020_disparos_qa1.sql` — travas da reserva/replanejar, devolução de reserva, fila só de campanha ativa, saldo do
+   cliente por modalidade, `webhook_por_numero`
+4. `021_desempenho_qa1.sql`
+5. `022_publico_qa1.sql`
+
+**Depois de CADA carga da base** (`carga_estado.py`/`carga_supabase.py`): `select public.atualizar_resumo_cache();`
+(vem da 016; sem isso os indicadores da Consulta ficam com os números da carga anterior).
+
 - `buscar_empresas(f, ordem, limite, pagina)` e `resumo_empresas(f)` recebem o **mesmo JSON de filtros**. As duas
   usam `empresas_where(f)`, que monta só as condições dos filtros presentes (valores escapados com `%L`).
 - `opcoes_filtros()` devolve setor › ramo › segmento › atividade e municípios/regiões com contagens.
@@ -71,22 +87,41 @@ Tempos medidos: filtros comuns ~25 ms; resumo 0,4–2 s (fica 15 min em cache no
 
 ## Disparos de WhatsApp (`/dashboard/disparos`)
 
-Prospecção ativa pelo WhatsApp, só para usuários `admin` em `app_usuarios` (o menu ganha a seção **Administrativo**).
+Prospecção ativa pelo WhatsApp. Campanhas, números, grupos e regras: só `admin` (o menu ganha a seção
+**Administrativo**); painel e conversas: também a equipe (grupos + ramos dela) e o cliente do grupo ("Meus disparos").
 
-**Fluxo (05/11/2026):** campanha (filtros da Consulta + textos) → a cada minuto o **pg_cron** do Supabase chama o
-ciclo → cada número pronto manda a 1ª mensagem para a melhor empresa ainda não contatada: **logo + texto + UM botão**
-("✅ Quero a consulta"; formato "texto" = logo + "responda SIM", para aparelhos sem botão) → quem toca/responde SIM
-recebe as perguntas pela própria conversa: **nome completo** e **CNPJ** (validado pelos dígitos; 3 respostas ruins →
-"Precisam de atenção") → mensagem final com **logo + "em análise" + botão que abre o site**. O telefone é o da
-conversa. O formulário `/consulta-gratuita/<token>` continua no ar, mas saiu do fluxo.
+**Fluxo:** campanha (filtros da Consulta + textos) → a cada minuto o **pg_cron** do Supabase chama o ciclo → cada
+número pronto manda a 1ª mensagem para a próxima empresa da fila da campanha (já dividida por nicho/estado/regime/
+porte, migração 017): **logo + texto + UM botão** ("✅ Quero a consulta"; formato "texto" = logo + "responda SIM") →
+quem toca/responde **SIM** recebe as perguntas pela própria conversa: **nome completo** → **número de contato**
+(botões "Usar este número" / "Informar outro", ou 1/2 por escrito) → se "outro", **qual número** (com DDD válido) →
+mensagem final com **logo + "em análise" + botão que abre o site**. Pergunta no lugar do nome ("quanto custa?") não
+vira nome; 3 respostas ruins → "Precisam de atenção". O formulário `/consulta-gratuita/<token>` continua no ar, mas
+saiu do fluxo (quem pediu SAIR não recebe a confirmação dele).
 
 **Teste no próprio WhatsApp:** na tela da campanha (salva, pode estar pausada) → "Testar a conversa no meu WhatsApp".
 Cria um registro `teste` (fora do funil e do limite diário) e manda a 1ª mensagem de verdade; o resto é o fluxo real.
 
-**Regra de ouro — ninguém recebe duas vezes:** a tabela `disparos` é um livro com índice ÚNICO em `telefone` e em
-`cnpj`. A reserva (`disparo_reservar`) acontece no banco antes do envio; corrida entre ciclos é decidida pelo índice.
-Falhas e números sem WhatsApp ficam registrados e não voltam. Quem responde SAIR vai para `disparo_bloqueios`.
-O único DELETE é de uma reserva que comprovadamente não chegou ao WhatsApp (WAHA fora do ar antes do envio).
+**Regra de ouro — ninguém recebe duas vezes (por grupo):** a tabela `disparos` é um livro com índices ÚNICOS em
+`(grupo_id, telefone)` e `(grupo_id, cnpj)` (migração 014 — o mesmo telefone pode ser contatado por grupos
+diferentes, nunca duas vezes pelo mesmo). A reserva (`disparo_reservar`) acontece no banco antes do envio, com a
+trava do grupo (uma reserva por vez em cada grupo: a quantidade total da campanha nunca estoura). Falhas e números sem
+WhatsApp ficam registrados e não voltam. Quem responde SAIR vai para `disparo_bloqueios` (o bloqueio é gravado antes
+do status; nem mensagem manual sai para ele). O único DELETE é de uma reserva que comprovadamente não chegou ao
+WhatsApp (`disparo_devolver`, migração 020): ela volta para o começo da fila.
+
+**Garantias do ciclo e do webhook (QA rodada 1):**
+- Prazo de 50 s por ciclo (a função morre aos 60): só começa um envio que cabe inteiro; o que não cabe volta para a
+  fila. A reserva nasce marcada "preparando o envio" e a marca sai logo antes de mandar: reserva parada COM a marca
+  volta para a fila; sem a marca (pode ter saído) vira "falhou" e nunca é reenviada. Erro do banco = não envia.
+- Webhook: o evento é gravado antes (anti-repetição) e desfeito se o processamento falhar → 500 → o provedor reenvia e
+  o reenvio é processado. Cada mensagem grava com UPDATE condicional pela versão (`atualizado_em`): duas mensagens
+  seguidas da mesma pessoa não se atropelam (a 2ª relê e decide de novo).
+- O contato é achado 1º pelo número que fez o contato (trocar o grupo de um número não quebra a conversa; a tela
+  recusa a troca enquanto houver conversa em andamento), depois pelo grupo do número; só responde por um número do
+  grupo do contato. Reação/aviso sem texto só ficam na conversa; LID (`…@lid`) não é tratado como telefone.
+- Campanha: filtros e grupo não mudam depois que ela começou a enviar; a fila só existe com a campanha ATIVA
+  (pausar/encerrar apaga, ativar monta); o porte antigo "Demais" vira Médio + Grande.
 
 Peças:
 - `supabase/migrations/005_disparos_whatsapp.sql` — tabelas, RLS (só admin), `disparo_reservar` (rodízio entre
@@ -95,10 +130,12 @@ Peças:
 - `src/lib/disparos/motor.ts` — o ciclo: trava por número, limite diário, sessão WORKING, check-exists (acha o chatId
   com/sem o 9), "digitando…", texto, enquete, intervalo aleatório.
 - `src/lib/disparos/webhook.ts` — entrega/leitura (`message.ack`), toque no botão (vem no `body` ou no `nativeFlow`),
-  coleta nome → CNPJ (`disparos.etapa`), SIM/NÃO/SAIR/cortesia; o resto vai para "Precisam de atenção".
+  coleta nome → contato → outro número (`disparos.etapa`), SIM/NÃO/SAIR/cortesia; o resto vai para "Precisam de
+  atenção". `src/app/api/sistema/zapi/route.ts` traduz o aviso da Z-API para o mesmo formato.
+- `src/lib/disparos/erro.ts` — erro do Postgres → frase em português (a tela nunca mostra a mensagem crua).
 - `supabase/migrations/007_disparos_conversa.sql` — formato da campanha, imagem, botões, perguntas, `etapa`, `lead_cnpj`, `teste`.
-- `src/lib/disparos/mensagens.ts` — modelos padrão, variáveis `{empresa}` `{saudacao}` `{link}` `{primeiro_nome}`,
-  variações `{Olá|Oi}` sorteadas por envio, leitura da intenção das respostas.
+- `src/lib/disparos/mensagens.ts` — modelos padrão, variáveis `{marca}` `{empresa}` `{saudacao}` `{municipio}`
+  `{primeiro_nome}` `{telefone}`, variações `{Olá|Oi}` sorteadas por envio, leitura da intenção das respostas.
 - `src/lib/disparos/waha.ts` — cliente do WAHA por número (URL + sessão + API key; no CORE, uma instância por número).
 
 Variáveis do servidor (Vercel, **nunca** `NEXT_PUBLIC_`):
@@ -106,12 +143,32 @@ Variáveis do servidor (Vercel, **nunca** `NEXT_PUBLIC_`):
 | Variável | Para quê |
 |---|---|
 | `SUPABASE_SECRET_KEY` | ciclo, webhook e formulário rodam sem usuário logado |
-| `DISPAROS_SEGREDO` | Bearer do pg_cron e chave HMAC do webhook. O MESMO valor vai no Vault do Supabase (`disparos_segredo`) |
+| `DISPAROS_SEGREDO` | segredo antigo, único: vale para tudo o que ainda não tem a variável própria abaixo |
+| `DISPAROS_CICLO_SEGREDO` | opcional; Bearer do pg_cron. O MESMO valor vai no Vault do Supabase (`disparos_segredo`) |
+| `ZAPI_WEBHOOK_SEGREDO` | opcional; base dos tokens do webhook da Z-API (cada número recebe o seu: HMAC do id) |
+| `WAHA_WEBHOOK_SEGREDO` | opcional; chave do HMAC do webhook do WAHA |
 | `APP_URL` | opcional; padrão `https://www.oficialcert.com` (links do formulário e do webhook) |
 
-Ligar um número: instância WAHA (NOWEB, HTTPS público) → parear por código de 8 dígitos → **Números e regras →
-Adicionar número** (URL + API key) → **Conectar webhook** (configura HMAC + eventos + store do NOWEB; reinicia a sessão
-~20 s). Número novo: 20–30 envios/dia e subir aos poucos.
+Sem as opcionais, tudo usa o `DISPAROS_SEGREDO` (como antes). O webhook da Z-API usa um **token por número**
+(derivado da base); o token antigo (`DISPAROS_SEGREDO` na URL) continua aceito para o número até alguém clicar em
+**Reconfigurar webhook** nele (`disparo_numeros.webhook_por_numero`, migração 020). O aviso também precisa vir da
+instância do número (`instanceId`) e com no máximo 72 h (conexão: 30 min) — o resto é ignorado.
+
+Trocar os segredos (separar por uso), sem parar nada:
+1. Gerar 2 valores novos (`openssl rand -base64 32`): um para o ciclo, um para a base da Z-API.
+2. Vercel → Settings → Environment Variables (Production): criar `DISPAROS_CICLO_SEGREDO` e `ZAPI_WEBHOOK_SEGREDO`;
+   redeploy.
+3. Logo em seguida, no SQL do Supabase: `select vault.update_secret((select id from vault.secrets where name =
+   'disparos_segredo'), '<valor do DISPAROS_CICLO_SEGREDO>');` (entre o passo 2 e o 3 o ciclo responde 401 e
+   simplesmente não envia — o pg_cron tenta de novo a cada minuto).
+4. Disparos → Números: **Reconfigurar webhook** em cada número da Z-API (grava a URL com o token novo do número; a
+   partir daí o token antigo deixa de valer para ele).
+5. Quando todos os números estiverem reconfigurados, o `DISPAROS_SEGREDO` só serve de reserva: pode trocar o valor
+   dele também (ou mantê-lo só no servidor).
+
+Ligar um número: instância da Z-API conectada por QR → **Números e regras → Adicionar número** (ID da instância +
+token + Client-Token) → **Reconfigurar webhook** (aponta recebidas, status e conexão para a plataforma, com o token do
+número). Número novo: 20–30 envios/dia e subir aos poucos.
 
 ## Provedor de WhatsApp: só Z-API (06/11/2026)
 
@@ -130,22 +187,27 @@ ele) e opção de **medir cliques** (o link passa por `/r/<token>`, que ignora r
   no grupo (`disparo_bloqueios.grupo_id`; nulo = todos os grupos).
 - O webhook acha o contato no grupo do número que recebeu (o mesmo telefone pode estar em vários grupos).
 - Cliente do grupo = papel `cliente` + `grupo_membros`: menu "Meus disparos", vê só painel/conversas/leads do grupo,
-  responde e exporta. Um cliente pode ter os dois produtos (Consulta de dados e Disparos).
+  responde e exporta. Um cliente pode ter os dois produtos (Consulta de dados e Disparos) e vê o Calendário do grupo.
+- Quem responde um contato pela plataforma (conferido no servidor, além do RLS): admin; equipe só nos grupos de que
+  é membro E nos ramos que recebeu; cliente só no grupo dele. A mensagem sai pelo número do grupo do contato e nunca
+  para quem pediu SAIR (ou recusou e não voltou a escrever).
 
 ## Papéis, calendário e o produto "Consulta de dados" (06/11/2026 · migrações 012 e 013)
 
 | Papel | O que vê |
 |---|---|
 | `admin` | tudo, inclusive **Usuários** (`/dashboard/usuarios`) |
-| `equipe` | base inteira + **Disparos só dos ramos dela** (`equipe_ramos`, garantido pelo RLS) + Calendário |
+| `equipe` | base inteira + **Disparos só dos grupos de que é membro e dos ramos dela** (`grupo_membros` + `equipe_ramos`, garantido pelo RLS) + Calendário |
 | `consulta` | base inteira, agente e Calendário |
-| `cliente` | **só** `/dashboard/minhas-empresas` |
+| `cliente` | o que contratou: **Minhas empresas** (Consulta de dados, plano em `clientes_acesso`) e/ou **Meus disparos** (grupo em `grupo_membros`), + **Calendário** do grupo |
 
 - `is_app_user()` = equipe interna (admin/equipe/consulta): é o que libera as tabelas da base no RLS. **O cliente não
   lê nenhuma tabela da base**; tudo passa por `cliente_buscar`/`cliente_contar`/`cliente_liberar`/`cliente_saldo`/
   `cliente_opcoes` (security definer), que aplicam o plano (`clientes_acesso`: ramos, estados, validade), escondem
   telefone/WhatsApp/e-mail/endereço até a empresa ser liberada (`clientes_liberacoes`) e cobram a cota — **mensal**
   (`cota_mensal`, renova dia 1º em Brasília) ou **por pacote** (`clientes_pacotes`, cada "leva de compra" soma).
+  Cada liberação guarda a modalidade em que foi feita (migração 020): no pacote só contam as liberações feitas no
+  pacote — trocar de mensal para pacote não zera o saldo.
 - **Disparos por ramo:** cada contato guarda `ramo`/`ramo_nome`/`uf` da empresa; o painel tem a faixa "Por ramo"
   (com os responsáveis) e o filtro `?ramo=`. Campanhas e números continuam só do admin.
 - **Calendário** (`/dashboard/calendario`, tabela `reunioes`, migração 015): **por grupo** — cada pessoa vê só o
@@ -165,7 +227,7 @@ Como funciona:
 - `src/lib/agente/ferramentas.ts` — buscar_codigos, consultar_empresas, detalhar_empresa, listar_contadores. Cada
   ferramenta devolve um *anexo* para a tela e um resumo curto para o modelo (sem contatos, para ele não repetir a tabela).
 - `src/lib/agente/conhecimento.ts` — dicionário termo → CNAE (conferido na base) e fatos tributários.
-- `src/lib/agente/agente.ts` — prompt e laço de ferramentas; `provedores.ts` — Nemotron/Gemini.
+- `src/lib/agente/agente.ts` — prompt e laço de ferramentas; `provedores.ts` — NVIDIA NIM (corrida entre modelos)/Gemini.
 - `src/app/api/agente/route.ts` — responde em NDJSON (etapas, anexos e texto chegam ao vivo).
 - O chat manda o que já está na tela num campo `contexto` separado do histórico (dentro do histórico o modelo
   imitava a nota), o que permite "dessas, só…" e "o WhatsApp da segunda".
@@ -180,7 +242,10 @@ Variáveis (servidor, **nunca** `NEXT_PUBLIC_`):
 | `AGENTE_PROVEDORES` | Ordem de tentativa, padrão `nvidia,gemini` |
 | `NVIDIA_MODEL`, `GEMINI_MODELOS` | Trocar modelos (lista separada por vírgula, em ordem) sem mexer no código |
 
-Modelo padrão: **Nemotron 3 Ultra** (`nvidia/nemotron-3-ultra-550b-a55b`), reserva Nemotron 3.5 Super e depois Gemini. Comparação de 04/11/2026 em `src/lib/agente/provedores.ts`; resposta completa com consulta leva 7–12 s.
+Modelos padrão: **Nemotron 3.5 Super VL** (`nvidia/nemotron-3.5-super-vl-120b-a12b`) e **Mistral Large 4**
+(`mistralai/mistral-large-4-1t-a52b`) em **corrida** (o 2º entra se o 1º não responder em ~5 s; o turno continua no
+que respondeu primeiro); Gemini de reserva quando a NVIDIA recusa. O Nemotron 3 Ultra saiu (não respondia na cota
+gratuita). Comparação em `src/lib/agente/provedores.ts`.
 
 ## Site institucional (`public/site/`)
 

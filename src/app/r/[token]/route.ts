@@ -21,7 +21,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     .maybeSingle()
   if (!d) return NextResponse.redirect(fallback, 302)
   const campanha = d.campanha as unknown as { site_url?: string | null; grupo?: { site_url?: string | null } | null } | null
-  const destino = campanha?.site_url || campanha?.grupo?.site_url || fallback
+  // só http(s) (o banco já barra outra coisa; aqui é a segunda trava: nunca redireciona para javascript:/data:)
+  const http = (u?: string | null) => (u && /^https?:\/\//i.test(u) ? u : null)
+  const destino = http(campanha?.site_url) || http(campanha?.grupo?.site_url) || fallback
   const agente = request.headers.get('user-agent') ?? ''
   if (!d.link_aberto_em && agente && !ROBO.test(agente)) {
     const agora = new Date().toISOString()

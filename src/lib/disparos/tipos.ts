@@ -234,7 +234,12 @@ export type Numero = {
   criado_em: string
 }
 
-export type NumeroComChave = Numero & { waha_api_key: string | null; client_token: string | null }
+export type NumeroComChave = Numero & {
+  waha_api_key: string | null
+  client_token: string | null
+  /** webhook já reconfigurado com o token próprio do número (migração 020); antes disso vale o token antigo */
+  webhook_por_numero?: boolean
+}
 
 export type ConfigDisparo = {
   id: 1
