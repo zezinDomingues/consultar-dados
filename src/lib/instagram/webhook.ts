@@ -49,6 +49,21 @@ async function graph(c: Cred, caminho: string, corpo: Record<string, unknown>) {
   return j
 }
 
+// Resposta no comentário: variações, para não repetir a mesma frase em todo comentário (o Instagram trata como robô)
+const RESPOSTAS = [
+  (u: string) => `${u}, já está na sua DM! 📩`,
+  (u: string) => `Pronto, ${u}! Te mandei tudo na DM 📩`,
+  (u: string) => `${u}, confere sua DM: o link do diagnóstico está lá 📩`,
+  (u: string) => `Enviado, ${u}! Dá uma olhada no seu direct 📩`,
+  (u: string) => `${u}, te chamei na DM com o passo a passo 📩`
+]
+function respostaPublica(usuario: string | undefined, ref: string) {
+  const u = usuario ? `@${usuario}` : 'Oi'
+  let h = 0
+  for (const ch of ref) h = (h * 31 + ch.charCodeAt(0)) >>> 0
+  return RESPOSTAS[h % RESPOSTAS.length](u)
+}
+
 const textoDm = (nome?: string) =>
   `Oi${nome ? `, ${nome}` : ''}! Aqui é da OficialCert. Para o diagnóstico, é só preencher em 1 minuto: ${LINK}\n` +
   `Se preferir, fale direto no WhatsApp ${WHATS}. Um especialista vai te retornar.`
@@ -83,7 +98,7 @@ export async function tratarWebhook(payload: { entry?: { changes?: Mudanca[]; me
         continue
       }
       try {
-        await graph(c, `${v.id}/replies`, { message: `Te chamei no direct${v.from?.username ? `, @${v.from.username}` : ''}!` })
+        await graph(c, `${v.id}/replies`, { message: respostaPublica(v.from?.username, v.id!) })
         await graph(c, `${c.userId}/messages`, { recipient: { comment_id: v.id }, message: { text: textoDm() } })
         await concluir('comments', v.id!, 'respondido + direct enviado')
         feitos.push(`comentário ${v.id}`)
