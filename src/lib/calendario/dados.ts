@@ -18,18 +18,6 @@ export type Reuniao = {
 
 export type Pessoa = { user_id: string; nome: string; email: string; papel: string }
 
-/** Cores fixas por pessoa (mesma pessoa = mesma cor no mês inteiro). */
-export const CORES = [
-  'bg-marca-700 text-white',
-  'bg-amber-500 text-marca-950',
-  'bg-emerald-600 text-white',
-  'bg-rose-600 text-white',
-  'bg-sky-600 text-white',
-  'bg-violet-600 text-white',
-  'bg-orange-600 text-white',
-  'bg-teal-700 text-white'
-]
-
 export async function reunioesEntre(inicioIso: string, fimIso: string, grupo?: number) {
   const supabase = await createClient()
   let q = supabase.from('reunioes').select('*')
