@@ -76,11 +76,33 @@ begin
   returning a.*;
 end $$;
 
+-- Eventos do webhook (comentários e directs). ref = id do comentário/mensagem: a Meta reenvia, nós tratamos uma vez só.
+create table if not exists public.instagram_eventos (
+  id          bigint generated always as identity primary key,
+  recebido_em timestamptz not null default now(),
+  campo       text not null,
+  ref         text not null,
+  de_usuario  text,
+  texto       text,
+  acao        text,
+  erro        text,
+  payload     jsonb not null,
+  unique (campo, ref)
+);
+alter table public.instagram_eventos enable row level security;
+revoke all on public.instagram_eventos from anon, authenticated;
+grant select on public.instagram_eventos to authenticated;
+drop policy if exists "admin le eventos do instagram" on public.instagram_eventos;
+create policy "admin le eventos do instagram" on public.instagram_eventos
+  for select to authenticated using ((select public.is_app_admin()));
+
+drop function if exists public.instagram_credenciais();
 create or replace function public.instagram_credenciais()
-returns table (token text, user_id text)
+returns table (token text, user_id text, app_secret text)
 language sql stable security definer set search_path = '' as $$
   select (select decrypted_secret from vault.decrypted_secrets where name = 'instagram_token' limit 1),
-         (select decrypted_secret from vault.decrypted_secrets where name = 'instagram_user_id' limit 1)
+         (select decrypted_secret from vault.decrypted_secrets where name = 'instagram_user_id' limit 1),
+         (select decrypted_secret from vault.decrypted_secrets where name = 'instagram_app_secret' limit 1)
 $$;
 
 revoke all on function public.instagram_precisa_ciclo() from public, anon, authenticated;
