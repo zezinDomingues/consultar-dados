@@ -16,7 +16,24 @@
   // Mensagem de abertura da conversa (mesma ordem de campos do original).
   var MENSAGEM_ABERTURA = 'Olá! Preenchi o formulário no site da OficialCert e gostaria de falar com um especialista.'
   var ENDPOINT_LEAD = '/api/publico/lead'
+  // Canais que levam ao site com ?origem= (ex.: o link da bio do Instagram). Fica guardado durante a visita
+  // e vai junto com o lead (origem "site_contato_instagram"), para a tela Leads do site mostrar de onde veio.
+  var CANAIS = ['instagram', 'linkedin', 'whatsapp']
   // ==========================================================================
+
+  var canal = ''
+  try {
+    var pedido = new URLSearchParams(location.search).get('origem') || ''
+    if (CANAIS.indexOf(pedido) >= 0) {
+      canal = pedido
+      sessionStorage.setItem('oc-canal', pedido)
+    } else {
+      canal = sessionStorage.getItem('oc-canal') || ''
+      if (CANAIS.indexOf(canal) < 0) canal = ''
+    }
+  } catch (e) {
+    canal = ''
+  }
 
   var texto = function (el) {
     return (el.getAttribute('aria-label') || el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim()
@@ -429,7 +446,7 @@
       }
     }
     travar(form, true, tipo === 'parceiro' ? 'Processando...' : 'Enviando...')
-    var origem = form.getAttribute('data-origem') || (tipo === 'parceiro' ? 'site_parceiro' : 'site_contato')
+    var origem = (form.getAttribute('data-origem') || (tipo === 'parceiro' ? 'site_parceiro' : 'site_contato')) + (canal ? '_' + canal : '')
     registrarLead(tipo, origem, d).then(function (res) {
       travar(form, false)
       if (res.ok) return sucesso(form, tipo, url, aberto)

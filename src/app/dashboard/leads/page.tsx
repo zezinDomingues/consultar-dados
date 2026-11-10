@@ -32,6 +32,16 @@ const ORIGEM: Record<string, string> = {
   site_parceiro: 'Seja um parceiro'
 }
 
+const CANAL: Record<string, string> = { instagram: 'Instagram', linkedin: 'LinkedIn', whatsapp: 'WhatsApp' }
+/** "site_contato_instagram" → "Fale com um especialista · via Instagram" */
+function rotuloOrigem(l: Lead) {
+  const o = l.origem ?? ''
+  const canal = Object.keys(CANAL).find(c => o.endsWith(`_${c}`))
+  const base = canal ? o.slice(0, -(canal.length + 1)) : o
+  const nome = ORIGEM[base] ?? (l.tipo === 'parceiro' ? 'Seja um parceiro' : 'Formulário do site')
+  return canal ? `${nome} · via ${CANAL[canal]}` : nome
+}
+
 const mascaraCnpj = (c: string) =>
   c.length === 14 ? `${c.slice(0, 2)}.${c.slice(2, 5)}.${c.slice(5, 8)}/${c.slice(8, 12)}-${c.slice(12)}` : c
 
@@ -170,7 +180,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
                         {fmtDataHora(l.criado_em)} · {fmtRelativo(l.criado_em)}
                       </time>
                       {' · '}
-                      {ORIGEM[l.origem ?? ''] ?? (l.tipo === 'parceiro' ? 'Seja um parceiro' : 'Formulário do site')}
+                      {rotuloOrigem(l)}
                       {l.pagina && l.pagina !== '/' && <> · página {l.pagina}</>}
                     </p>
                   </div>
