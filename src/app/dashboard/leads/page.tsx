@@ -32,7 +32,7 @@ const ORIGEM: Record<string, string> = {
   site_parceiro: 'Seja um parceiro'
 }
 
-const CANAL: Record<string, string> = { instagram: 'Instagram', linkedin: 'LinkedIn', whatsapp: 'WhatsApp' }
+const CANAL: Record<string, string> = { instagram: 'Instagram', linkedin: 'LinkedIn', whatsapp: 'WhatsApp', cartao: 'cartão de visita', pasta: 'pasta institucional' }
 /** "site_contato_instagram" → "Fale com um especialista · via Instagram" */
 function rotuloOrigem(l: Lead) {
   const o = l.origem ?? ''

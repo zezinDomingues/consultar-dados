@@ -18,7 +18,7 @@
   var ENDPOINT_LEAD = '/api/publico/lead'
   // Canais que levam ao site com ?origem= (ex.: o link da bio do Instagram). Fica guardado durante a visita
   // e vai junto com o lead (origem "site_contato_instagram"), para a tela Leads do site mostrar de onde veio.
-  var CANAIS = ['instagram', 'linkedin', 'whatsapp']
+  var CANAIS = ['instagram', 'linkedin', 'whatsapp', 'cartao', 'pasta']
   // ==========================================================================
 
   var canal = ''
