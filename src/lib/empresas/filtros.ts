@@ -88,6 +88,16 @@ const NUMEROS = ['capital_min', 'capital_max', 'idade_min', 'idade_max', 'estab_
 const BOOLEANOS = ['com_whatsapp', 'com_email', 'contato_proprio'] as const satisfies readonly ChaveFiltro[]
 const TEXTOS = ['q', 'cnae_secundario', 'email'] as const satisfies readonly ChaveFiltro[]
 
+/** Mínimo maior que o máximo (capital, idade) vira a faixa certa: a tela, os links e o CSV saem com os dois trocados. */
+export function normalizarFaixas<T extends Partial<Record<'capital_min' | 'capital_max' | 'idade_min' | 'idade_max', unknown>>>(f: T): T {
+  for (const [min, max] of [['capital_min', 'capital_max'], ['idade_min', 'idade_max']] as const) {
+    const a = f[min]
+    const b = f[max]
+    if (typeof a === 'number' && typeof b === 'number' && a > b) Object.assign(f, { [min]: b, [max]: a })
+  }
+  return f
+}
+
 /** Lê a consulta de qualquer fonte chave→valor (URL, searchParams). Filtro inválido é ignorado, não quebra a página. */
 export function lerConsulta(get: (chave: string) => string | null | undefined): Consulta {
   const bruto: Record<string, unknown> = {}
@@ -120,6 +130,7 @@ export function lerConsulta(get: (chave: string) => string | null | undefined): 
     const r = shape[k].safeParse(v)
     if (r.success && r.data !== undefined) filtros[k] = r.data
   }
+  normalizarFaixas(filtros)
 
   const o = get('ordem')
   const ordem = (o && o in ORDENS ? o : 'score') as Ordem

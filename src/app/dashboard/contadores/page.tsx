@@ -15,8 +15,8 @@ export default async function ContadoresPage({ searchParams }: { searchParams: P
   await paginaInterna()
   const sp = await searchParams
   const q = sp.q?.trim() || undefined
-  const pagina = Math.max(1, parseInt(sp.pagina ?? '1', 10) || 1)
-  const { itens, total } = await listarContadores(q, pagina, POR_PAGINA)
+  // página além do fim volta a última que existe (QA-01); listarContadores devolve a página mostrada
+  const { itens, total, pagina } = await listarContadores(q, Math.max(1, parseInt(sp.pagina ?? '1', 10) || 1), POR_PAGINA)
   const paginas = Math.max(1, Math.ceil(total / POR_PAGINA))
   const href = (p: number) => `${ROTAS.contadores}?${new URLSearchParams({ ...(q ? { q } : {}), ...(p > 1 ? { pagina: String(p) } : {}) })}`
 

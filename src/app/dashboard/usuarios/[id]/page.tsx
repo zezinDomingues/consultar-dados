@@ -15,6 +15,8 @@ export const metadata: Metadata = { title: 'Usuário' }
 export default async function UsuarioPage({ params }: { params: Promise<{ id: string }> }) {
   if (!(await usuarioAtual())?.admin) redirect(ROTAS.dashboard)
   const { id } = await params
+  // id que não é uuid nem chega ao banco (QA-03)
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) notFound()
   const [u, opcoes, gruposDisparo] = await Promise.all([obterUsuario(id), opcoesFiltros(), listarGrupos()])
   const opcoesGrupos = gruposDisparo.map(g => ({ chave: String(g.id), nome: g.nome, n: g.enviados }))
   if (!u) notFound()

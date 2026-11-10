@@ -18,15 +18,18 @@ export const metadata: Metadata = { title: 'Campanha' }
 // Edição: textos, nome, ordem e limites. Os filtros ficam fixos (público diferente = campanha nova).
 export default async function CampanhaPage({ params }: { params: Promise<{ id: string }> }) {
   if (!(await usuarioAtual())?.admin) redirect(ROTAS.disparos)
-  const id = Number((await params).id)
-  if (!Number.isInteger(id) || id <= 0) notFound()
+  const bruto = (await params).id
+  if (!/^[1-9]\d{0,14}$/.test(bruto)) notFound() // só inteiro positivo ("1e3", "0x10", " 7" nem chegam ao banco)
+  const id = Number(bruto)
   const c = await obterCampanha(id)
   if (!c) notFound()
-  const [opcoes, com, sem, [exemplo], numeros, cfg, divisao] = await Promise.all([
+  const [opcoes, elegiveis, [exemplo], numeros, cfg, divisao] = await Promise.all([
     opcoesFiltros(),
-    contarElegiveis(c.filtros, true, c.grupo_id),
-    contarElegiveis(c.filtros, false, c.grupo_id),
-    buscarEmpresas({ ...c.filtros, com_whatsapp: true }, c.ordem, 1, 1, 'razao_social,nome_fantasia,municipio'),
+    contarElegiveis(c.filtros, c.grupo_id),
+    // só o exemplo da prévia: se o banco falhar, a tela usa um nome fictício (sem erro 500)
+    buscarEmpresas({ ...c.filtros, com_whatsapp: true }, c.ordem, 1, 1, 'razao_social,nome_fantasia,municipio').catch(
+      () => []
+    ),
     listarNumeros(),
     lerConfig(),
     divisaoCampanha(id).catch(() => null)
@@ -48,7 +51,7 @@ export default async function CampanhaPage({ params }: { params: Promise<{ id: s
         filtros={c.filtros}
         rotulos={rotulosFiltros(c.filtros, opcoes).map(r => r.rotulo)}
         hrefAjustar={hrefConsulta({ filtros: c.filtros, ordem: c.ordem })}
-        elegiveis={{ com_whatsapp: com.com_whatsapp, elegiveis: com.elegiveis, elegiveis_sem_excluir: sem.elegiveis }}
+        elegiveis={elegiveis}
         exemplo={{ empresa: nomeEmpresa(exemplo ?? { razao_social: 'Empresa Exemplo' }), municipio: exemplo?.municipio ?? 'São Paulo' }}
         numeros={numerosDoGrupo.map(n => ({ id: n.id, rotulo: n.rotulo, status: n.status }))}
         grupo={{ id: c.grupo_id, nome: grupo?.nome ?? 'OficialCert', fluxo: grupo?.fluxo ?? 'coleta', medir_cliques: grupo?.medir_cliques ?? true }}

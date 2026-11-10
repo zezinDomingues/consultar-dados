@@ -23,11 +23,13 @@ export default async function NovaCampanhaPage({ searchParams }: { searchParams:
   const grupos = (await listarGrupos()).filter(g => g.ativo)
   const grupo = grupos.find(g => String(g.id) === String(sp.grupo)) ?? grupos[0]
   if (!grupo) redirect(ROTAS.grupos)
-  const [opcoes, com, sem, [exemplo], numeros, cfg] = await Promise.all([
+  const [opcoes, elegiveis, [exemplo], numeros, cfg] = await Promise.all([
     opcoesFiltros(),
-    contarElegiveis(filtros, true, grupo.id),
-    contarElegiveis(filtros, false, grupo.id),
-    buscarEmpresas({ ...filtros, com_whatsapp: true }, ordem, 1, 1, 'razao_social,nome_fantasia,municipio'),
+    contarElegiveis(filtros, grupo.id),
+    // só o exemplo da prévia: se o banco falhar, a tela usa um nome fictício (sem erro 500)
+    buscarEmpresas({ ...filtros, com_whatsapp: true }, ordem, 1, 1, 'razao_social,nome_fantasia,municipio').catch(
+      () => []
+    ),
     listarNumeros(),
     lerConfig()
   ])
@@ -74,7 +76,7 @@ export default async function NovaCampanhaPage({ searchParams }: { searchParams:
         filtros={filtros}
         rotulos={rotulos}
         hrefAjustar={hrefConsulta({ filtros: { ...filtros, com_whatsapp: true }, ordem })}
-        elegiveis={{ com_whatsapp: com.com_whatsapp, elegiveis: com.elegiveis, elegiveis_sem_excluir: sem.elegiveis }}
+        elegiveis={elegiveis}
         exemplo={{ empresa: nomeEmpresa(exemplo ?? { razao_social: 'Empresa Exemplo' }), municipio: exemplo?.municipio ?? 'São Paulo' }}
         numeros={numerosDoGrupo.map(n => ({ id: n.id, rotulo: n.rotulo, status: n.status }))}
         grupo={{ id: grupo.id, nome: grupo.nome, fluxo: grupo.fluxo, medir_cliques: grupo.medir_cliques }}

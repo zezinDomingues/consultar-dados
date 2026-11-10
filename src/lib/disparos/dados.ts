@@ -170,12 +170,37 @@ export async function lerConfig() {
   return data as ConfigDisparo
 }
 
-export async function contarElegiveis(filtros: Filtros, excluirCompartilhados: boolean, grupo?: number) {
+export type Elegiveis = { com_whatsapp: number; elegiveis: number; elegiveis_sem_excluir: number }
+
+/** A função do banco já devolve elegiveis_sem_excluir (migração 016)? Descoberto na 1ª chamada. */
+let umaChamadaSo: boolean | undefined
+
+/**
+ * Quantas empresas dos filtros ainda podem receber (com e sem excluir celular compartilhado). Com a migração 016 é
+ * UMA chamada (ela devolve elegiveis_sem_excluir); sem ela, as duas chamadas de antes, em paralelo. Se o banco
+ * falhar ou demorar, devolve null: a tela segue sem o número em vez de cair com erro 500.
+ */
+export async function contarElegiveis(filtros: Filtros, grupo?: number): Promise<Elegiveis | null> {
   await exigirAdmin()
   const supabase = await createClient()
-  const { data, error } = await supabase.rpc('disparo_contar_elegiveis', { f: filtros, excluir_compartilhados: excluirCompartilhados, p_grupo: grupo ?? null })
-  if (error) throw new Error(`elegíveis: ${error.message}`)
-  return data as { com_whatsapp: number; elegiveis: number }
+  const contar = async (excluir: boolean) => {
+    const { data, error } = await supabase.rpc('disparo_contar_elegiveis', {
+      f: filtros,
+      excluir_compartilhados: excluir,
+      p_grupo: grupo ?? null
+    })
+    if (error) throw new Error(`elegíveis: ${error.message}`)
+    return data as { com_whatsapp: number; elegiveis: number; elegiveis_sem_excluir?: number }
+  }
+  try {
+    const [com, semAntigo] = await Promise.all([contar(true), umaChamadaSo === false ? contar(false) : null])
+    umaChamadaSo = typeof com.elegiveis_sem_excluir === 'number'
+    const sem = umaChamadaSo ? com.elegiveis_sem_excluir! : (semAntigo ?? (await contar(false))).elegiveis
+    return { com_whatsapp: com.com_whatsapp, elegiveis: com.elegiveis, elegiveis_sem_excluir: sem }
+  } catch (e) {
+    console.error(e instanceof Error ? e.message : e)
+    return null
+  }
 }
 
 export async function listarBloqueios() {
