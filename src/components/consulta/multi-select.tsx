@@ -22,7 +22,8 @@ export function MultiSelect({
   selecionados,
   aoMudar,
   mostrarCodigo = false,
-  placeholder = 'Todos'
+  placeholder = 'Todos',
+  selecionarTodos = false
 }: {
   rotulo: string
   opcoes: Opcao[]
@@ -30,6 +31,8 @@ export function MultiSelect({
   aoMudar: (valores: string[] | undefined) => void
   mostrarCodigo?: boolean
   placeholder?: string
+  /** Mostra o botão "Selecionar todos" (marca tudo o que a busca encontrou, não só o que está na tela). */
+  selecionarTodos?: boolean
 }) {
   const [aberto, setAberto] = useState(false)
   const [busca, setBusca] = useState('')
@@ -37,13 +40,14 @@ export function MultiSelect({
   const sel = useMemo(() => new Set(selecionados ?? []), [selecionados])
   const porChave = useMemo(() => new Map(opcoes.map(o => [o.chave, o])), [opcoes])
 
-  const filtradas = useMemo(() => {
+  const restantes = useMemo(() => {
     const b = normalizar(busca.trim())
     const base = b
       ? opcoes.filter(o => normalizar(o.nome).includes(b) || o.chave.startsWith(b) || o.cod?.startsWith(busca.trim()))
       : opcoes
-    return base.filter(o => !sel.has(o.chave)).slice(0, LIMITE)
+    return base.filter(o => !sel.has(o.chave))
   }, [busca, opcoes, sel])
+  const filtradas = useMemo(() => restantes.slice(0, LIMITE), [restantes])
 
   const nomeDe = (chave: string) => porChave.get(chave)?.nome ?? chave
   const lista = [...sel]
@@ -139,6 +143,34 @@ export function MultiSelect({
                 className='h-8 w-full rounded-md border border-slate-200 pl-8 pr-2 text-sm outline-none focus:border-marca-400'
               />
             </div>
+            {selecionarTodos && (restantes.length > 0 || lista.length > 0) && (
+              <div className='mb-1 flex items-center justify-between gap-2 border-b border-slate-100 px-1 pb-2'>
+                <button
+                  type='button'
+                  disabled={restantes.length === 0}
+                  onClick={() => aoMudar([...sel, ...restantes.map(o => o.chave)])}
+                  className={cn(
+                    'rounded-md px-2 py-1 text-xs font-medium text-marca-800 hover:bg-marca-50 disabled:cursor-default disabled:text-slate-400 disabled:hover:bg-transparent',
+                    FOCO
+                  )}
+                >
+                  {restantes.length === 0
+                    ? 'Todos selecionados'
+                    : busca.trim()
+                      ? `Selecionar os ${fmtInt(restantes.length)} encontrados`
+                      : `Selecionar todos (${fmtInt(restantes.length)})`}
+                </button>
+                {lista.length > 0 && (
+                  <button
+                    type='button'
+                    onClick={() => aoMudar(undefined)}
+                    className={cn('rounded-md px-2 py-1 text-xs text-slate-600 hover:bg-slate-100', FOCO)}
+                  >
+                    Limpar ({fmtInt(lista.length)})
+                  </button>
+                )}
+              </div>
+            )}
             <div className='max-h-[min(20rem,50dvh)] overflow-y-auto overscroll-contain' role='group' aria-label={rotulo}>
               {lista.length > 0 && (
                 <div className='mb-1 border-b border-slate-100 pb-1'>

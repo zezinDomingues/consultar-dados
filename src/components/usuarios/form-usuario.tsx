@@ -255,6 +255,7 @@ function Formulario({
             selecionados={selRamos}
             aoMudar={mudouSelecao(setSelRamos)}
             mostrarCodigo
+            selecionarTodos
             placeholder='Nenhum ainda'
           />
           <p className='text-[11px] text-slate-500'>Ela só vê, no painel de disparos, os contatos desses ramos.</p>
