@@ -1,6 +1,6 @@
 'use client'
 
-import { startTransition, useActionState, useCallback, useEffect, useId, useRef, useState } from 'react'
+import { startTransition, useActionState, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, Copy, Eye, LoaderCircle, Save, UserPlus } from 'lucide-react'
 import { toast } from 'sonner'
 import { atualizarUsuario, criarUsuario, type Retorno } from '@/app/dashboard/usuarios/actions'
@@ -43,7 +43,10 @@ function campoDoErro(r: Retorno & { campo?: string }, papel: string): Campo | nu
 export function FormUsuario(props: { usuario?: Usuario; ramos: Opcao[]; ufs: Opcao[]; grupos: Opcao[] }) {
   const [versao, setVersao] = useState(0)
   const recomecar = useCallback(() => setVersao(v => v + 1), [])
-  return <Formulario key={versao} {...props} recomecar={recomecar} />
+  // Só divisões CNAE de 2 dígitos: "Atividade não informada" (88X) existe na base, mas não é ramo que se atribui
+  // a alguém — o servidor e o banco recusam ("Ramo inválido"), e com o "Selecionar todos" ela entrava junto.
+  const ramos = useMemo(() => props.ramos.filter(r => /^\d{2}$/.test(r.chave)), [props.ramos])
+  return <Formulario key={versao} {...props} ramos={ramos} recomecar={recomecar} />
 }
 
 function Formulario({
